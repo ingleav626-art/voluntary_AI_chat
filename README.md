@@ -2,6 +2,9 @@
 
 这是一个主动式ai的仓库
 
+## 项目规范
+请参考 [AI开发规范文档](AI_SPEC.md) 了解项目开发规范。
+
 # Java 桌面 AI 特色聊天软件 — 技术与架构规划
 
 下面我按"技术选型 → 整体架构 → 模块拆解 → 关键难点 → 开发路线"五个层面给你完整规划。
@@ -25,7 +28,7 @@
 
 | 技术 | 用途 |
 |---|---|
-| Spring Boot 3.x (JDK 17+) | 后端主框架 |
+| Spring Boot 3.x (JDK 25) | 后端主框架 |
 | Spring Security + JWT | 鉴权 |
 | Netty / Spring WebSocket (STOMP) | 实时通信 |
 | MyBatis-Plus | ORM |

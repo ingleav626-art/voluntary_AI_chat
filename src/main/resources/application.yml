@@ -1,0 +1,24 @@
+# Voluntary AI Chat 应用配置
+spring:
+  application:
+    name: voluntary-ai-chat
+
+  # 暂未配置数据库，排除自动配置
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+
+# 日志
+logging:
+  level:
+    root: INFO
+    org.example: DEBUG
+
+# 服务端口
+server:
+  port: 8080
