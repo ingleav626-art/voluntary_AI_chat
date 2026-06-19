@@ -17,7 +17,7 @@ spring:
 logging:
   level:
     root: INFO
-    org.example: DEBUG
+    "[org.example]": DEBUG
 
 # 服务端口
 server:

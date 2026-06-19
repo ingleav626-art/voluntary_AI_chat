@@ -5,6 +5,17 @@
 ## 项目规范
 请参考 [AI开发规范文档](AI_SPEC.md) 了解项目开发规范。
 
+## 文档目录
+| 文档 | 说明 |
+|------|------|
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 贡献指南（两人协作规范） |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | 开发路线图 |
+| [docs/FEATURES.md](docs/FEATURES.md) | 功能规格文档 |
+| [docs/API.md](docs/API.md) | API接口文档 |
+| [docs/DATABASE.md](docs/DATABASE.md) | 数据库设计文档 |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 架构设计文档 |
+| [docs/TASK_BOARD.md](docs/TASK_BOARD.md) | 任务看板 |
+
 # Java 桌面 AI 特色聊天软件 — 技术与架构规划
 
 下面我按"技术选型 → 整体架构 → 模块拆解 → 关键难点 → 开发路线"五个层面给你完整规划。
