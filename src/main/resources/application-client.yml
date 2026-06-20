@@ -1,0 +1,5 @@
+# 客户端配置
+client:
+  base-url: http://localhost:8080/api
+  connect-timeout: 10
+  read-timeout: 30
