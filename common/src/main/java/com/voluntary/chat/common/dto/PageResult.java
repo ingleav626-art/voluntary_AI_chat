@@ -1,13 +1,13 @@
 package com.voluntary.chat.common.dto;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 @Data
 @Builder
@@ -21,7 +21,7 @@ public class PageResult<T> {
     private int page;
     private int size;
 
-    public static <T> PageResult<T> of(List<T> list, long total, int page, int size) {
+    public static <T> PageResult<T> of(final List<T> list, final long total, final int page, final int size) {
         return PageResult.<T>builder()
                 .list(new ArrayList<>(list))
                 .total(total)
