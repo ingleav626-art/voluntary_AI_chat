@@ -162,6 +162,8 @@ class FriendServiceTest {
         when(userService.findByPhone(TARGET_PHONE)).thenReturn(mockTargetUser);
         when(friendMapper.selectCount(any())).thenReturn(0L);
         when(friendApplyMapper.selectOne(any())).thenReturn(reverseApply);
+        // restoreFriend 返回 0 表示无已删除记录，需要插入新记录
+        when(friendMapper.restoreFriend(anyLong(), anyLong())).thenReturn(0);
 
         friendService.applyFriend(1001L, request);
 
@@ -215,11 +217,36 @@ class FriendServiceTest {
 
         when(friendApplyMapper.selectById(5001L)).thenReturn(apply);
         when(friendMapper.selectCount(any())).thenReturn(0L);
+        // restoreFriend 返回 0 表示无已删除记录，需要插入新记录
+        when(friendMapper.restoreFriend(anyLong(), anyLong())).thenReturn(0);
 
         friendService.handleApply(1002L, 5001L, "ACCEPT");
 
         verify(friendApplyMapper).updateById(apply);
         verify(friendMapper, times(2)).insert(any(Friend.class));
+    }
+
+    @Test
+    @DisplayName("处理好友申请-同意时恢复已删除的好友关系")
+    void handleApply_shouldRestoreDeletedFriendship() {
+        FriendApply apply = new FriendApply();
+        apply.setId(5001L);
+        apply.setUserId(1001L);
+        apply.setTargetUserId(1002L);
+        apply.setStatus(0);
+
+        when(friendApplyMapper.selectById(5001L)).thenReturn(apply);
+        // isFriend 返回 0（非好友），restoreFriend 返回 1（恢复成功）
+        when(friendMapper.selectCount(any())).thenReturn(0L);
+        when(friendMapper.restoreFriend(anyLong(), anyLong())).thenReturn(1);
+
+        friendService.handleApply(1002L, 5001L, "ACCEPT");
+
+        verify(friendApplyMapper).updateById(apply);
+        // 恢复成功，不应插入新记录
+        verify(friendMapper, never()).insert(any(Friend.class));
+        // 双向恢复
+        verify(friendMapper, times(2)).restoreFriend(anyLong(), anyLong());
     }
 
     @Test

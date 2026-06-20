@@ -260,9 +260,16 @@ public class FriendService {
 
     /**
      * 若不存在则创建好友关系
+     *
+     * <p>好友表使用逻辑删除 + 唯一索引 (user_id, friend_id)，
+     * 当好友被删除后重新添加时，需先恢复已删除记录，否则唯一索引冲突。</p>
      */
     private void createFriendIfNotExists(Long userId, Long friendId) {
         if (isFriend(userId, friendId)) {
+            return;
+        }
+        // 尝试恢复已删除的记录（绕过逻辑删除），若恢复成功则无需插入
+        if (friendMapper.restoreFriend(userId, friendId) > 0) {
             return;
         }
         Friend friend = new Friend();
