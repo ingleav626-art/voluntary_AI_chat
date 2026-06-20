@@ -1,3 +1,4 @@
+# Maven
 target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
@@ -6,23 +7,28 @@ target/
 
 # Java
 *.class
+*.jar
+*.war
+*.ear
+*.log
 
-### IntelliJ IDEA ###
+# IDE
 .idea/
 *.iws
 *.iml
 *.ipr
-
-### Eclipse ###
-.apt_generated
-.classpath
-.factorypath
+.vscode/
 .project
-.settings
+.classpath
+.settings/
 .springBeans
 .sts4-cache
 
-### NetBeans ###
+# Eclipse
+.apt_generated
+.factorypath
+
+# NetBeans
 /nbproject/private/
 /nbbuild/
 /dist/
@@ -32,8 +38,27 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
-### VS Code ###
-.vscode/
-
-### Mac OS ###
+# OS
 .DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# 环境配置
+.env
+.env.local
+.env.*.local
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
+*.cache
+test_error
+
+# 日志
+logs/
+*.log
+
+# AI 开发规范（每次发送给 AI，不提交）
+AGENTS.md
