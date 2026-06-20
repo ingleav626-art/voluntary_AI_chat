@@ -25,6 +25,33 @@ Content-Type: application/json
 }
 ```
 
+**分页请求参数**（所有分页接口统一）:
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| page | int | 1 | 页码（从1开始） |
+| size | int | 20 | 每页数量（最大100） |
+
+**分页响应格式**（所有分页接口统一）:
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "list": [],
+    "total": 100,
+    "page": 1,
+    "size": 20
+  }
+}
+```
+
+**会话ID生成规则**:
+| 场景 | session_id 格式 | 示例 |
+|------|----------------|------|
+| 单聊 | `p_{min(userId1,userId2)}_{max(userId1,userId2)}` | `p_1001_1002` |
+| 群聊 | `g_{groupId}` | `g_2001` |
+| AI单聊 | `a_{aiId}_{userId}` | `a_3001_1001` |
+
 **错误码**:
 | 错误码 | 说明 |
 |--------|------|
@@ -34,6 +61,28 @@ Content-Type: application/json
 | 403 | 无权限 |
 | 404 | 资源不存在 |
 | 500 | 服务器错误 |
+
+**业务错误码**:
+| 错误码 | 模块 | 说明 |
+|--------|------|------|
+| 1001 | 认证 | 手机号已注册 |
+| 1002 | 认证 | 验证码错误或已过期 |
+| 1003 | 认证 | 用户名已存在 |
+| 1004 | 认证 | 账号或密码错误 |
+| 1005 | 认证 | 登录次数过多，账号已锁定 |
+| 1006 | 认证 | Refresh Token 已失效 |
+| 2001 | 好友 | 好友申请已存在（待处理） |
+| 2002 | 好友 | 已是好友关系 |
+| 2003 | 好友 | 不能添加自己为好友 |
+| 3001 | 群组 | 无权执行此操作 |
+| 3002 | 群组 | 群成员已满 |
+| 3003 | 群组 | 已在群中 |
+| 4001 | 消息 | 消息已超过2分钟，不可撤回 |
+| 4002 | 消息 | 无权撤回他人消息 |
+| 4003 | 消息 | 图片格式不支持 |
+| 4004 | 消息 | 图片大小超出限制 |
+| 5001 | AI | API Key 无效 |
+| 5002 | AI | AI 不存在或已禁用 |
 
 ---
 
@@ -124,6 +173,8 @@ POST /auth/login
 POST /auth/refresh
 ```
 
+**说明**: Refresh Token 一次性有效，使用后自动失效。客户端收到新的 access token 后，需同时保存服务端返回的新 refresh token。
+
 **请求参数**:
 ```json
 {
@@ -138,6 +189,7 @@ POST /auth/refresh
   "message": "刷新成功",
   "data": {
     "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+    "refreshToken": "eyJhbGciOiJIUzI1NiJ9...",
     "expiresIn": 7200
   }
 }
@@ -193,7 +245,7 @@ PUT /user/profile
 
 ### 2.3 搜索用户
 ```
-GET /user/search?keyword=张三
+GET /user/search?keyword=张三&page=1&size=20
 ```
 
 **响应**:
@@ -209,7 +261,10 @@ GET /user/search?keyword=张三
         "avatar": "http://minio.example.com/avatar/001.jpg",
         "bio": "程序员"
       }
-    ]
+    ],
+    "total": 5,
+    "page": 1,
+    "size": 20
   }
 }
 ```
@@ -222,6 +277,8 @@ GET /user/search?keyword=张三
 ```
 POST /friend/apply
 ```
+
+**说明**: 如果已存在待处理的申请，返回错误码 `2001`。如果对方已发送过申请，自动接受并建立好友关系。
 
 **请求参数**:
 ```json
@@ -330,10 +387,67 @@ DELETE /friend/{friendId}
 
 ## 四、消息模块
 
-### 4.1 获取聊天记录
+### 消息收发通道说明
+
+消息发送支持两种通道，适用场景不同：
+
+| 通道 | 适用场景 | 特点 |
+|------|---------|------|
+| WebSocket `SEND_MESSAGE` | 实时聊天（主要通道） | 低延迟，服务端直接转发 |
+| REST `POST /message/send` | 离线补发、历史消息重试、机器人发送 | 可靠性高，支持重试 |
+
+**客户端默认使用 WebSocket 发送**，仅在 WebSocket 断连或需要可靠投递时使用 REST 接口。
+
+### 4.1 获取会话列表
 ```
-GET /message/history?targetId=user_002&page=1&size=20
+GET /conversation/list?page=1&size=20
 ```
+
+**说明**: 获取当前用户所有会话，按最后一条消息时间倒序排列。客户端首页使用此接口。
+
+**响应**:
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "list": [
+      {
+        "sessionId": "p_1001_1002",
+        "targetId": "user_002",
+        "targetType": "USER",
+        "targetName": "李四",
+        "targetAvatar": "http://minio.example.com/avatar/003.jpg",
+        "lastMessage": "你好",
+        "lastMessageType": "TEXT",
+        "lastMessageTime": "2024-01-01T10:00:00Z",
+        "unreadCount": 3
+      },
+      {
+        "sessionId": "g_2001",
+        "targetId": "group_001",
+        "targetType": "GROUP",
+        "targetName": "技术交流群",
+        "targetAvatar": "http://minio.example.com/group/001.jpg",
+        "lastMessage": "大家好",
+        "lastMessageType": "TEXT",
+        "lastMessageTime": "2024-01-01T09:30:00Z",
+        "unreadCount": 10
+      }
+    ],
+    "total": 15,
+    "page": 1,
+    "size": 20
+  }
+}
+```
+
+### 4.2 获取聊天记录
+```
+GET /message/history?sessionId=p_1001_1002&page=1&size=20
+```
+
+**说明**: 按会话维度拉取消息，支持分页。加载更多历史消息时使用上一次返回的最小 `createTime` 作为游标。
 
 **响应**:
 ```json
@@ -344,9 +458,11 @@ GET /message/history?targetId=user_002&page=1&size=20
     "list": [
       {
         "messageId": "msg_001",
+        "sessionId": "p_1001_1002",
         "senderId": "user_001",
         "senderName": "张三",
         "senderAvatar": "http://minio.example.com/avatar/001.jpg",
+        "senderType": "USER",
         "type": "TEXT",
         "content": "你好",
         "createTime": "2024-01-01T10:00:00Z",
@@ -360,15 +476,17 @@ GET /message/history?targetId=user_002&page=1&size=20
 }
 ```
 
-### 4.2 发送消息（REST）
+### 4.3 发送消息（REST，备用通道）
 ```
 POST /message/send
 ```
 
+**说明**: REST 发送消息的备用通道，用于离线补发或重试。实时聊天请使用 WebSocket `SEND_MESSAGE`。
+
 **请求参数**:
 ```json
 {
-  "targetId": "user_002",
+  "sessionId": "p_1001_1002",
   "type": "TEXT",
   "content": "你好"
 }
@@ -386,10 +504,15 @@ POST /message/send
 }
 ```
 
-### 4.3 撤回消息
+### 4.4 撤回消息
 ```
 POST /message/recall
 ```
+
+**说明**:
+- 人-人消息：发送后 2 分钟内可撤回，超时返回错误码 `4001`
+- 人-AI 消息：可随时撤回
+- 群消息撤回：仅群主和管理员可撤回他人消息，普通成员只能撤回自己的消息，否则返回错误码 `4002`
 
 **请求参数**:
 ```json
@@ -407,11 +530,40 @@ POST /message/recall
 }
 ```
 
-### 4.4 上传图片
+### 4.5 消息已读回执
+```
+POST /message/read
+```
+
+**说明**: 客户端打开会话时批量上报已读消息。
+
+**请求参数**:
+```json
+{
+  "sessionId": "p_1001_1002",
+  "messageIds": ["msg_001", "msg_002", "msg_003"]
+}
+```
+
+**响应**:
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": null
+}
+```
+
+### 4.6 上传图片
 ```
 POST /message/upload/image
 Content-Type: multipart/form-data
 ```
+
+**限制**:
+- 支持格式：JPEG、PNG、GIF、WebP
+- 最大大小：10MB
+- 服务端自动压缩（最大宽度 1080px）并生成缩略图
 
 **请求参数**:
 ```
@@ -424,11 +576,13 @@ file: [图片文件]
   "code": 200,
   "message": "上传成功",
   "data": {
+    "fileId": "file_001",
     "url": "http://minio.example.com/chat/image/001.jpg",
     "thumbnailUrl": "http://minio.example.com/chat/image/001_thumb.jpg",
     "width": 1920,
     "height": 1080,
-    "size": 1024000
+    "size": 1024000,
+    "fileType": "image/jpeg"
   }
 }
 ```
@@ -464,7 +618,7 @@ POST /group/create
 
 ### 5.2 获取群列表
 ```
-GET /group/list
+GET /group/list?page=1&size=20
 ```
 
 **响应**:
@@ -481,14 +635,17 @@ GET /group/list
         "memberCount": 50,
         "ownerId": "user_001"
       }
-    ]
+    ],
+    "total": 5,
+    "page": 1,
+    "size": 20
   }
 }
 ```
 
 ### 5.3 获取群成员
 ```
-GET /group/{groupId}/members
+GET /group/{groupId}/members?page=1&size=50
 ```
 
 **响应**:
@@ -505,7 +662,10 @@ GET /group/{groupId}/members
         "role": "OWNER",
         "joinTime": "2024-01-01T00:00:00Z"
       }
-    ]
+    ],
+    "total": 50,
+    "page": 1,
+    "size": 50
   }
 }
 ```
@@ -515,11 +675,14 @@ GET /group/{groupId}/members
 PUT /group/{groupId}
 ```
 
+**说明**: 仅群主可修改。
+
 **请求参数**:
 ```json
 {
   "name": "新群名",
-  "announcement": "群公告内容"
+  "announcement": "群公告内容",
+  "announcementPinned": true
 }
 ```
 
@@ -532,13 +695,68 @@ PUT /group/{groupId}
 }
 ```
 
+### 5.5 邀请成员
+```
+POST /group/{groupId}/invite
+```
+
+**说明**: 群主、管理员、普通成员均可邀请（受群最大人数限制）。
+
+**请求参数**:
+```json
+{
+  "userIds": ["user_005", "user_006"]
+}
+```
+
+**响应**:
+```json
+{
+  "code": 200,
+  "message": "邀请成功",
+  "data": null
+}
+```
+
+### 5.6 移除成员
+```
+DELETE /group/{groupId}/members/{userId}
+```
+
+**说明**: 仅群主和管理员可操作，群主不可被移除。
+
+**响应**:
+```json
+{
+  "code": 200,
+  "message": "已移除",
+  "data": null
+}
+```
+
+### 5.7 退出群组
+```
+POST /group/{groupId}/leave
+```
+
+**说明**: 群主不可退出，需先转让群主或解散群组。
+
+**响应**:
+```json
+{
+  "code": 200,
+  "message": "已退出",
+  "data": null
+}
+```
+
 ---
 
 ## 六、AI模块
 
 ### 6.1 获取AI列表
 ```
-GET /ai/list
+GET /ai/list?page=1&size=20
 ```
 
 **响应**:
@@ -554,9 +772,13 @@ GET /ai/list
         "avatar": "http://minio.example.com/ai/001.jpg",
         "persona": "你是一个友好的助手",
         "modelProvider": "openai",
-        "model": "gpt-4"
+        "model": "gpt-4",
+        "isGroup": false
       }
-    ]
+    ],
+    "total": 3,
+    "page": 1,
+    "size": 20
   }
 }
 ```
@@ -573,9 +795,12 @@ POST /ai/create
   "persona": "你是一个友好的助手，喜欢帮助别人",
   "modelProvider": "openai",
   "model": "gpt-4",
-  "apiKey": "sk-xxx"
+  "apiKey": "sk-xxx",
+  "isGroup": false
 }
 ```
+
+**说明**: `apiKey` 服务端使用 AES-256-GCM 加密后存储，不保存明文。`isGroup` 为 true 表示该 AI 可用于群聊。
 
 **响应**:
 ```json
@@ -588,10 +813,49 @@ POST /ai/create
 }
 ```
 
-### 6.3 AI对话
+### 6.3 修改AI角色
+```
+PUT /ai/{aiId}
+```
+
+**请求参数**:
+```json
+{
+  "name": "小助手Pro",
+  "persona": "你是一个专业的技术助手",
+  "model": "gpt-4-turbo"
+}
+```
+
+**响应**:
+```json
+{
+  "code": 200,
+  "message": "修改成功",
+  "data": null
+}
+```
+
+### 6.4 删除AI角色
+```
+DELETE /ai/{aiId}
+```
+
+**响应**:
+```json
+{
+  "code": 200,
+  "message": "已删除",
+  "data": null
+}
+```
+
+### 6.5 AI对话（REST，同步模式）
 ```
 POST /ai/chat
 ```
+
+**说明**: REST 方式等待 AI 完整响应后返回，适用于非实时场景（如后台任务、消息补发）。实时聊天请使用 WebSocket `AI_CHAT` + `AI_STREAM`。
 
 **请求参数**:
 ```json
@@ -615,7 +879,7 @@ POST /ai/chat
 }
 ```
 
-### 6.4 获取AI记忆
+### 6.6 获取AI记忆
 ```
 GET /ai/{aiId}/memories?userId=user_001&page=1&size=10
 ```
@@ -632,6 +896,62 @@ GET /ai/{aiId}/memories?userId=user_001&page=1&size=10
         "summary": "用户喜欢编程和音乐",
         "keywords": ["编程", "音乐"],
         "createTime": "2024-01-01T00:00:00Z"
+      }
+    ],
+    "total": 8,
+    "page": 1,
+    "size": 10
+  }
+}
+```
+
+### 6.7 AI群配置管理
+```
+POST /ai/group/{groupId}/config
+```
+
+**说明**: 为群配置 AI 触发规则。仅群主和管理员可操作。
+
+**请求参数**:
+```json
+{
+  "aiId": "ai_001",
+  "triggerKeywords": "小助手,AI,助手",
+  "triggerProbability": 0.10,
+  "isEnabled": true
+}
+```
+
+**响应**:
+```json
+{
+  "code": 200,
+  "message": "配置成功",
+  "data": {
+    "configId": "cfg_001"
+  }
+}
+```
+
+### 6.8 获取群AI配置列表
+```
+GET /ai/group/{groupId}/configs
+```
+
+**响应**:
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "list": [
+      {
+        "configId": "cfg_001",
+        "aiId": "ai_001",
+        "aiName": "小助手",
+        "triggerKeywords": "小助手,AI",
+        "triggerProbability": 0.10,
+        "isEnabled": true
       }
     ]
   }
@@ -650,51 +970,74 @@ ws://localhost:8080/ws?token={jwt_token}
 ### 消息格式
 ```json
 {
+  "id": "客户端生成的唯一消息ID（UUID）",
   "type": "消息类型",
   "data": {}
 }
 ```
 
+**说明**: 所有 WebSocket 消息必须携带 `id` 字段（UUID 格式），用于消息对账和重试确认。服务端推送的消息也携带 `id`，客户端可通过该 `id` 确认消息已送达。
+
 ### 消息类型
 
-#### 发送消息
+#### 发送消息（客户端 → 服务端）
 ```json
 {
+  "id": "550e8400-e29b-41d4-a716-446655440000",
   "type": "SEND_MESSAGE",
   "data": {
-    "targetId": "user_002",
-    "type": "TEXT",
+    "sessionId": "p_1001_1002",
+    "msgType": "TEXT",
     "content": "你好"
   }
 }
 ```
 
-#### 接收消息
+#### 消息确认（服务端 → 客户端）
 ```json
 {
+  "id": "服务端生成的消息ID",
+  "type": "MESSAGE_ACK",
+  "data": {
+    "clientId": "550e8400-e29b-41d4-a716-446655440000",
+    "messageId": "msg_001",
+    "createTime": "2024-01-01T10:00:00Z"
+  }
+}
+```
+
+#### 接收消息（服务端 → 客户端）
+```json
+{
+  "id": "服务端生成的消息ID",
   "type": "RECEIVE_MESSAGE",
   "data": {
     "messageId": "msg_001",
+    "sessionId": "p_1001_1002",
     "senderId": "user_002",
     "senderName": "李四",
     "senderAvatar": "http://...",
-    "type": "TEXT",
+    "senderType": "USER",
+    "msgType": "TEXT",
     "content": "你好",
     "createTime": "2024-01-01T10:00:00Z"
   }
 }
 ```
 
-#### 群消息
+#### 群消息（服务端 → 客户端）
 ```json
 {
+  "id": "服务端生成的消息ID",
   "type": "GROUP_MESSAGE",
   "data": {
     "messageId": "msg_002",
+    "sessionId": "g_2001",
     "groupId": "group_001",
     "senderId": "user_001",
     "senderName": "张三",
-    "type": "TEXT",
+    "senderType": "USER",
+    "msgType": "TEXT",
     "content": "大家好",
     "mentionUsers": ["user_002"],
     "createTime": "2024-01-01T10:00:00Z"
@@ -702,9 +1045,24 @@ ws://localhost:8080/ws?token={jwt_token}
 }
 ```
 
-#### AI流式响应
+#### AI对话请求（客户端 → 服务端）
 ```json
 {
+  "id": "550e8400-e29b-41d4-a716-446655440001",
+  "type": "AI_CHAT",
+  "data": {
+    "aiId": "ai_001",
+    "sessionId": "a_3001_1001",
+    "content": "你好",
+    "conversationId": "conv_001"
+  }
+}
+```
+
+#### AI流式响应（服务端 → 客户端）
+```json
+{
+  "id": "服务端生成的消息ID",
   "type": "AI_STREAM",
   "data": {
     "messageId": "msg_ai_001",
@@ -715,9 +1073,12 @@ ws://localhost:8080/ws?token={jwt_token}
 }
 ```
 
-#### 在线状态更新
+**说明**: `done: true` 表示 AI 回复结束，同时携带完整的 `content`。
+
+#### 在线状态更新（服务端 → 客户端）
 ```json
 {
+  "id": "服务端生成的消息ID",
   "type": "STATUS_CHANGE",
   "data": {
     "userId": "user_002",
@@ -726,18 +1087,70 @@ ws://localhost:8080/ws?token={jwt_token}
 }
 ```
 
-#### 心跳
+#### 已读通知（服务端 → 客户端）
 ```json
 {
+  "id": "服务端生成的消息ID",
+  "type": "READ_RECEIPT",
+  "data": {
+    "sessionId": "p_1001_1002",
+    "userId": "user_002",
+    "lastReadMessageId": "msg_005",
+    "readTime": "2024-01-01T10:30:00Z"
+  }
+}
+```
+
+#### 心跳（双向）
+客户端 → 服务端:
+```json
+{
+  "id": "心跳ID",
   "type": "PING",
   "data": {}
 }
 ```
 
-响应:
+服务端 → 客户端:
 ```json
 {
+  "id": "心跳ID",
   "type": "PONG",
   "data": {}
+}
+```
+
+#### 重连请求（客户端 → 服务端）
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440002",
+  "type": "RECONNECT",
+  "data": {
+    "lastMessageId": "msg_010"
+  }
+}
+```
+
+**说明**: 客户端断线重连后发送此消息，`lastMessageId` 为断线前收到的最后一条消息的服务端消息ID。服务端据此推送增量消息。
+
+#### 重连响应（服务端 → 客户端）
+```json
+{
+  "id": "服务端生成的消息ID",
+  "type": "RECONNECT_ACK",
+  "data": {
+    "missedMessages": [
+      {
+        "messageId": "msg_011",
+        "sessionId": "p_1001_1002",
+        "senderId": "user_002",
+        "senderName": "李四",
+        "senderType": "USER",
+        "msgType": "TEXT",
+        "content": "你去哪了？",
+        "createTime": "2024-01-01T10:05:00Z"
+      }
+    ]
+  }
 }
 ```
