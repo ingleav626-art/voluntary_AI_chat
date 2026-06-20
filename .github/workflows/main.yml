@@ -27,24 +27,24 @@ jobs:
           cache: maven
 
       - name: 代码风格检查 (Checkstyle)
-        run: mvn checkstyle:check --no-transfer-progress --batch-mode
+        run: mvn checkstyle:check -pl common,server --no-transfer-progress --batch-mode
 
       - name: 编译 + 单元测试 + 覆盖率 (Maven Verify)
-        run: mvn verify --no-transfer-progress --batch-mode -Dspotbugs.skip=true
+        run: mvn verify -pl common,server --no-transfer-progress --batch-mode -Dspotbugs.skip=true
 
       - name: 潜在Bug检测 (SpotBugs)
-        run: mvn spotbugs:check spotbugs:spotbugs --no-transfer-progress --batch-mode
+        run: mvn spotbugs:check spotbugs:spotbugs -pl common,server --no-transfer-progress --batch-mode
 
       - name: 上传覆盖率报告
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: jacoco-report-${{ matrix.java-version }}
-          path: target/site/jacoco
+          path: server/target/site/jacoco
 
       - name: 上传测试报告
         uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: surefire-reports-${{ matrix.java-version }}
-          path: target/surefire-reports
+          path: server/target/surefire-reports

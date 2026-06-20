@@ -1,0 +1,30 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+  main:
+    allow-bean-definition-overriding: true
+
+jwt:
+  secret: dGVzdC1zZWNyZXQtZm9yLXRlc3Rpbmctb25seS1rZXktMTIzNDU2Nzg5MA==
+  access-token-expiration: 7200000
+  refresh-token-expiration: 604800000
+
+logging:
+  level:
+    root: INFO
+    com.voluntary.chat: DEBUG
+
+server:
+  port: 0
