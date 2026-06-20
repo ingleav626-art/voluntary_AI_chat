@@ -5,7 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * 注册响应模型
+ * 注册响应模型（与服务端 LoginResponse 结构一致）
  *
  * <p>服务端注册成功后直接返回登录态（注册即登录），
  * 因此响应结构与 {@link LoginResponse} 一致。</p>

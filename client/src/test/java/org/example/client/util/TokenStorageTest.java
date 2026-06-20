@@ -10,12 +10,10 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * TokenStorage 单元测试
- */
 @DisplayName("TokenStorage 测试")
 class TokenStorageTest {
 
@@ -24,7 +22,6 @@ class TokenStorageTest {
 
     @BeforeAll
     static void setUpClass() {
-        // 指定临时目录作为 Token 存储路径，避免污染用户主目录
         System.setProperty("app.token.dir", tempDir.toString());
     }
 
@@ -41,12 +38,12 @@ class TokenStorageTest {
     @Test
     @DisplayName("保存和加载 Token")
     void testSaveAndLoad() {
-        final LoginResponse response = new LoginResponse();
+        LoginResponse response = new LoginResponse();
         response.setAccessToken("access-token-123");
         response.setRefreshToken("refresh-token-456");
 
         TokenStorage.save(response);
-        final LoginResponse loaded = TokenStorage.load();
+        LoginResponse loaded = TokenStorage.load();
 
         assertNotNull(loaded);
         assertEquals("access-token-123", loaded.getAccessToken());
@@ -54,16 +51,15 @@ class TokenStorageTest {
     }
 
     @Test
-    @DisplayName("加载不存在的 Token")
+    @DisplayName("加载不存在的 Token 返回 null")
     void testLoadNonExistent() {
-        final LoginResponse loaded = TokenStorage.load();
-        assertNull(loaded);
+        assertNull(TokenStorage.load());
     }
 
     @Test
     @DisplayName("清除 Token")
     void testClear() {
-        final LoginResponse response = new LoginResponse();
+        LoginResponse response = new LoginResponse();
         response.setAccessToken("test-token");
         response.setRefreshToken("test-refresh");
 
@@ -80,4 +76,16 @@ class TokenStorageTest {
     void testSaveNull() {
         assertThrows(NullPointerException.class, () -> TokenStorage.save(null));
     }
+
+    @Test
+    @DisplayName("加载格式错误的 Token 返回 null")
+    void testLoadCorruptedData() throws Exception {
+        // 写入只有一部分的数据（Base64编码后少于2个分隔部分）
+        String badData = Base64.getEncoder().encodeToString("only-one-part".getBytes());
+        Path tokenFile = tempDir.resolve("token.dat");
+        Files.writeString(tokenFile, badData);
+
+        assertNull(TokenStorage.load());
+    }
+
 }

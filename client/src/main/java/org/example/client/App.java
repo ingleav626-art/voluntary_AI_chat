@@ -1,5 +1,7 @@
 package org.example.client;
 
+import java.io.IOException;
+
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -60,7 +62,6 @@ public class App extends Application {
 
     @Override
     public void init() {
-        // 初始化客户端配置
         ClientConfig.getInstance().load();
         LOG.info("客户端配置加载成功: baseUrl={}", ClientConfig.getInstance().getBaseUrl());
     }
@@ -88,7 +89,7 @@ public class App extends Application {
             primaryStage.setHeight(LOGIN_WINDOW_HEIGHT);
             primaryStage.setResizable(false);
             LOG.info("已切换到登录界面");
-        } catch (final Exception e) {
+        } catch (final IOException e) {
             LOG.error("加载登录界面失败", e);
         }
     }
@@ -107,7 +108,7 @@ public class App extends Application {
             primaryStage.setHeight(REGISTER_WINDOW_HEIGHT);
             primaryStage.setResizable(false);
             LOG.info("已切换到注册界面");
-        } catch (final Exception e) {
+        } catch (final IOException e) {
             LOG.error("加载注册界面失败", e);
         }
     }

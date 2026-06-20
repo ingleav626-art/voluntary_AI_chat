@@ -18,6 +18,9 @@ public class UserInfo {
     /** 用户ID */
     private Long userId;
 
+    /** 手机号（脱敏后） */
+    private String phone;
+
     /** 用户名 */
     private String username;
 

@@ -49,13 +49,14 @@ class RegisterModelTest {
     @Test
     @DisplayName("RegisterResponse 构造和 Getter")
     void testRegisterResponse() {
-        final UserInfo user = new UserInfo(1L, "张三", "http://example.com/avatar.jpg", "个人简介");
+        final UserInfo userInfo = new UserInfo(1L, null, "张三", null, null);
         final RegisterResponse response = new RegisterResponse(
-                "access-token", "refresh-token", 7200L, user);
+                "token123", "refresh456", 7200L, userInfo);
 
-        assertEquals("access-token", response.getAccessToken());
-        assertEquals("refresh-token", response.getRefreshToken());
+        assertEquals("token123", response.getAccessToken());
+        assertEquals("refresh456", response.getRefreshToken());
         assertEquals(7200L, response.getExpiresIn());
+        assertNotNull(response.getUser());
         assertEquals(1L, response.getUser().getUserId());
         assertEquals("张三", response.getUser().getUsername());
     }
@@ -64,15 +65,15 @@ class RegisterModelTest {
     @DisplayName("RegisterResponse Setter")
     void testRegisterResponseSetter() {
         final RegisterResponse response = new RegisterResponse();
-        response.setAccessToken("new-access");
-        response.setRefreshToken("new-refresh");
+        response.setAccessToken("token789");
+        response.setRefreshToken("refresh012");
         response.setExpiresIn(3600L);
-        final UserInfo user = new UserInfo(2L, "李四", null, null);
-        response.setUser(user);
+        response.setUser(new UserInfo(2L, null, "李四", null, null));
 
-        assertEquals("new-access", response.getAccessToken());
-        assertEquals("new-refresh", response.getRefreshToken());
+        assertEquals("token789", response.getAccessToken());
+        assertEquals("refresh012", response.getRefreshToken());
         assertEquals(3600L, response.getExpiresIn());
+        assertNotNull(response.getUser());
         assertEquals(2L, response.getUser().getUserId());
         assertEquals("李四", response.getUser().getUsername());
     }

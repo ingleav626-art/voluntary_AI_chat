@@ -212,8 +212,8 @@
                 <configuration>
                     <!-- JaCoCo agent 参数 -->
                     <argLine>${argLine}</argLine>
-                    <!-- 禁用 fork 以避免 JBR 与 JaCoCo agent 不兼容 -->
-                    <forkCount>0</forkCount>
+                    <!-- JaCoCo agent 需要 fork JVM 才能正常生成 exec 数据 -->
+                    <forkCount>1</forkCount>
                     <includes>
                         <include>**/*Test.java</include>
                         <include>**/*Tests.java</include>

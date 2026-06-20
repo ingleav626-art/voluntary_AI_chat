@@ -29,10 +29,10 @@
     </build>
 
     <dependencies>
-        <!-- 项目内 common 模块 -->
+        <!-- Server 模块（内嵌启动） -->
         <dependency>
             <groupId>com.voluntary</groupId>
-            <artifactId>voluntary-ai-chat-common</artifactId>
+            <artifactId>voluntary-ai-chat-server</artifactId>
             <version>${project.version}</version>
         </dependency>
 

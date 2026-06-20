@@ -160,10 +160,9 @@ public final class AuthService {
         final int statusCode = response.statusCode();
 
         if (statusCode == HTTP_OK) {
-            final ApiResponse<RegisterResponse> apiResponse =
-                    JsonUtils.fromJson(response.body(),
-                            JsonUtils.getMapper().getTypeFactory()
-                                    .constructParametricType(ApiResponse.class, RegisterResponse.class));
+            final ApiResponse<RegisterResponse> apiResponse = JsonUtils.fromJson(response.body(),
+                    JsonUtils.getMapper().getTypeFactory()
+                            .constructParametricType(ApiResponse.class, RegisterResponse.class));
 
             if (apiResponse != null && apiResponse.isSuccess()) {
                 LOG.info("注册成功: userId={}",
@@ -216,10 +215,9 @@ public final class AuthService {
         final int statusCode = response.statusCode();
 
         if (statusCode == HTTP_OK) {
-            final ApiResponse<Void> apiResponse =
-                    JsonUtils.fromJson(response.body(),
-                            JsonUtils.getMapper().getTypeFactory()
-                                    .constructParametricType(ApiResponse.class, Void.class));
+            final ApiResponse<Void> apiResponse = JsonUtils.fromJson(response.body(),
+                    JsonUtils.getMapper().getTypeFactory()
+                            .constructParametricType(ApiResponse.class, Void.class));
 
             if (apiResponse != null && apiResponse.isSuccess()) {
                 LOG.info("验证码发送成功");
@@ -252,10 +250,9 @@ public final class AuthService {
         final int statusCode = response.statusCode();
 
         if (statusCode == HTTP_OK) {
-            final ApiResponse<LoginResponse> apiResponse =
-                    JsonUtils.fromJson(response.body(),
-                            JsonUtils.getMapper().getTypeFactory()
-                                    .constructParametricType(ApiResponse.class, LoginResponse.class));
+            final ApiResponse<LoginResponse> apiResponse = JsonUtils.fromJson(response.body(),
+                    JsonUtils.getMapper().getTypeFactory()
+                            .constructParametricType(ApiResponse.class, LoginResponse.class));
 
             if (apiResponse != null && apiResponse.isSuccess()) {
                 LOG.info("登录成功: userId={}", apiResponse.getData().getUser().getUserId());
@@ -306,4 +303,3 @@ public final class AuthService {
         return phone.substring(0, PHONE_PREFIX_LENGTH) + "****" + phone.substring(phone.length() - PHONE_SUFFIX_LENGTH);
     }
 }
-

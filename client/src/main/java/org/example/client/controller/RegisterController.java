@@ -27,6 +27,9 @@ public final class RegisterController implements Initializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(RegisterController.class);
 
+    /** 注册成功后返回登录页的延迟时间（毫秒） */
+    private static final long RETURN_DELAY_MS = 1000L;
+
     @FXML
     private TextField phoneField;
 
