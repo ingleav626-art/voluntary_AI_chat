@@ -29,6 +29,13 @@
     </build>
 
     <dependencies>
+        <!-- Server 模块（内嵌启动） -->
+        <dependency>
+            <groupId>com.voluntary</groupId>
+            <artifactId>voluntary-ai-chat-server</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- JavaFX -->
         <dependency>
             <groupId>org.openjfx</groupId>

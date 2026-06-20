@@ -104,6 +104,8 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
+                    <!-- 将 fat JAR 标记为 exec classifier，主 JAR 保持为普通 JAR 供其他模块依赖 -->
+                    <classifier>exec</classifier>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>
