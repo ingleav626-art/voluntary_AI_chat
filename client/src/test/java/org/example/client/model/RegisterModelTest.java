@@ -49,20 +49,31 @@ class RegisterModelTest {
     @Test
     @DisplayName("RegisterResponse 构造和 Getter")
     void testRegisterResponse() {
-        final RegisterResponse response = new RegisterResponse(1L, "张三");
+        final UserInfo user = new UserInfo(1L, "张三", "http://example.com/avatar.jpg", "个人简介");
+        final RegisterResponse response = new RegisterResponse(
+                "access-token", "refresh-token", 7200L, user);
 
-        assertEquals(1L, response.getUserId());
-        assertEquals("张三", response.getUsername());
+        assertEquals("access-token", response.getAccessToken());
+        assertEquals("refresh-token", response.getRefreshToken());
+        assertEquals(7200L, response.getExpiresIn());
+        assertEquals(1L, response.getUser().getUserId());
+        assertEquals("张三", response.getUser().getUsername());
     }
 
     @Test
     @DisplayName("RegisterResponse Setter")
     void testRegisterResponseSetter() {
         final RegisterResponse response = new RegisterResponse();
-        response.setUserId(2L);
-        response.setUsername("李四");
+        response.setAccessToken("new-access");
+        response.setRefreshToken("new-refresh");
+        response.setExpiresIn(3600L);
+        final UserInfo user = new UserInfo(2L, "李四", null, null);
+        response.setUser(user);
 
-        assertEquals(2L, response.getUserId());
-        assertEquals("李四", response.getUsername());
+        assertEquals("new-access", response.getAccessToken());
+        assertEquals("new-refresh", response.getRefreshToken());
+        assertEquals(3600L, response.getExpiresIn());
+        assertEquals(2L, response.getUser().getUserId());
+        assertEquals("李四", response.getUser().getUsername());
     }
 }

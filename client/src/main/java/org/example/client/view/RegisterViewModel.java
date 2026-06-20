@@ -207,8 +207,9 @@ public final class RegisterViewModel {
     }
 
     private void handleSuccess(final RegisterResponse response) {
-        LOG.info("注册成功: userId={}", response.getUserId());
-        successMessage.set("注册成功，请登录");
+        LOG.info("注册成功，自动登录: userId={}",
+                response.getUser() != null ? response.getUser().getUserId() : null);
+        successMessage.set("注册成功，正在登录...");
 
         if (onRegisterSuccess != null) {
             onRegisterSuccess.accept(response);

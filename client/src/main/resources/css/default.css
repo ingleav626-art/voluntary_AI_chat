@@ -100,3 +100,311 @@
     -fx-font-size: 13;
     -fx-text-alignment: center;
 }
+
+/* ============ 主界面样式 ============ */
+
+/* 主根容器 */
+.main-root {
+    -fx-background-color: #F5F5F5;
+}
+
+/* 侧边栏 */
+.sidebar {
+    -fx-background-color: #2C3E50;
+    -fx-padding: 0;
+    -fx-spacing: 0;
+}
+
+/* 用户卡片 */
+.user-card {
+    -fx-padding: 15;
+    -fx-background-color: #34495E;
+    -fx-spacing: 10;
+}
+
+.avatar-text {
+    -fx-text-fill: white;
+    -fx-font-size: 16;
+    -fx-font-weight: bold;
+}
+
+.username-label {
+    -fx-text-fill: white;
+    -fx-font-size: 14;
+    -fx-font-weight: bold;
+}
+
+.status-label {
+    -fx-text-fill: #B0BEC5;
+    -fx-font-size: 11;
+}
+
+/* 图标按钮 */
+.btn-icon {
+    -fx-background-color: transparent;
+    -fx-text-fill: #B0BEC5;
+    -fx-font-size: 12;
+    -fx-cursor: hand;
+    -fx-border-color: transparent;
+}
+
+.btn-icon:hover {
+    -fx-text-fill: white;
+    -fx-background-color: #3E556D;
+    -fx-background-radius: 4;
+}
+
+/* 搜索框 */
+.search-box {
+    -fx-padding: 10 15;
+    -fx-background-color: #2C3E50;
+    -fx-spacing: 8;
+}
+
+.search-icon {
+    -fx-text-fill: #B0BEC5;
+    -fx-font-size: 14;
+}
+
+.search-input {
+    -fx-background-color: #3E556D;
+    -fx-text-fill: white;
+    -fx-background-radius: 4;
+    -fx-border-color: transparent;
+    -fx-font-size: 13;
+    -fx-prompt-text-fill: #90A4AE;
+}
+
+.search-input:focused {
+    -fx-border-color: #1976D2;
+}
+
+/* 会话列表 */
+.conversation-list {
+    -fx-background-color: #2C3E50;
+    -fx-padding: 0;
+    -fx-border-color: transparent;
+}
+
+.conversation-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: white;
+    -fx-padding: 10 15;
+    -fx-cursor: hand;
+}
+
+.conversation-list .list-cell:filled:selected {
+    -fx-background-color: #3E556D;
+}
+
+.conversation-list .list-cell:filled:hover {
+    -fx-background-color: #34495E;
+}
+
+.conversation-cell {
+    -fx-padding: 0;
+}
+
+.conv-name {
+    -fx-text-fill: white;
+    -fx-font-size: 14;
+    -fx-font-weight: bold;
+}
+
+.conv-time {
+    -fx-text-fill: #90A4AE;
+    -fx-font-size: 11;
+}
+
+.conv-last-msg {
+    -fx-text-fill: #B0BEC5;
+    -fx-font-size: 12;
+}
+
+.unread-badge {
+    -fx-background-color: #E53E3E;
+    -fx-text-fill: white;
+    -fx-font-size: 10;
+    -fx-font-weight: bold;
+    -fx-background-radius: 10;
+    -fx-padding: 2 6;
+    -fx-min-width: 20;
+    -fx-alignment: center;
+}
+
+/* 侧边栏底部 */
+.sidebar-footer {
+    -fx-padding: 10 15;
+    -fx-background-color: #34495E;
+    -fx-spacing: 10;
+}
+
+.btn-logout {
+    -fx-background-color: transparent;
+    -fx-text-fill: #EF5350;
+    -fx-font-size: 12;
+    -fx-cursor: hand;
+    -fx-border-color: #EF5350;
+    -fx-border-radius: 4;
+    -fx-border-width: 1;
+}
+
+.btn-logout:hover {
+    -fx-background-color: #EF5350;
+    -fx-text-fill: white;
+}
+
+/* 聊天区域 */
+.chat-area {
+    -fx-background-color: #F5F5F5;
+    -fx-spacing: 0;
+}
+
+/* 聊天标题栏 */
+.chat-header {
+    -fx-padding: 15 20;
+    -fx-background-color: white;
+    -fx-border-color: #E0E0E0;
+    -fx-border-width: 0 0 1 0;
+    -fx-spacing: 10;
+}
+
+.chat-title {
+    -fx-font-size: 16;
+    -fx-font-weight: bold;
+    -fx-text-fill: #333;
+}
+
+.connection-label {
+    -fx-font-size: 12;
+    -fx-text-fill: #9E9E9E;
+}
+
+/* 消息列表 */
+.message-list {
+    -fx-background-color: #F5F5F5;
+    -fx-padding: 10;
+}
+
+.message-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 5 15;
+}
+
+/* 消息气泡 - 发送 */
+.message-bubble-sent {
+    -fx-background-color: #1976D2;
+    -fx-background-radius: 10 10 0 10;
+    -fx-padding: 8 12;
+    -fx-max-width: 400;
+    -fx-alignment: center-right;
+}
+
+.message-bubble-sent .message-content {
+    -fx-text-fill: white;
+    -fx-font-size: 14;
+}
+
+.message-bubble-sent .message-time {
+    -fx-text-fill: rgba(255, 255, 255, 0.7);
+    -fx-font-size: 10;
+}
+
+/* 消息气泡 - 接收 */
+.message-bubble-received {
+    -fx-background-color: white;
+    -fx-background-radius: 10 10 10 0;
+    -fx-padding: 8 12;
+    -fx-max-width: 400;
+    -fx-alignment: center-left;
+}
+
+.message-bubble-received .message-content {
+    -fx-text-fill: #333;
+    -fx-font-size: 14;
+}
+
+.message-bubble-received .message-time {
+    -fx-text-fill: #9E9E9E;
+    -fx-font-size: 10;
+}
+
+/* 撤回消息 */
+.message-recalled {
+    -fx-text-fill: #9E9E9E;
+    -fx-font-size: 12;
+    -fx-italic: true;
+    -fx-alignment: center;
+}
+
+/* 输入区域 */
+.input-area {
+    -fx-padding: 10 15;
+    -fx-background-color: white;
+    -fx-border-color: #E0E0E0;
+    -fx-border-width: 1 0 0 0;
+    -fx-spacing: 8;
+}
+
+.input-textarea {
+    -fx-background-color: #F5F5F5;
+    -fx-background-radius: 4;
+    -fx-border-color: #E0E0E0;
+    -fx-border-radius: 4;
+    -fx-font-size: 14;
+    -fx-padding: 8;
+    -fx-pref-width: 999;
+}
+
+.input-textarea:focused {
+    -fx-border-color: #1976D2;
+}
+
+.input-toolbar {
+    -fx-padding: 5 0 0 0;
+    -fx-spacing: 10;
+}
+
+/* 发送按钮 */
+.btn-send {
+    -fx-background-color: #1976D2;
+    -fx-text-fill: white;
+    -fx-font-size: 14;
+    -fx-font-weight: bold;
+    -fx-background-radius: 4;
+    -fx-padding: 8 25;
+    -fx-cursor: hand;
+}
+
+.btn-send:hover {
+    -fx-background-color: #1565C0;
+}
+
+.btn-send:pressed {
+    -fx-background-color: #0D47A1;
+}
+
+.btn-send:disabled {
+    -fx-background-color: #BDBDBD;
+    -fx-text-fill: #9E9E9E;
+}
+
+/* 滚动条 */
+.scroll-bar {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: #BDBDBD;
+    -fx-background-radius: 4;
+}
+
+.scroll-bar .thumb:hover {
+    -fx-background-color: #9E9E9E;
+}
+
+.scroll-bar .increment-button,
+.scroll-bar .decrement-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}

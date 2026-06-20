@@ -166,7 +166,9 @@ public final class AuthService {
                                     .constructParametricType(ApiResponse.class, RegisterResponse.class));
 
             if (apiResponse != null && apiResponse.isSuccess()) {
-                LOG.info("注册成功: userId={}", apiResponse.getData().getUserId());
+                LOG.info("注册成功: userId={}",
+                        apiResponse.getData().getUser() != null
+                                ? apiResponse.getData().getUser().getUserId() : null);
             } else {
                 LOG.warn("注册失败: code={}, message={}",
                         apiResponse != null ? apiResponse.getCode() : null,
