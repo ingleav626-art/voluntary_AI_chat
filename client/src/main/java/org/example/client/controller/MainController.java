@@ -78,6 +78,9 @@ public final class MainController implements Initializable {
     private Button refreshButton;
 
     @FXML
+    private Button friendButton;
+
+    @FXML
     private Button logoutButton;
 
     @FXML
@@ -253,6 +256,15 @@ public final class MainController implements Initializable {
     private void handleSettings() {
         LOG.info("点击设置");
         // TODO: 打开设置面板
+    }
+
+    /**
+     * 处理好友管理
+     */
+    @FXML
+    private void handleFriend() {
+        LOG.info("切换到好友面板");
+        org.example.client.App.switchToFriend();
     }
 
     /**

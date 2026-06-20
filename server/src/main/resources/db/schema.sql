@@ -67,3 +67,30 @@ CREATE TABLE IF NOT EXISTS `message_read` (
     UNIQUE KEY `uk_message_user` (`message_id`, `user_id`),
     KEY `idx_user_session` (`user_id`, `session_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='消息已读表';
+
+CREATE TABLE IF NOT EXISTS `friend_apply` (
+    `id` BIGINT NOT NULL COMMENT '申请ID（雪花算法）',
+    `user_id` BIGINT NOT NULL COMMENT '申请人ID',
+    `target_user_id` BIGINT NOT NULL COMMENT '目标用户ID',
+    `message` VARCHAR(200) DEFAULT NULL COMMENT '申请留言',
+    `status` TINYINT DEFAULT 0 COMMENT '状态：0-待处理，1-已同意，2-已拒绝',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_deleted` TINYINT DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+    PRIMARY KEY (`id`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_target_user_id` (`target_user_id`),
+    KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='好友申请表';
+
+CREATE TABLE IF NOT EXISTS `friend` (
+    `id` BIGINT NOT NULL COMMENT 'ID（雪花算法）',
+    `user_id` BIGINT NOT NULL COMMENT '用户ID',
+    `friend_id` BIGINT NOT NULL COMMENT '好友ID',
+    `remark` VARCHAR(50) DEFAULT NULL COMMENT '备注名',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `is_deleted` TINYINT DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_user_friend` (`user_id`, `friend_id`),
+    KEY `idx_friend_id` (`friend_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='好友关系表';

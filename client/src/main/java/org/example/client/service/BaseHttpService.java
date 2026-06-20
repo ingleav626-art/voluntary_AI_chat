@@ -32,6 +32,9 @@ public abstract class BaseHttpService {
     /** HTTP 状态码 - 未认证 */
     private static final int HTTP_UNAUTHORIZED = 401;
 
+    /** HTTP 状态码 - 无权限 */
+    private static final int HTTP_FORBIDDEN = 403;
+
     /** Authorization 请求头前缀 */
     private static final String AUTH_HEADER_PREFIX = "Bearer ";
 
@@ -86,6 +89,23 @@ public abstract class BaseHttpService {
                 .header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE)
                 .timeout(Duration.ofSeconds(ClientConfig.getInstance().getReadTimeout()))
                 .POST(HttpRequest.BodyPublishers.ofString(json != null ? json : "{}"));
+        addAuthHeader(builder);
+        return builder;
+    }
+
+    /**
+     * 构建 DELETE 请求
+     *
+     * @param path 接口路径
+     * @return HttpRequest 构建器
+     */
+    protected HttpRequest.Builder buildDeleteRequest(final String path) {
+        final String url = ClientConfig.getInstance().getBaseUrl() + path;
+        final HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE)
+                .timeout(Duration.ofSeconds(ClientConfig.getInstance().getReadTimeout()))
+                .DELETE();
         addAuthHeader(builder);
         return builder;
     }
@@ -150,6 +170,11 @@ public abstract class BaseHttpService {
         if (statusCode == HTTP_UNAUTHORIZED) {
             LOG.warn("Token 已失效，需要重新登录");
             return createErrorResponse(HTTP_UNAUTHORIZED, "登录已失效，请重新登录");
+        }
+
+        if (statusCode == HTTP_FORBIDDEN) {
+            LOG.warn("请求被拒绝: 403 Forbidden，可能未登录或 Token 无效");
+            return createErrorResponse(HTTP_FORBIDDEN, "请先登录");
         }
 
         LOG.error("请求失败: statusCode={}", statusCode);

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox fx:id="rootPane" prefHeight="700.0" prefWidth="1000.0"
+      styleClass="friend-root"
+      xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="org.example.client.controller.FriendController">
+
+    <!-- 顶部标题栏 -->
+    <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="friend-header">
+        <Label styleClass="friend-title" text="好友管理"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button fx:id="backButton" mnemonicParsing="false"
+                onAction="#handleBack" styleClass="btn-icon" text="返回"/>
+    </HBox>
+
+    <Separator/>
+
+    <!-- 主体内容：左右分栏 -->
+    <SplitPane dividerPositions="0.5" VBox.vgrow="ALWAYS">
+
+        <!-- 左侧：好友列表 -->
+        <VBox spacing="5.0" styleClass="friend-panel">
+            <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="friend-panel-header">
+                <Label styleClass="friend-panel-title" text="好友列表"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Button fx:id="refreshFriendsButton" mnemonicParsing="false"
+                        onAction="#handleRefreshFriends" styleClass="btn-icon" text="刷新"/>
+            </HBox>
+
+            <ListView fx:id="friendList" styleClass="friend-list" VBox.vgrow="ALWAYS">
+                <placeholder>
+                    <Label text="暂无好友"/>
+                </placeholder>
+            </ListView>
+        </VBox>
+
+        <!-- 右侧：好友申请 -->
+        <VBox spacing="5.0" styleClass="friend-panel">
+            <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="friend-panel-header">
+                <Label styleClass="friend-panel-title" text="好友申请"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Button fx:id="refreshAppliesButton" mnemonicParsing="false"
+                        onAction="#handleRefreshApplies" styleClass="btn-icon" text="刷新"/>
+            </HBox>
+
+            <!-- 添加好友表单 -->
+            <VBox spacing="8.0" styleClass="add-friend-form">
+                <TextField fx:id="targetPhoneField" promptText="输入手机号" styleClass="friend-input"/>
+                <TextField fx:id="applyMessageField" promptText="申请留言（可选）" styleClass="friend-input"/>
+                <Button fx:id="sendApplyButton" mnemonicParsing="false"
+                        onAction="#handleSendApply" styleClass="btn-primary" text="发送申请"/>
+            </VBox>
+
+            <Separator/>
+
+            <!-- 申请列表 -->
+            <ListView fx:id="applyList" styleClass="apply-list" VBox.vgrow="ALWAYS">
+                <placeholder>
+                    <Label text="暂无申请"/>
+                </placeholder>
+            </ListView>
+        </VBox>
+    </SplitPane>
+
+    <!-- 底部状态栏 -->
+    <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="friend-footer">
+        <Label fx:id="errorLabel" styleClass="error-message" text=""/>
+        <Label fx:id="successLabel" styleClass="success-message" text=""/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <ProgressIndicator fx:id="loadingIndicator" prefWidth="20" prefHeight="20" visible="false"/>
+    </HBox>
+</VBox>

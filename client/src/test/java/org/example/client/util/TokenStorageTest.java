@@ -67,7 +67,7 @@ class TokenStorageTest {
         response.setAccessToken("test-token");
         response.setRefreshToken("test-refresh");
 
-        TokenStorage.save(response);
+        TokenStorage.save(response, true);
         final Path tokenFile = tempDir.resolve("token.dat");
         assertTrue(Files.exists(tokenFile));
 

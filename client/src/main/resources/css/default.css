@@ -408,3 +408,164 @@
     -fx-background-color: transparent;
     -fx-padding: 0;
 }
+
+/* ========== 好友面板样式 ========== */
+
+.friend-root {
+    -fx-background-color: #F5F5F5;
+}
+
+.friend-header {
+    -fx-background-color: white;
+    -fx-padding: 15 20;
+    -fx-border-color: #E0E0E0;
+    -fx-border-width: 0 0 1 0;
+}
+
+.friend-title {
+    -fx-font-size: 20;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1976D2;
+}
+
+.friend-panel {
+    -fx-padding: 10;
+    -fx-background-color: white;
+}
+
+.friend-panel-header {
+    -fx-padding: 5 0 10 0;
+}
+
+.friend-panel-title {
+    -fx-font-size: 16;
+    -fx-font-weight: bold;
+    -fx-text-fill: #333;
+}
+
+.friend-list {
+    -fx-background-color: transparent;
+    -fx-padding: 5 0;
+}
+
+.friend-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 8 5;
+    -fx-border-color: #F0F0F0;
+    -fx-border-width: 0 0 1 0;
+}
+
+.friend-list .list-cell:filled:hover {
+    -fx-background-color: #F9F9F9;
+}
+
+.friend-cell {
+    -fx-padding: 5 0;
+}
+
+.friend-info {
+    -fx-spacing: 2;
+}
+
+.friend-name {
+    -fx-font-size: 14;
+    -fx-font-weight: bold;
+    -fx-text-fill: #333;
+}
+
+.friend-remark {
+    -fx-font-size: 12;
+    -fx-text-fill: #9E9E9E;
+}
+
+.apply-list {
+    -fx-background-color: transparent;
+    -fx-padding: 5 0;
+}
+
+.apply-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 8 5;
+    -fx-border-color: #F0F0F0;
+    -fx-border-width: 0 0 1 0;
+}
+
+.apply-cell {
+    -fx-padding: 5 0;
+    -fx-spacing: 4;
+}
+
+.apply-name {
+    -fx-font-size: 14;
+    -fx-font-weight: bold;
+    -fx-text-fill: #333;
+}
+
+.apply-status {
+    -fx-font-size: 12;
+    -fx-text-fill: #9E9E9E;
+}
+
+.apply-message {
+    -fx-font-size: 12;
+    -fx-text-fill: #666;
+}
+
+.add-friend-form {
+    -fx-padding: 10;
+    -fx-background-color: #F9F9F9;
+    -fx-background-radius: 4;
+    -fx-spacing: 8;
+}
+
+.friend-input {
+    -fx-background-color: white;
+    -fx-background-radius: 4;
+    -fx-border-color: #E0E0E0;
+    -fx-border-radius: 4;
+    -fx-font-size: 13;
+    -fx-padding: 8;
+}
+
+.friend-input:focused {
+    -fx-border-color: #1976D2;
+}
+
+.friend-footer {
+    -fx-background-color: white;
+    -fx-padding: 8 20;
+    -fx-border-color: #E0E0E0;
+    -fx-border-width: 1 0 0 0;
+}
+
+.success-message {
+    -fx-text-fill: #4CAF50;
+    -fx-font-size: 12;
+}
+
+/* 小型按钮 */
+.btn-success-sm {
+    -fx-background-color: #4CAF50;
+    -fx-text-fill: white;
+    -fx-font-size: 12;
+    -fx-background-radius: 4;
+    -fx-padding: 4 12;
+    -fx-cursor: hand;
+}
+
+.btn-success-sm:hover {
+    -fx-background-color: #43A047;
+}
+
+.btn-danger-sm {
+    -fx-background-color: #F44336;
+    -fx-text-fill: white;
+    -fx-font-size: 12;
+    -fx-background-radius: 4;
+    -fx-padding: 4 12;
+    -fx-cursor: hand;
+}
+
+.btn-danger-sm:hover {
+    -fx-background-color: #D32F2F;
+}

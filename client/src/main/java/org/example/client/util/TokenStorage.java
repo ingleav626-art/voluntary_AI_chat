@@ -37,17 +37,38 @@ public final class TokenStorage {
     /** Token 数据分隔符数量 */
     private static final int TOKEN_PARTS_COUNT = 2;
 
+    /** 内存缓存的 Token，即使不勾选"记住我"也会保存，保证当前会话可用 */
+    private static LoginResponse cachedToken;
+
     private TokenStorage() {
         // 工具类禁止实例化
     }
 
     /**
-     * 保存 Token
+     * 保存 Token 到内存，并可选持久化到文件
      *
      * @param response 登录响应
      */
     public static void save(final LoginResponse response) {
+        save(response, false);
+    }
+
+    /**
+     * 保存 Token 到内存，并可选持久化到文件
+     *
+     * @param response 登录响应
+     * @param persist  是否持久化到文件（勾选"记住我"时为 true）
+     */
+    public static void save(final LoginResponse response, final boolean persist) {
         Objects.requireNonNull(response, "response 不能为 null");
+
+        // 总是缓存到内存，保证当前会话可用
+        cachedToken = response;
+
+        if (!persist) {
+            LOG.debug("Token 已保存到内存（不持久化）");
+            return;
+        }
 
         final Path tokenFile = getTokenFile();
         try {
@@ -66,9 +87,16 @@ public final class TokenStorage {
     /**
      * 加载 Token
      *
+     * <p>优先从内存缓存加载，不存在时再从文件加载。</p>
+     *
      * @return 登录响应，不存在时返回 null
      */
     public static LoginResponse load() {
+        // 优先从内存缓存加载
+        if (cachedToken != null) {
+            return cachedToken;
+        }
+
         final Path tokenFile = getTokenFile();
         if (!Files.exists(tokenFile)) {
             LOG.debug("Token 文件不存在");
@@ -88,6 +116,8 @@ public final class TokenStorage {
             final LoginResponse response = new LoginResponse();
             response.setAccessToken(parts[0]);
             response.setRefreshToken(parts[1]);
+            // 缓存到内存，避免重复读取文件
+            cachedToken = response;
             return response;
         } catch (final IOException e) {
             LOG.error("加载 Token 失败", e);
@@ -96,9 +126,12 @@ public final class TokenStorage {
     }
 
     /**
-     * 清除 Token
+     * 清除 Token（内存和文件）
      */
     public static void clear() {
+        // 清除内存缓存
+        cachedToken = null;
+
         final Path tokenFile = getTokenFile();
         try {
             Files.deleteIfExists(tokenFile);

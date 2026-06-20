@@ -46,6 +46,8 @@
 
             <!-- 底部操作栏 -->
             <HBox alignment="CENTER" spacing="10.0" styleClass="sidebar-footer">
+                <Button fx:id="friendButton" mnemonicParsing="false"
+                        onAction="#handleFriend" styleClass="btn-icon" text="好友"/>
                 <Button fx:id="refreshButton" mnemonicParsing="false"
                         onAction="#handleRefresh" styleClass="btn-icon" text="刷新"/>
                 <Button fx:id="logoutButton" mnemonicParsing="false"

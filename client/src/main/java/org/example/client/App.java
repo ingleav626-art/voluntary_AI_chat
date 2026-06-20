@@ -49,8 +49,14 @@ public class App extends Application {
     /** 主界面 FXML */
     private static final String MAIN_FXML = "/fxml/main.fxml";
 
+    /** 好友面板 FXML */
+    private static final String FRIEND_FXML = "/fxml/friend_panel.fxml";
+
     /** 主舞台引用，用于页面切换 */
     private static Stage primaryStage;
+
+    /** 当前登录响应，用于界面间切换保持登录态 */
+    private static LoginResponse currentLoginResponse;
 
     @Override
     public void init() {
@@ -112,6 +118,7 @@ public class App extends Application {
      * @param loginResponse 登录响应，包含用户信息和 Token
      */
     public static void switchToMain(final LoginResponse loginResponse) {
+        currentLoginResponse = loginResponse;
         try {
             final FXMLLoader loader = new FXMLLoader(App.class.getResource(MAIN_FXML));
             final Parent root = loader.load();
@@ -133,6 +140,38 @@ public class App extends Application {
             LOG.info("已切换到主聊天界面");
         } catch (final Exception e) {
             LOG.error("加载主聊天界面失败", e);
+        }
+    }
+
+    /**
+     * 切换到好友面板
+     */
+    public static void switchToFriend() {
+        try {
+            final FXMLLoader loader = new FXMLLoader(App.class.getResource(FRIEND_FXML));
+            final Parent root = loader.load();
+
+            final Scene scene = createScene(root, MAIN_WINDOW_WIDTH, MAIN_WINDOW_HEIGHT);
+            primaryStage.setTitle("AI 聊天 - 好友管理");
+            primaryStage.setScene(scene);
+            primaryStage.setWidth(MAIN_WINDOW_WIDTH);
+            primaryStage.setHeight(MAIN_WINDOW_HEIGHT);
+            primaryStage.setResizable(true);
+            primaryStage.centerOnScreen();
+            LOG.info("已切换到好友面板");
+        } catch (final Exception e) {
+            LOG.error("加载好友面板失败", e);
+        }
+    }
+
+    /**
+     * 从好友面板返回主聊天界面
+     */
+    public static void switchToMainFromFriend() {
+        if (currentLoginResponse != null) {
+            switchToMain(currentLoginResponse);
+        } else {
+            switchToLogin();
         }
     }
 

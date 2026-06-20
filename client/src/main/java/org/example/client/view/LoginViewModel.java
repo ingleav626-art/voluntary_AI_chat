@@ -115,10 +115,9 @@ public final class LoginViewModel {
     private void handleSuccess(final LoginResponse response) {
         LOG.info("登录成功");
 
-        // 保存 Token
-        if (rememberMe.get()) {
-            TokenStorage.save(response);
-        }
+        // 无论是否勾选"记住我"，都保存 Token 到内存
+        // 只有勾选"记住我"时才持久化到文件
+        TokenStorage.save(response, rememberMe.get());
 
         // 调用成功回调
         if (onSuccess != null) {
