@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Data
@@ -13,14 +15,15 @@ import java.util.List;
 @AllArgsConstructor
 public class PageResult<T> {
 
-    private List<T> list;
+    @Builder.Default
+    private List<T> list = Collections.emptyList();
     private long total;
     private int page;
     private int size;
 
     public static <T> PageResult<T> of(List<T> list, long total, int page, int size) {
         return PageResult.<T>builder()
-                .list(list)
+                .list(new ArrayList<>(list))
                 .total(total)
                 .page(page)
                 .size(size)

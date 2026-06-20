@@ -57,7 +57,6 @@ public class UserService {
             throw new BusinessException(ErrorCode.ACCOUNT_LOCKED);
         }
 
-        String inputHash = passwordEncoder.encode(password + user.getSalt());
         if (!passwordEncoder.matches(password + user.getSalt(), user.getPasswordHash())) {
             throw new BusinessException(ErrorCode.ACCOUNT_OR_PASSWORD_ERROR);
         }
