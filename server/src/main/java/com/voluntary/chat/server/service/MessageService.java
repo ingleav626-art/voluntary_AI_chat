@@ -193,6 +193,23 @@ public class MessageService {
         return messageMapper.selectOne(wrapper);
     }
 
+    /**
+     * 获取用户参与的所有会话ID（去重）
+     */
+    public List<String> getUserSessionIds(Long userId) {
+        LambdaQueryWrapper<Message> wrapper = new LambdaQueryWrapper<>();
+        wrapper.and(w -> w.eq(Message::getSenderId, userId).or().eq(Message::getTargetId, userId))
+                .eq(Message::getIsDeleted, 0)
+                .select(Message::getSessionId)
+                .groupBy(Message::getSessionId);
+
+        List<Message> messages = messageMapper.selectList(wrapper);
+        return messages.stream()
+                .map(Message::getSessionId)
+                .distinct()
+                .toList();
+    }
+
     private MessageResponse toResponse(Message message, Map<Long, User> userMap) {
         MessageResponse.MessageResponseBuilder builder = MessageResponse.builder()
                 .messageId(message.getId())

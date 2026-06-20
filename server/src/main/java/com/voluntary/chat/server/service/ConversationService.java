@@ -1,13 +1,11 @@
 package com.voluntary.chat.server.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.voluntary.chat.common.dto.PageResult;
 import com.voluntary.chat.common.enums.MessageType;
 import com.voluntary.chat.common.enums.TargetType;
 import com.voluntary.chat.server.dto.response.ConversationResponse;
 import com.voluntary.chat.server.entity.Message;
 import com.voluntary.chat.server.entity.User;
-import com.voluntary.chat.server.mapper.MessageMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,7 +19,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ConversationService {
 
-    private final MessageMapper messageMapper;
     private final MessageService messageService;
     private final UserService userService;
 
@@ -31,19 +28,7 @@ public class ConversationService {
      */
     public PageResult<ConversationResponse> getConversations(Long userId, int page, int size) {
         // 查询用户参与的所有会话ID（去重）
-        LambdaQueryWrapper<Message> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Message::getSenderId, userId)
-                .or()
-                .eq(Message::getTargetId, userId);
-        wrapper.eq(Message::getIsDeleted, 0)
-                .select(Message::getSessionId)
-                .groupBy(Message::getSessionId);
-
-        List<Message> sessionMessages = messageMapper.selectList(wrapper);
-        List<String> sessionIds = sessionMessages.stream()
-                .map(Message::getSessionId)
-                .distinct()
-                .toList();
+        List<String> sessionIds = messageService.getUserSessionIds(userId);
 
         if (sessionIds.isEmpty()) {
             return PageResult.of(List.of(), 0, page, size);
