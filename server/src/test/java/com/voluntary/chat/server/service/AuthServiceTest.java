@@ -19,22 +19,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import com.voluntary.chat.server.config.redis.SmsCodeStorage;
-import com.voluntary.chat.server.dto.request.LoginRequest;
-import com.voluntary.chat.server.dto.request.RefreshTokenRequest;
-import com.voluntary.chat.server.dto.request.RegisterRequest;
-import com.voluntary.chat.server.dto.response.LoginResponse;
-import com.voluntary.chat.server.dto.response.RefreshTokenResponse;
-import com.voluntary.chat.server.entity.User;
-import com.voluntary.chat.server.entity.UserToken;
-import com.voluntary.chat.server.mapper.UserTokenMapper;
-import com.voluntary.chat.server.security.JwtTokenProvider;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 
