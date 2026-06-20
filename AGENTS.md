@@ -5,7 +5,7 @@
 ---
 
 ## 项目概述
-
+你负责后端开发，并辅助进行前端代码适配。
 Java 桌面 AI 聊天软件：JavaFX（客户端）+ Spring Boot 3（服务端）+ WebSocket
 远程仓库名称地址：https://github.com/ingleav626-art/voluntary_AI_chat
 
