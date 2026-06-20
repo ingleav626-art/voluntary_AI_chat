@@ -1,6 +1,5 @@
 package com.voluntary.chat.server.dto.request;
 
-import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data

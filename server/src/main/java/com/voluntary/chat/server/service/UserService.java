@@ -16,8 +16,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -81,6 +85,19 @@ public class UserService {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
         return user;
+    }
+
+    /**
+     * 批量查询用户信息，避免循环查询
+     */
+    public Map<Long, User> findByIds(java.util.Set<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(User::getId, userIds).eq(User::getIsDeleted, 0);
+        List<User> users = userMapper.selectList(wrapper);
+        return users.stream().collect(Collectors.toMap(User::getId, Function.identity()));
     }
 
     public UserResponse getProfile(Long userId) {
