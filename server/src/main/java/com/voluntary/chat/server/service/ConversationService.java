@@ -15,9 +15,6 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -78,7 +75,7 @@ public class ConversationService {
     }
 
     private ConversationResponse buildConversationResponse(Long userId, String sessionId,
-                                                           Message lastMsg, long unreadCount) {
+            Message lastMsg, long unreadCount) {
         ConversationResponse.ConversationResponseBuilder builder = ConversationResponse.builder()
                 .sessionId(sessionId)
                 .lastMessage(lastMsg.getContent())

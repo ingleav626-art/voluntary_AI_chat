@@ -2,12 +2,10 @@ package com.voluntary.chat.server.websocket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.voluntary.chat.common.constant.MessageTypes;
-import com.voluntary.chat.common.enums.MessageType;
 import com.voluntary.chat.common.enums.SenderType;
 import com.voluntary.chat.common.model.WebSocketMessage;
 import com.voluntary.chat.server.dto.request.SendMessageRequest;
 import com.voluntary.chat.server.dto.response.SendMessageResponse;
-import com.voluntary.chat.server.entity.Message;
 import com.voluntary.chat.server.entity.User;
 import com.voluntary.chat.server.service.MessageService;
 import com.voluntary.chat.server.service.UserService;
@@ -20,7 +18,6 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
