@@ -5,7 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * 注册响应模型
+ * 注册响应模型（与服务端 LoginResponse 结构一致）
  *
  * @author voluntary-ai-chat
  * @since 1.0.0
@@ -15,9 +15,15 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class RegisterResponse {
 
-    /** 用户ID */
-    private Long userId;
+    /** 访问令牌 */
+    private String accessToken;
 
-    /** 用户名 */
-    private String username;
+    /** 刷新令牌 */
+    private String refreshToken;
+
+    /** 过期时间（秒） */
+    private Long expiresIn;
+
+    /** 用户信息 */
+    private UserInfo user;
 }

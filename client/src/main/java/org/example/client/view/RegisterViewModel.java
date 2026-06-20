@@ -2,6 +2,7 @@ package org.example.client.view;
 
 import java.util.function.Consumer;
 
+import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -43,6 +44,9 @@ public final class RegisterViewModel {
 
     /** 验证码倒计时秒数 */
     private static final int COUNTDOWN_SECONDS = 60;
+
+    /** 倒计时间隔（毫秒） */
+    private static final long COUNTDOWN_INTERVAL_MS = 1000L;
 
     /** 手机号属性 */
     private final StringProperty phone = new SimpleStringProperty("");
@@ -105,12 +109,14 @@ public final class RegisterViewModel {
 
         AuthService.getInstance().sendSmsCode(request)
                 .thenAcceptAsync(response -> {
-                    if (response != null && response.isSuccess()) {
-                        successMessage.set("验证码已发送");
-                        startCountdown();
-                    } else {
-                        errorMessage.set(response != null ? response.getMessage() : "验证码发送失败");
-                    }
+                    javafx.application.Platform.runLater(() -> {
+                        if (response != null && response.isSuccess()) {
+                            successMessage.set("验证码已发送");
+                            startCountdown();
+                        } else {
+                            errorMessage.set(response != null ? response.getMessage() : "验证码发送失败");
+                        }
+                    });
                 });
     }
 
@@ -131,8 +137,7 @@ public final class RegisterViewModel {
                 phone.get(),
                 code.get(),
                 username.get(),
-                password.get()
-        );
+                password.get());
 
         AuthService.getInstance().register(request)
                 .thenAcceptAsync(response -> {
@@ -191,23 +196,26 @@ public final class RegisterViewModel {
 
         countdownThread = new Thread(() -> {
             for (int i = COUNTDOWN_SECONDS; i > 0; i--) {
-                smsButtonText.set(i + "秒后重发");
+                final int seconds = i;
+                Platform.runLater(() -> smsButtonText.set(seconds + "秒后重发"));
                 try {
-                    Thread.sleep(1000);
+                    Thread.sleep(COUNTDOWN_INTERVAL_MS);
                 } catch (final InterruptedException e) {
                     Thread.currentThread().interrupt();
                     return;
                 }
             }
-            smsButtonText.set("获取验证码");
-            smsButtonDisabled.set(false);
+            Platform.runLater(() -> {
+                smsButtonText.set("获取验证码");
+                smsButtonDisabled.set(false);
+            });
         });
         countdownThread.setDaemon(true);
         countdownThread.start();
     }
 
     private void handleSuccess(final RegisterResponse response) {
-        LOG.info("注册成功: userId={}", response.getUserId());
+        LOG.info("注册成功: userId={}", response.getUser() != null ? response.getUser().getUserId() : null);
         successMessage.set("注册成功，请登录");
 
         if (onRegisterSuccess != null) {

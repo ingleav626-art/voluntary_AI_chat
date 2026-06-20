@@ -26,6 +26,9 @@ public final class RegisterController implements Initializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(RegisterController.class);
 
+    /** 注册成功后返回登录页的延迟时间（毫秒） */
+    private static final long RETURN_DELAY_MS = 1000L;
+
     @FXML
     private TextField phoneField;
 
@@ -109,7 +112,7 @@ public final class RegisterController implements Initializable {
             // 延迟1秒后返回登录页面，让用户看到成功提示
             new Thread(() -> {
                 try {
-                    Thread.sleep(1000);
+                    Thread.sleep(RETURN_DELAY_MS);
                 } catch (final InterruptedException e) {
                     Thread.currentThread().interrupt();
                     return;

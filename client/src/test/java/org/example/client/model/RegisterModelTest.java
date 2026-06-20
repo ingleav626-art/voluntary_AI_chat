@@ -49,20 +49,32 @@ class RegisterModelTest {
     @Test
     @DisplayName("RegisterResponse 构造和 Getter")
     void testRegisterResponse() {
-        final RegisterResponse response = new RegisterResponse(1L, "张三");
+        final UserInfo userInfo = new UserInfo(1L, null, "张三", null, null);
+        final RegisterResponse response = new RegisterResponse(
+                "token123", "refresh456", 7200L, userInfo);
 
-        assertEquals(1L, response.getUserId());
-        assertEquals("张三", response.getUsername());
+        assertEquals("token123", response.getAccessToken());
+        assertEquals("refresh456", response.getRefreshToken());
+        assertEquals(7200L, response.getExpiresIn());
+        assertNotNull(response.getUser());
+        assertEquals(1L, response.getUser().getUserId());
+        assertEquals("张三", response.getUser().getUsername());
     }
 
     @Test
     @DisplayName("RegisterResponse Setter")
     void testRegisterResponseSetter() {
         final RegisterResponse response = new RegisterResponse();
-        response.setUserId(2L);
-        response.setUsername("李四");
+        response.setAccessToken("token789");
+        response.setRefreshToken("refresh012");
+        response.setExpiresIn(3600L);
+        response.setUser(new UserInfo(2L, null, "李四", null, null));
 
-        assertEquals(2L, response.getUserId());
-        assertEquals("李四", response.getUsername());
+        assertEquals("token789", response.getAccessToken());
+        assertEquals("refresh012", response.getRefreshToken());
+        assertEquals(3600L, response.getExpiresIn());
+        assertNotNull(response.getUser());
+        assertEquals(2L, response.getUser().getUserId());
+        assertEquals("李四", response.getUser().getUsername());
     }
 }
