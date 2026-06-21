@@ -44,9 +44,12 @@ public final class MainViewModel {
     /** 当前用户信息 */
     private final ObjectProperty<UserInfo> currentUser = new SimpleObjectProperty<>();
 
-    /** 会话列表 */
+    /** 会话列表（显示用，可能被搜索过滤） */
     private final ListProperty<ConversationInfo> conversations = new SimpleListProperty<>(
             FXCollections.observableArrayList());
+
+    /** 全部会话列表（搜索过滤的源数据） */
+    private final ObservableList<ConversationInfo> allConversations = FXCollections.observableArrayList();
 
     /** 当前选中的会话 */
     private final ObjectProperty<ConversationInfo> selectedConversation = new SimpleObjectProperty<>();
@@ -131,6 +134,7 @@ public final class MainViewModel {
                         final List<ConversationInfo> list = response.getData() != null
                                 ? response.getData().getList()
                                 : new ArrayList<>();
+                        allConversations.setAll(list);
                         conversations.setAll(list);
                         LOG.info("会话列表加载成功: count={}", list.size());
                     } else {
@@ -143,6 +147,7 @@ public final class MainViewModel {
 
     /**
      * 选择会话
+     * 选中后清零未读数，加载历史消息并上报已读
      *
      * @param conversation 会话
      */
@@ -150,6 +155,15 @@ public final class MainViewModel {
         selectedConversation.set(conversation);
 
         if (conversation != null) {
+            // 清零未读数
+            if (conversation.getUnreadCount() > 0) {
+                conversation.setUnreadCount(0);
+                final int index = conversations.indexOf(conversation);
+                if (index >= 0) {
+                    conversations.set(index, conversation);
+                }
+            }
+
             // 创建聊天视图模型并加载历史消息
             final ChatViewModel chatVm = new ChatViewModel(
                     currentUser.get(), conversation);
@@ -177,8 +191,103 @@ public final class MainViewModel {
             case MessageTypes.RECEIVE_MESSAGE -> handleReceiveMessage(wsMessage);
             case MessageTypes.MESSAGE_ACK -> handleAck(wsMessage);
             case MessageTypes.STATUS_CHANGE -> handleStatusChange(wsMessage);
+            case MessageTypes.RECONNECT_ACK -> handleReconnectAck(wsMessage);
+            case MessageTypes.READ_RECEIPT -> handleReadReceipt(wsMessage);
             default -> LOG.debug("未处理的消息类型: {}", wsMessage.getType());
         }
+    }
+
+    /**
+     * 处理断线重连消息补发
+     * 将离线期间的消息追加到对应会话
+     *
+     * @param wsMessage WebSocket 消息
+     */
+    @SuppressWarnings("unchecked")
+    private void handleReconnectAck(final WebSocketMessage wsMessage) {
+        final java.util.Map<String, Object> data = (java.util.Map<String, Object>) wsMessage.getData();
+        if (data == null) {
+            return;
+        }
+
+        final List<MessageInfo> missedMessages = (List<MessageInfo>) data.get("missedMessages");
+        if (missedMessages == null || missedMessages.isEmpty()) {
+            LOG.info("断线重连：没有离线消息");
+            return;
+        }
+
+        for (final MessageInfo msg : missedMessages) {
+            msg.setSentByMe(currentUser.get() != null
+                    && currentUser.get().getUserId() != null
+                    && currentUser.get().getUserId().equals(msg.getSenderId()));
+        }
+
+        // 按会话分组追加消息
+        final java.util.Map<String, List<MessageInfo>> grouped = new java.util.HashMap<>();
+        for (final MessageInfo msg : missedMessages) {
+            grouped.computeIfAbsent(msg.getSessionId(), k -> new ArrayList<>()).add(msg);
+        }
+
+        for (final java.util.Map.Entry<String, List<MessageInfo>> entry : grouped.entrySet()) {
+            final ChatViewModel chatVm = chatViewModel.get();
+            if (chatVm != null && entry.getKey().equals(chatVm.getSessionId())) {
+                // 当前会话直接追加
+                chatVm.getMessages().addAll(entry.getValue());
+            } else {
+                // 非当前会话，增加未读数
+                for (final ConversationInfo conv : conversations) {
+                    if (entry.getKey().equals(conv.getSessionId())) {
+                        conv.setUnreadCount(conv.getUnreadCount() + entry.getValue().size());
+                        final int index = conversations.indexOf(conv);
+                        if (index >= 0) {
+                            conversations.set(index, conv);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        LOG.info("断线重连消息补发完成: count={}", missedMessages.size());
+    }
+
+    /**
+     * 处理已读回执
+     * 更新已发送消息的已读状态
+     *
+     * @param wsMessage WebSocket 消息
+     */
+    @SuppressWarnings("unchecked")
+    private void handleReadReceipt(final WebSocketMessage wsMessage) {
+        final java.util.Map<String, Object> data = (java.util.Map<String, Object>) wsMessage.getData();
+        if (data == null) {
+            return;
+        }
+
+        final String sessionId = (String) data.get("sessionId");
+        final String lastReadMessageId = (String) data.get("lastReadMessageId");
+
+        if (sessionId == null || lastReadMessageId == null) {
+            return;
+        }
+
+        final ChatViewModel chatVm = chatViewModel.get();
+        if (chatVm != null && sessionId.equals(chatVm.getSessionId())) {
+            // 更新当前会话中消息的已读状态
+            for (final MessageInfo msg : chatVm.getMessages()) {
+                if (msg.isSentByMe() && msg.getMessageId() != null
+                        && lastReadMessageId.equals(String.valueOf(msg.getMessageId()))) {
+                    msg.setRead(true);
+                    final int index = chatVm.getMessages().indexOf(msg);
+                    if (index >= 0) {
+                        chatVm.getMessages().set(index, msg);
+                    }
+                    break;
+                }
+            }
+        }
+
+        LOG.info("收到已读回执: sessionId={}, lastReadMessageId={}", sessionId, lastReadMessageId);
     }
 
     /**
@@ -224,6 +333,25 @@ public final class MainViewModel {
         final ChatViewModel chatVm = chatViewModel.get();
         if (chatVm != null && sessionId.equals(chatVm.getSessionId())) {
             chatVm.appendMessage(message);
+            // 当前会话收到消息时自动上报已读
+            chatVm.reportRead();
+        } else {
+            // 非当前会话，增加未读数
+            for (final ConversationInfo conv : conversations) {
+                if (sessionId.equals(conv.getSessionId())) {
+                    conv.setUnreadCount(conv.getUnreadCount() + 1);
+                    final int index = conversations.indexOf(conv);
+                    if (index >= 0) {
+                        conversations.set(index, conv);
+                    }
+                    // 同步更新 allConversations
+                    final int allIndex = allConversations.indexOf(conv);
+                    if (allIndex >= 0) {
+                        allConversations.set(allIndex, conv);
+                    }
+                    break;
+                }
+            }
         }
 
         LOG.info("收到消息: sessionId={}, messageId={}", sessionId, messageId);
@@ -371,6 +499,30 @@ public final class MainViewModel {
 
     public ObservableList<ConversationInfo> getConversations() {
         return conversations.get();
+    }
+
+    /**
+     * 过滤会话列表
+     * 根据关键词模糊匹配会话名称，空关键词时恢复全部
+     *
+     * @param keyword 搜索关键词
+     */
+    public void filterConversations(final String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            conversations.setAll(allConversations);
+            return;
+        }
+
+        final String lowerKeyword = keyword.trim().toLowerCase();
+        final List<ConversationInfo> filtered = new ArrayList<>();
+        for (final ConversationInfo conv : allConversations) {
+            if (conv.getTargetName() != null
+                    && conv.getTargetName().toLowerCase().contains(lowerKeyword)) {
+                filtered.add(conv);
+            }
+        }
+        conversations.setAll(filtered);
+        LOG.info("会话搜索: keyword={}, result={}", keyword, filtered.size());
     }
 
     public ObjectProperty<ConversationInfo> selectedConversationProperty() {

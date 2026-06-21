@@ -1,0 +1,129 @@
+/* 认证模块样式 - 登录、注册（温馨主题） */
+
+/* ===== 登录容器 - 温暖渐变背景 ===== */
+.login-container {
+    -fx-background-color: linear-gradient(from 0% 0% to 0% 100%, #FFF8F0 0%, #FFE8D6 55%, #FFDAB9 100%);
+}
+
+/* ===== 标题 - 温暖珊瑚色 ===== */
+.title {
+    -fx-font-size: 30;
+    -fx-font-weight: bold;
+    -fx-text-fill: #D4622A;
+    -fx-padding: 0 0 4 0;
+}
+
+/* ===== 副标题 - 柔和棕色 ===== */
+.subtitle {
+    -fx-font-size: 14;
+    -fx-text-fill: #8B6F47;
+    -fx-padding: 0 0 12 0;
+}
+
+/* ===== 记住我复选框 ===== */
+.remember-checkbox {
+    -fx-font-size: 13;
+    -fx-text-fill: #8B6F47;
+}
+
+.remember-checkbox .box {
+    -fx-background-color: #FFFEF8;
+    -fx-border-color: #E8D5C4;
+    -fx-border-radius: 4;
+    -fx-border-width: 1.5;
+}
+
+.remember-checkbox:selected .box {
+    -fx-background-color: #E76F51;
+    -fx-border-color: #E76F51;
+}
+
+.remember-checkbox:selected .mark {
+    -fx-background-color: white;
+}
+
+/* ===== 登录页按钮 - 温暖渐变（覆盖公共样式） ===== */
+.login-container .btn-primary {
+    -fx-background-color: linear-gradient(from 0% 0% to 100% 0%, #F4A261 0%, #E76F51 100%);
+    -fx-text-fill: white;
+    -fx-font-size: 15;
+    -fx-font-weight: bold;
+    -fx-background-radius: 20;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(231,111,81,0.35), 8, 0, 0, 2);
+}
+
+.login-container .btn-primary:hover {
+    -fx-background-color: linear-gradient(from 0% 0% to 100% 0%, #E76F51 0%, #D4622A 100%);
+}
+
+.login-container .btn-primary:pressed {
+    -fx-background-color: #D4622A;
+    -fx-effect: dropshadow(gaussian, rgba(231,111,81,0.2), 4, 0, 0, 1);
+}
+
+.login-container .btn-primary:disabled {
+    -fx-background-color: #D4A373;
+    -fx-text-fill: #F5E6D3;
+    -fx-effect: none;
+}
+
+/* ===== 登录页输入框 - 柔和圆角（覆盖公共样式） ===== */
+.login-container .input-field {
+    -fx-background-color: #FFFEF8;
+    -fx-background-radius: 8;
+    -fx-border-color: #E8D5C4;
+    -fx-border-radius: 8;
+    -fx-border-width: 1.5;
+    -fx-font-size: 14;
+    -fx-padding: 12;
+    -fx-pref-width: 320;
+}
+
+.login-container .input-field:focused {
+    -fx-border-color: #E76F51;
+    -fx-background-color: #FFFFFF;
+    -fx-effect: dropshadow(gaussian, rgba(231,111,81,0.2), 6, 0, 0, 0);
+}
+
+/* ===== 登录页错误提示 ===== */
+.login-container .error-message {
+    -fx-text-fill: #C0392B;
+    -fx-font-size: 13;
+    -fx-text-alignment: center;
+}
+
+/* ===== 登录页链接 - 温暖珊瑚 ===== */
+.login-container .link-label {
+    -fx-font-size: 13;
+    -fx-text-fill: #E76F51;
+    -fx-cursor: hand;
+}
+
+.login-container .link-label:hover {
+    -fx-text-fill: #D4622A;
+    -fx-underline: true;
+}
+
+/* ===== 加载指示器 - 白色适配温暖按钮 ===== */
+.login-container .progress-indicator {
+    -fx-progress-color: white;
+}
+
+/* ===== 验证码按钮 ===== */
+.btn-sms {
+    -fx-background-color: #F4A261;
+    -fx-text-fill: white;
+    -fx-font-size: 12;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+}
+
+.btn-sms:hover {
+    -fx-background-color: #E76F51;
+}
+
+.btn-sms:disabled {
+    -fx-background-color: #D4A373;
+    -fx-text-fill: #F5E6D3;
+}

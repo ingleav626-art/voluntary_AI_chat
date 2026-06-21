@@ -79,10 +79,19 @@
 
             <!-- 输入区域 -->
             <VBox styleClass="input-area">
+                <!-- 工具栏：+ 按钮、图片按钮 -->
+                <HBox alignment="CENTER_LEFT" spacing="8.0" styleClass="input-toolbar">
+                    <Button fx:id="plusButton" mnemonicParsing="false"
+                            onAction="#handlePlusButton" styleClass="btn-tool" text="+"/>
+                    <Button fx:id="imageButton" mnemonicParsing="false"
+                            onAction="#handleSendImage" styleClass="btn-tool" text="图片"/>
+                </HBox>
+                <!-- 输入框 -->
                 <TextArea fx:id="inputArea" promptText="输入消息... (Enter 发送, Shift+Enter 换行)"
                           styleClass="input-textarea" wrapText="true"
                           prefRowCount="3"/>
-                <HBox alignment="CENTER_RIGHT" spacing="10.0" styleClass="input-toolbar">
+                <!-- 底部：错误提示 + 发送按钮 -->
+                <HBox alignment="CENTER_RIGHT" spacing="10.0" styleClass="input-footer">
                     <Label fx:id="errorLabel" styleClass="error-message" text=""/>
                     <Button fx:id="sendButton" mnemonicParsing="false"
                             onAction="#handleSend" styleClass="btn-send" text="发送"/>

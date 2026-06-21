@@ -1,10 +1,14 @@
 package org.example.client.service;
 
 import java.net.http.HttpRequest;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 
+import org.example.client.config.ClientConfig;
 import org.example.client.model.ApiResponse;
 import org.example.client.model.ConversationInfo;
+import org.example.client.model.ImageUploadResponse;
 import org.example.client.model.MarkReadRequest;
 import org.example.client.model.MessageInfo;
 import org.example.client.model.PageResult;
@@ -43,6 +47,9 @@ public final class ChatService extends BaseHttpService {
 
         /** 消息撤回接口路径 */
         private static final String MESSAGE_RECALL_PATH = "/message/recall";
+
+        /** 图片上传接口路径 */
+        private static final String MESSAGE_UPLOAD_IMAGE_PATH = "/message/upload/image";
 
         /** 默认每页数量 */
         private static final int DEFAULT_PAGE_SIZE = 20;
@@ -168,8 +175,6 @@ public final class ChatService extends BaseHttpService {
                 final HttpRequest httpRequest = buildPostRequest(
                                 MESSAGE_RECALL_PATH, java.util.Map.of("messageId", String.valueOf(messageId))).build();
 
-                LOG.info("撤回消息: messageId={}", messageId);
-
                 return sendRequest(httpRequest, getTypeFactory().constructParametricType(
                                 ApiResponse.class, Void.class));
         }
@@ -181,5 +186,62 @@ public final class ChatService extends BaseHttpService {
          */
         public CompletableFuture<ApiResponse<PageResult<ConversationInfo>>> getConversations() {
                 return getConversations(1, DEFAULT_PAGE_SIZE);
+        }
+
+        /**
+         * 上传图片
+         * 使用 multipart/form-data 格式上传，服务端返回图片URL
+         *
+         * @param filePath 图片文件路径
+         * @return 异步结果，包含图片URL等信息
+         */
+        public CompletableFuture<ApiResponse<ImageUploadResponse>> uploadImage(final Path filePath) {
+                try {
+                        final byte[] fileBytes = Files.readAllBytes(filePath);
+                        final String boundary = "----Boundary" + System.currentTimeMillis();
+                        final String url = ClientConfig.getInstance().getBaseUrl() + MESSAGE_UPLOAD_IMAGE_PATH;
+
+                        // 构建 multipart/form-data 请求体
+                        final StringBuilder sb = new StringBuilder();
+                        sb.append("--").append(boundary).append("\r\n");
+                        sb.append("Content-Disposition: form-data; name=\"file\"; filename=\"")
+                                        .append(filePath.getFileName().toString()).append("\"\r\n");
+                        sb.append("Content-Type: ").append(Files.probeContentType(filePath)).append("\r\n\r\n");
+
+                        final byte[] header = sb.toString().getBytes();
+                        final byte[] footer = ("\r\n--" + boundary + "--\r\n").getBytes();
+
+                        final java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+                        bos.write(header);
+                        bos.write(fileBytes);
+                        bos.write(footer);
+                        final byte[] body = bos.toByteArray();
+
+                        final HttpRequest.Builder builder = HttpRequest.newBuilder()
+                                        .uri(java.net.URI.create(url))
+                                        .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                                        .timeout(java.time.Duration
+                                                        .ofSeconds(ClientConfig.getInstance().getReadTimeout()))
+                                        .POST(HttpRequest.BodyPublishers.ofByteArray(body));
+
+                        // 添加认证头
+                        final org.example.client.model.LoginResponse loginResponse = org.example.client.util.TokenStorage
+                                        .load();
+                        if (loginResponse != null && loginResponse.getAccessToken() != null
+                                        && !loginResponse.getAccessToken().isEmpty()) {
+                                builder.header("Authorization", "Bearer " + loginResponse.getAccessToken());
+                        }
+
+                        final HttpRequest request = builder.build();
+                        LOG.info("上传图片: fileName={}", filePath.getFileName());
+
+                        return sendRequest(request, getTypeFactory().constructParametricType(
+                                        ApiResponse.class, ImageUploadResponse.class));
+                } catch (final java.io.IOException e) {
+                        LOG.error("读取图片文件失败: {}", filePath, e);
+                        final CompletableFuture<ApiResponse<ImageUploadResponse>> failed = new CompletableFuture<>();
+                        failed.completeExceptionally(e);
+                        return failed;
+                }
         }
 }

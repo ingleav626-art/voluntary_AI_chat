@@ -1,5 +1,6 @@
 package org.example.client.view;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -7,6 +8,8 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.example.client.model.ConversationInfo;
+import org.example.client.model.ImageUploadResponse;
+import org.example.client.model.MarkReadRequest;
 import org.example.client.model.MessageInfo;
 import org.example.client.model.UserInfo;
 import org.example.client.service.ChatService;
@@ -97,8 +100,15 @@ public final class ChatViewModel {
                                         && currentUser.getUserId() != null
                                         && currentUser.getUserId().equals(msg.getSenderId()));
                             }
+                            // 按时间升序排序（先发的在上方），服务端默认按时间倒序返回
+                            list.sort(java.util.Comparator.comparing(
+                                    MessageInfo::getCreateTime,
+                                    java.util.Comparator.nullsFirst(java.time.LocalDateTime::compareTo)));
                             messages.setAll(list);
                             LOG.info("历史消息加载成功: count={}", list.size());
+
+                            // 加载成功后上报已读
+                            reportRead();
                         }
                     } else {
                         final String msg = response != null ? response.getMessage() : "加载聊天记录失败";
@@ -222,12 +232,122 @@ public final class ChatViewModel {
                                         && currentUser.getUserId() != null
                                         && currentUser.getUserId().equals(msg.getSenderId()));
                             }
+                            // 按时间升序排序后插入顶部（先发的在上方）
+                            list.sort(java.util.Comparator.comparing(
+                                    MessageInfo::getCreateTime,
+                                    java.util.Comparator.nullsFirst(java.time.LocalDateTime::compareTo)));
                             messages.addAll(0, list);
                             LOG.info("加载更多消息: count={}", list.size());
                         }
                     } else {
                         currentPage--;
                         LOG.debug("没有更多历史消息");
+                    }
+                });
+    }
+
+    /**
+     * 撤回消息
+     * 调用 REST API 撤回，成功后更新消息状态
+     *
+     * @param messageId 消息ID
+     */
+    public void recallMessage(final Long messageId) {
+        if (messageId == null || messageId < 0) {
+            errorMessage.set("消息ID无效，无法撤回");
+            return;
+        }
+
+        ChatService.getInstance().recallMessage(messageId)
+                .thenAccept(response -> {
+                    if (response != null && response.isSuccess()) {
+                        // 更新消息状态为已撤回
+                        for (final MessageInfo msg : messages) {
+                            if (messageId.equals(msg.getMessageId())) {
+                                msg.setRecalled(true);
+                                final int index = messages.indexOf(msg);
+                                if (index >= 0) {
+                                    messages.set(index, msg);
+                                }
+                                break;
+                            }
+                        }
+                        LOG.info("消息撤回成功: messageId={}", messageId);
+                    } else {
+                        final String msg = response != null ? response.getMessage() : "撤回失败";
+                        errorMessage.set(msg);
+                        LOG.warn("消息撤回失败: {}", msg);
+                    }
+                });
+    }
+
+    /**
+     * 上报已读消息
+     * 收集所有非自己发送的消息ID，批量上报
+     */
+    public void reportRead() {
+        if (conversation == null || messages.isEmpty()) {
+            return;
+        }
+
+        final List<Long> unreadMessageIds = new ArrayList<>();
+        for (final MessageInfo msg : messages) {
+            if (!msg.isSentByMe() && msg.getMessageId() != null && msg.getMessageId() > 0) {
+                unreadMessageIds.add(msg.getMessageId());
+            }
+        }
+
+        if (unreadMessageIds.isEmpty()) {
+            LOG.debug("没有需要上报已读的消息");
+            return;
+        }
+
+        final MarkReadRequest request = new MarkReadRequest(conversation.getSessionId(), unreadMessageIds);
+        ChatService.getInstance().markRead(request)
+                .thenAccept(response -> {
+                    if (response != null && response.isSuccess()) {
+                        LOG.info("已读上报成功: sessionId={}, count={}",
+                                conversation.getSessionId(), unreadMessageIds.size());
+                    } else {
+                        LOG.warn("已读上报失败: {}", response != null ? response.getMessage() : "未知错误");
+                    }
+                });
+    }
+
+    /** 图片消息类型常量 */
+    private static final String MSG_TYPE_IMAGE = "IMAGE";
+
+    /**
+     * 发送图片消息
+     * 先上传图片获取URL，再通过WebSocket发送IMAGE类型消息
+     *
+     * @param filePath 图片文件路径
+     */
+    public void sendImage(final Path filePath) {
+        if (conversation == null) {
+            errorMessage.set("未选择会话");
+            return;
+        }
+
+        loading.set(true);
+        ChatService.getInstance().uploadImage(filePath)
+                .thenAccept(response -> {
+                    loading.set(false);
+                    if (response != null && response.isSuccess() && response.getData() != null) {
+                        final ImageUploadResponse uploadResult = response.getData();
+                        // 通过 WebSocket 发送 IMAGE 类型消息
+                        final String clientId = UUID.randomUUID().toString();
+                        final Map<String, Object> data = new HashMap<>();
+                        data.put("sessionId", conversation.getSessionId());
+                        data.put("msgType", MSG_TYPE_IMAGE);
+                        data.put("content", uploadResult.getUrl());
+
+                        WebSocketClient.getInstance().send(MessageTypes.SEND_MESSAGE, data);
+                        LOG.info("图片消息发送: url={}", uploadResult.getUrl());
+                    } else {
+                        final String msg = response != null ? response.getMessage() : "图片上传失败";
+                        errorMessage.set(msg);
+                        LOG.warn("图片上传失败: {}", msg);
                     }
                 });
     }

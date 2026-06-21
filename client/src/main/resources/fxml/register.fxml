@@ -29,7 +29,7 @@
     <HBox alignment="CENTER_LEFT" spacing="8.0">
         <TextField fx:id="phoneField" promptText="请输入手机号" styleClass="input-field" HBox.hgrow="ALWAYS"/>
         <Button fx:id="smsButton" mnemonicParsing="false"
-                onAction="#handleSendSms" prefHeight="36.0" prefWidth="100.0"
+                onAction="#handleSendSms" prefHeight="36.0" prefWidth="110.0" minWidth="110.0"
                 styleClass="btn-sms" text="获取验证码"/>
     </HBox>
 

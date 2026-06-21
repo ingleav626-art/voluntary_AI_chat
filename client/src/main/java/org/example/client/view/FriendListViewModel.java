@@ -69,6 +69,11 @@ public final class FriendListViewModel {
                 .thenAccept(response -> Platform.runLater(() -> {
                     loading.set(false);
 
+                    LOG.info("好友列表响应: code={}, message={}, data={}",
+                            response == null ? "null" : response.getCode(),
+                            response == null ? "null" : response.getMessage(),
+                            response == null ? "null" : response.getData());
+
                     if (response != null && response.isSuccess() && response.getData() != null) {
                         final List<FriendResponse> list = response.getData();
                         friends.setAll(list);
