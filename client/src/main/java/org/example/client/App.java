@@ -11,6 +11,7 @@ import javafx.stage.Stage;
 import org.example.client.config.ClientConfig;
 import org.example.client.controller.MainController;
 import org.example.client.model.LoginResponse;
+import org.example.client.util.ServerDiscovery;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,9 +68,21 @@ public class App extends Application {
         if (configEnv != null && !configEnv.isEmpty()) {
             ClientConfig.getInstance().setConfigFile(configEnv);
             LOG.info("使用自定义配置文件: {}", configEnv);
+            ClientConfig.getInstance().load();
+        } else {
+            // 尝试自动发现服务器
+            LOG.info("尝试自动发现服务器...");
+            final String discoveredServer = ServerDiscovery.autoDiscover();
+            if (discoveredServer != null) {
+                LOG.info("自动发现服务器成功: {}", discoveredServer);
+                // 动态设置服务器地址
+                ClientConfig.getInstance().setBaseUrl(discoveredServer);
+            } else {
+                LOG.info("自动发现失败，使用默认配置");
+                ClientConfig.getInstance().load();
+            }
         }
 
-        ClientConfig.getInstance().load();
         LOG.info("客户端配置加载成功: baseUrl={}", ClientConfig.getInstance().getBaseUrl());
     }
 
@@ -139,7 +152,8 @@ public class App extends Application {
 
             final Scene scene = createScene(root, MAIN_WINDOW_WIDTH, MAIN_WINDOW_HEIGHT);
             primaryStage.setTitle("AI 聊天 - " + (loginResponse.getUser() != null
-                    ? loginResponse.getUser().getUsername() : ""));
+                    ? loginResponse.getUser().getUsername()
+                    : ""));
             primaryStage.setScene(scene);
             primaryStage.setWidth(MAIN_WINDOW_WIDTH);
             primaryStage.setHeight(MAIN_WINDOW_HEIGHT);
@@ -186,8 +200,8 @@ public class App extends Application {
     /**
      * 创建场景并应用样式
      *
-     * @param root 根节点
-     * @param width 宽度
+     * @param root   根节点
+     * @param width  宽度
      * @param height 高度
      * @return 场景
      */

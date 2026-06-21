@@ -56,6 +56,15 @@ public final class ClientConfig {
         this.configFile = configFile;
     }
 
+    /**
+     * 设置服务器 Base URL
+     *
+     * @param baseUrl 服务器 Base URL
+     */
+    public void setBaseUrl(final String baseUrl) {
+        this.baseUrl = baseUrl;
+    }
+
     public void load() {
         try (final InputStream is = getClass().getClassLoader().getResourceAsStream(configFile)) {
             if (is == null) {
