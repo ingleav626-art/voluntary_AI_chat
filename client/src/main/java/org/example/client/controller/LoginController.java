@@ -86,8 +86,8 @@ public final class LoginController implements Initializable {
 
     @FXML
     private void handleForgotPassword() {
-        LOG.info("点击忘记密码");
-        // TODO: 跳转到忘记密码页面
+        LOG.info("点击忘记密码，跳转到忘记密码页面");
+        org.example.client.App.switchToForgotPassword();
     }
 
     @FXML

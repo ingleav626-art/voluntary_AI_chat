@@ -9,6 +9,7 @@ import java.util.concurrent.CompletableFuture;
 
 import org.example.client.config.ClientConfig;
 import org.example.client.model.ApiResponse;
+import org.example.client.model.ForgotPasswordRequest;
 import org.example.client.model.LoginRequest;
 import org.example.client.model.LoginResponse;
 import org.example.client.model.RegisterRequest;
@@ -37,6 +38,9 @@ public final class AuthService {
 
     /** 发送验证码接口路径 */
     private static final String SMS_SEND_PATH = "/auth/sms/send";
+
+    /** 忘记密码接口路径 */
+    private static final String FORGOT_PASSWORD_PATH = "/auth/forgot-password";
 
     /** HTTP 状态码 - 成功 */
     private static final int HTTP_OK = 200;
@@ -167,7 +171,8 @@ public final class AuthService {
             if (apiResponse != null && apiResponse.isSuccess()) {
                 LOG.info("注册成功: userId={}",
                         apiResponse.getData().getUser() != null
-                                ? apiResponse.getData().getUser().getUserId() : null);
+                                ? apiResponse.getData().getUser().getUserId()
+                                : null);
             } else {
                 LOG.warn("注册失败: code={}, message={}",
                         apiResponse != null ? apiResponse.getCode() : null,
@@ -301,5 +306,78 @@ public final class AuthService {
             return "***";
         }
         return phone.substring(0, PHONE_PREFIX_LENGTH) + "****" + phone.substring(phone.length() - PHONE_SUFFIX_LENGTH);
+    }
+
+    /**
+     * 异步忘记密码（重置密码）
+     *
+     * @param request 忘记密码请求
+     * @return 异步结果
+     */
+    public CompletableFuture<ApiResponse<Void>> forgotPassword(final ForgotPasswordRequest request) {
+        final String url = ClientConfig.getInstance().getBaseUrl() + FORGOT_PASSWORD_PATH;
+        final String body = JsonUtils.toJson(request);
+
+        LOG.info("发送忘记密码请求: phone={}", maskPhone(request.getPhone()));
+
+        final HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "application/json")
+                .timeout(Duration.ofSeconds(ClientConfig.getInstance().getReadTimeout()))
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build();
+
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(this::handleForgotPasswordResponse)
+                .exceptionally(this::handleForgotPasswordError);
+    }
+
+    @SuppressWarnings("unchecked")
+    private ApiResponse<Void> handleForgotPasswordResponse(final HttpResponse<String> response) {
+        final int statusCode = response.statusCode();
+
+        if (statusCode == HTTP_OK) {
+            final ApiResponse<Void> apiResponse = JsonUtils.fromJson(response.body(),
+                    JsonUtils.getMapper().getTypeFactory()
+                            .constructParametricType(ApiResponse.class, Void.class));
+
+            if (apiResponse != null && apiResponse.isSuccess()) {
+                LOG.info("密码重置成功");
+            } else {
+                LOG.warn("密码重置失败: code={}, message={}",
+                        apiResponse != null ? apiResponse.getCode() : null,
+                        apiResponse != null ? apiResponse.getMessage() : null);
+            }
+
+            return apiResponse;
+        }
+
+        LOG.error("忘记密码请求失败: statusCode={}", statusCode);
+        return createForgotPasswordErrorResponse(statusCode, "网络请求失败");
+    }
+
+    private ApiResponse<Void> handleForgotPasswordError(final Throwable ex) {
+        LOG.error("忘记密码请求异常", ex);
+        return createForgotPasswordErrorResponse(HTTP_SERVER_ERROR, "网络连接失败，请检查网络");
+    }
+
+    private ApiResponse<Void> createForgotPasswordErrorResponse(final int code, final String message) {
+        final ApiResponse<Void> response = new ApiResponse<>();
+        response.setCode(code);
+        response.setMessage(mapForgotPasswordErrorMessage(code, message));
+        return response;
+    }
+
+    private String mapForgotPasswordErrorMessage(final int code, final String defaultMessage) {
+        switch (code) {
+            case CODE_SMS_INVALID:
+                return "验证码错误或已过期";
+            case HTTP_BAD_REQUEST:
+                return "请求参数错误，请检查输入";
+            case HTTP_SERVER_ERROR:
+                return "服务器异常，请稍后重试";
+            default:
+                return defaultMessage;
+        }
     }
 }

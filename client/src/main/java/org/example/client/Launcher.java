@@ -41,7 +41,13 @@ public final class Launcher {
      * @param args 命令行参数
      */
     public static void main(final String[] args) {
-        startEmbeddedServer();
+        // 热点模式下跳过内嵌后端启动，连接远程服务器
+        final String skipServer = System.getenv("SKIP_EMBEDDED_SERVER");
+        if ("true".equalsIgnoreCase(skipServer)) {
+            LOG.info("SKIP_EMBEDDED_SERVER=true，跳过内嵌后端启动，将连接远程服务器");
+        } else {
+            startEmbeddedServer();
+        }
         Application.launch(App.class, args);
     }
 
