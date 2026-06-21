@@ -6,6 +6,10 @@ CREATE TABLE IF NOT EXISTS `user` (
     `salt` VARCHAR(50) NOT NULL COMMENT '密码盐值',
     `avatar` VARCHAR(500) DEFAULT NULL COMMENT '头像URL',
     `bio` VARCHAR(500) DEFAULT NULL COMMENT '个性签名',
+    `gender` TINYINT DEFAULT 0 COMMENT '性别：0-未知，1-男，2-女',
+    `age` INT DEFAULT NULL COMMENT '年龄',
+    `birthday` DATE DEFAULT NULL COMMENT '生日',
+    `detail_bio` TEXT DEFAULT NULL COMMENT '个人详细说明',
     `status` TINYINT DEFAULT 0 COMMENT '状态：0-正常，1-禁用',
     `last_login_time` DATETIME DEFAULT NULL COMMENT '最后登录时间',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -94,3 +98,33 @@ CREATE TABLE IF NOT EXISTS `friend` (
     UNIQUE KEY `uk_user_friend` (`user_id`, `friend_id`),
     KEY `idx_friend_id` (`friend_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='好友关系表';
+
+CREATE TABLE IF NOT EXISTS `group` (
+    `id` BIGINT NOT NULL COMMENT '群组ID（雪花算法）',
+    `name` VARCHAR(50) NOT NULL COMMENT '群组名称',
+    `avatar` VARCHAR(500) DEFAULT NULL COMMENT '群头像URL',
+    `announcement` VARCHAR(500) DEFAULT NULL COMMENT '群公告',
+    `announcement_pinned` TINYINT DEFAULT 0 COMMENT '公告是否置顶：0-否，1-是',
+    `owner_id` BIGINT NOT NULL COMMENT '群主ID',
+    `max_member_count` INT DEFAULT 200 COMMENT '最大成员数',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_deleted` TINYINT DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+    PRIMARY KEY (`id`),
+    KEY `idx_owner_id` (`owner_id`),
+    KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='群组表';
+
+CREATE TABLE IF NOT EXISTS `group_member` (
+    `id` BIGINT NOT NULL COMMENT 'ID（雪花算法）',
+    `group_id` BIGINT NOT NULL COMMENT '群组ID',
+    `user_id` BIGINT NOT NULL COMMENT '用户ID',
+    `role` TINYINT DEFAULT 0 COMMENT '角色：0-普通成员，1-管理员，2-群主',
+    `nickname` VARCHAR(50) DEFAULT NULL COMMENT '群昵称',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '加入时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_deleted` TINYINT DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_group_user` (`group_id`, `user_id`),
+    KEY `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='群成员表';

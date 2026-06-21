@@ -1,6 +1,7 @@
 package com.voluntary.chat.server.controller;
 
 import com.voluntary.chat.server.common.ApiResult;
+import com.voluntary.chat.server.dto.request.ForgotPasswordRequest;
 import com.voluntary.chat.server.dto.request.LoginRequest;
 import com.voluntary.chat.server.dto.request.RefreshTokenRequest;
 import com.voluntary.chat.server.dto.request.RegisterRequest;
@@ -52,5 +53,13 @@ public class AuthController {
         LOG.info("收到刷新Token请求");
         RefreshTokenResponse response = authService.refresh(request);
         return ApiResult.ok(response);
+    }
+
+    @PostMapping("/forgot-password")
+    public ApiResult<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        LOG.info("收到忘记密码请求: phone={}", request.getPhone());
+        authService.forgotPassword(request.getPhone(), request.getCode(),
+                request.getNewPassword(), request.getConfirmPassword());
+        return ApiResult.ok("密码重置成功", null);
     }
 }

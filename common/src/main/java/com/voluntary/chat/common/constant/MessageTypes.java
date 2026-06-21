@@ -17,4 +17,5 @@ public class MessageTypes {
     public static final String PONG = "PONG";
     public static final String RECONNECT = "RECONNECT";
     public static final String RECONNECT_ACK = "RECONNECT_ACK";
+    public static final String FORCE_LOGOUT = "FORCE_LOGOUT";
 }

@@ -148,6 +148,11 @@ public final class MainController implements Initializable {
         // 会话点击事件
         conversationList.setOnMouseClicked(this::handleConversationClick);
 
+        // 搜索会话：监听搜索框文本变化，防抖避免频繁请求
+        searchField.textProperty().addListener((obs, oldVal, newVal) -> {
+            viewModel.searchConversations(newVal);
+        });
+
         // 绑定聊天标题
         chatTitleLabel.textProperty().bind(
                 Bindings.createStringBinding(() -> {

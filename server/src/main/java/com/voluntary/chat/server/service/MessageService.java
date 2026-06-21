@@ -2,6 +2,7 @@ package com.voluntary.chat.server.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.voluntary.chat.common.dto.PageResult;
+import com.voluntary.chat.common.enums.GroupRole;
 import com.voluntary.chat.common.enums.MessageType;
 import com.voluntary.chat.common.enums.SenderType;
 import com.voluntary.chat.common.enums.TargetType;
@@ -14,6 +15,7 @@ import com.voluntary.chat.server.dto.response.SendMessageResponse;
 import com.voluntary.chat.server.entity.Message;
 import com.voluntary.chat.server.entity.MessageRead;
 import com.voluntary.chat.server.entity.User;
+import com.voluntary.chat.server.mapper.GroupMemberMapper;
 import com.voluntary.chat.server.mapper.MessageMapper;
 import com.voluntary.chat.server.mapper.MessageReadMapper;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,6 +38,7 @@ public class MessageService {
     private final MessageMapper messageMapper;
     private final MessageReadMapper messageReadMapper;
     private final UserService userService;
+    private final GroupMemberMapper groupMemberMapper;
 
     /** 消息撤回时间限制：2分钟 */
     private static final long RECALL_TIMEOUT_MINUTES = 2;
@@ -104,7 +108,8 @@ public class MessageService {
 
     /**
      * 撤回消息
-     * 人-人消息：2分钟内可撤回；AI消息：随时可撤回
+     * 人-人消息：2分钟内可撤回；AI消息：随时可撤回；
+     * 群消息：仅群主和管理员可撤回他人消息，普通成员只能撤回自己的消息
      */
     @Transactional
     public void recallMessage(Long userId, Long messageId) {
@@ -114,14 +119,37 @@ public class MessageService {
         }
 
         // AI消息可随时撤回
-        if (message.getSenderType() != SenderType.AI.ordinal()) {
-            // 人-人消息：2分钟内可撤回
-            if (message.getCreateTime().plusMinutes(RECALL_TIMEOUT_MINUTES).isBefore(LocalDateTime.now())) {
-                throw new BusinessException(ErrorCode.MESSAGE_RECALL_TIMEOUT);
+        if (message.getSenderType() == SenderType.AI.ordinal()) {
+            message.setRecallTime(LocalDateTime.now());
+            messageMapper.updateById(message);
+            return;
+        }
+
+        // 群消息：群主/管理员可撤回他人消息
+        String sessionId = message.getSessionId();
+        if (sessionId != null && sessionId.startsWith("g_")) {
+            Long groupId = Long.parseLong(sessionId.split("_")[1]);
+            Integer role = groupMemberMapper.selectRoleByGroupIdAndUserId(groupId, userId);
+            boolean isGroupAdmin = role != null && role >= GroupRole.ADMIN.getCode();
+
+            if (!message.getSenderId().equals(userId) && !isGroupAdmin) {
+                // 不是发送者，也不是群管理，无权撤回
+                throw new BusinessException(ErrorCode.NO_PERMISSION_TO_RECALL);
             }
-            // 只能撤回自己的消息
+            // 群管理员/群主可以撤回任何消息，不限制2分钟
+            if (message.getSenderId().equals(userId) && !isGroupAdmin) {
+                // 普通成员只能撤回自己的消息，且需在2分钟内
+                if (message.getCreateTime().plusMinutes(RECALL_TIMEOUT_MINUTES).isBefore(LocalDateTime.now())) {
+                    throw new BusinessException(ErrorCode.MESSAGE_RECALL_TIMEOUT);
+                }
+            }
+        } else {
+            // 人-人消息：只能撤回自己的消息，且2分钟内
             if (!message.getSenderId().equals(userId)) {
                 throw new BusinessException(ErrorCode.NO_PERMISSION_TO_RECALL);
+            }
+            if (message.getCreateTime().plusMinutes(RECALL_TIMEOUT_MINUTES).isBefore(LocalDateTime.now())) {
+                throw new BusinessException(ErrorCode.MESSAGE_RECALL_TIMEOUT);
             }
         }
 
@@ -195,8 +223,10 @@ public class MessageService {
 
     /**
      * 获取用户参与的所有会话ID（去重）
+     * 包括消息表中存在的会话，以及用户加入的群组会话
      */
     public List<String> getUserSessionIds(Long userId) {
+        // 1. 从消息表中查询用户参与过的会话
         LambdaQueryWrapper<Message> wrapper = new LambdaQueryWrapper<>();
         wrapper.and(w -> w.eq(Message::getSenderId, userId).or().eq(Message::getTargetId, userId))
                 .eq(Message::getIsDeleted, 0)
@@ -204,10 +234,21 @@ public class MessageService {
                 .groupBy(Message::getSessionId);
 
         List<Message> messages = messageMapper.selectList(wrapper);
-        return messages.stream()
+        List<String> sessionIds = messages.stream()
                 .map(Message::getSessionId)
                 .distinct()
-                .toList();
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+
+        // 2. 补充用户加入但无消息的群组会话
+        List<Long> groupIds = groupMemberMapper.selectGroupIdsByUserId(userId);
+        for (Long groupId : groupIds) {
+            String groupSessionId = "g_" + groupId;
+            if (!sessionIds.contains(groupSessionId)) {
+                sessionIds.add(groupSessionId);
+            }
+        }
+
+        return sessionIds;
     }
 
     private MessageResponse toResponse(Message message, Map<Long, User> userMap) {

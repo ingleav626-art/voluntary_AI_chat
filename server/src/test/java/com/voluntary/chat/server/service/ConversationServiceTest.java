@@ -4,8 +4,10 @@ import com.voluntary.chat.common.dto.PageResult;
 import com.voluntary.chat.common.enums.MessageType;
 import com.voluntary.chat.common.enums.TargetType;
 import com.voluntary.chat.server.dto.response.ConversationResponse;
+import com.voluntary.chat.server.entity.GroupEntity;
 import com.voluntary.chat.server.entity.Message;
 import com.voluntary.chat.server.entity.User;
+import com.voluntary.chat.server.mapper.GroupMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,6 +35,9 @@ class ConversationServiceTest {
 
     @Mock
     private UserService userService;
+
+    @Mock
+    private GroupMapper groupMapper;
 
     @InjectMocks
     private ConversationService conversationService;
@@ -114,9 +119,15 @@ class ConversationServiceTest {
         groupMessage.setCreateTime(LocalDateTime.now());
         groupMessage.setIsDeleted(0);
 
+        GroupEntity mockGroup = new GroupEntity();
+        mockGroup.setId(2001L);
+        mockGroup.setName("技术交流群");
+        mockGroup.setAvatar("http://example.com/group.jpg");
+
         when(messageService.getUserSessionIds(1001L)).thenReturn(List.of("g_2001"));
         when(messageService.getLastMessage("g_2001")).thenReturn(groupMessage);
         when(messageService.getUnreadCount(1001L, "g_2001")).thenReturn(5L);
+        when(groupMapper.selectById(2001L)).thenReturn(mockGroup);
 
         PageResult<ConversationResponse> result = conversationService.getConversations(1001L, 1, 20);
 
@@ -127,7 +138,8 @@ class ConversationServiceTest {
         assertEquals("g_2001", conv.getSessionId());
         assertEquals(2001L, conv.getTargetId());
         assertEquals(TargetType.GROUP.name(), conv.getTargetType());
-        assertEquals("群聊", conv.getTargetName());
+        assertEquals("技术交流群", conv.getTargetName());
+        assertEquals("http://example.com/group.jpg", conv.getTargetAvatar());
     }
 
     @Test
@@ -212,5 +224,115 @@ class ConversationServiceTest {
         assertNotNull(result);
         assertEquals(0, result.getTotal());
         assertTrue(result.getList().isEmpty());
+    }
+
+    @Test
+    @DisplayName("获取会话列表-按关键词搜索")
+    void getConversations_shouldFilter_byKeyword() {
+        Message msg1 = new Message();
+        msg1.setSessionId("p_1001_1002");
+        msg1.setContent("消息1");
+        msg1.setType(0);
+        msg1.setCreateTime(LocalDateTime.now());
+        msg1.setIsDeleted(0);
+
+        Message msg2 = new Message();
+        msg2.setSessionId("p_1001_1003");
+        msg2.setContent("消息2");
+        msg2.setType(0);
+        msg2.setCreateTime(LocalDateTime.now().minusMinutes(1));
+        msg2.setIsDeleted(0);
+
+        User user2 = new User();
+        user2.setId(1002L);
+        user2.setUsername("李四");
+
+        User user3 = new User();
+        user3.setId(1003L);
+        user3.setUsername("王五");
+
+        when(messageService.getUserSessionIds(1001L)).thenReturn(List.of("p_1001_1002", "p_1001_1003"));
+        when(messageService.getLastMessage("p_1001_1002")).thenReturn(msg1);
+        when(messageService.getLastMessage("p_1001_1003")).thenReturn(msg2);
+        when(messageService.getUnreadCount(anyLong(), anyString())).thenReturn(0L);
+        when(userService.findById(1002L)).thenReturn(user2);
+        when(userService.findById(1003L)).thenReturn(user3);
+
+        // 搜索 "李四" 只命中第一个会话
+        PageResult<ConversationResponse> result = conversationService.getConversations(1001L, 1, 20, "李四");
+
+        assertEquals(1, result.getTotal());
+        assertEquals("p_1001_1002", result.getList().get(0).getSessionId());
+    }
+
+    @Test
+    @DisplayName("获取会话列表-按群名搜索")
+    void getConversations_shouldFilter_byGroupName() {
+        Message groupMsg = new Message();
+        groupMsg.setSessionId("g_2001");
+        groupMsg.setContent("大家好");
+        groupMsg.setType(0);
+        groupMsg.setCreateTime(LocalDateTime.now());
+        groupMsg.setIsDeleted(0);
+
+        GroupEntity mockGroup = new GroupEntity();
+        mockGroup.setId(2001L);
+        mockGroup.setName("技术交流群");
+
+        when(messageService.getUserSessionIds(1001L)).thenReturn(List.of("g_2001"));
+        when(messageService.getLastMessage("g_2001")).thenReturn(groupMsg);
+        when(messageService.getUnreadCount(1001L, "g_2001")).thenReturn(0L);
+        when(groupMapper.selectById(2001L)).thenReturn(mockGroup);
+
+        PageResult<ConversationResponse> result = conversationService.getConversations(1001L, 1, 20, "技术");
+
+        assertEquals(1, result.getTotal());
+        assertEquals("g_2001", result.getList().get(0).getSessionId());
+    }
+
+    @Test
+    @DisplayName("获取会话列表-关键词无匹配返回空")
+    void getConversations_shouldReturnEmpty_whenKeywordNoMatch() {
+        Message msg = new Message();
+        msg.setSessionId("p_1001_1002");
+        msg.setContent("消息");
+        msg.setType(0);
+        msg.setCreateTime(LocalDateTime.now());
+        msg.setIsDeleted(0);
+
+        User user2 = new User();
+        user2.setId(1002L);
+        user2.setUsername("李四");
+
+        when(messageService.getUserSessionIds(1001L)).thenReturn(List.of("p_1001_1002"));
+        when(messageService.getLastMessage("p_1001_1002")).thenReturn(msg);
+        when(messageService.getUnreadCount(1001L, "p_1001_1002")).thenReturn(0L);
+        when(userService.findById(1002L)).thenReturn(user2);
+
+        PageResult<ConversationResponse> result = conversationService.getConversations(1001L, 1, 20, "不存在的名字");
+
+        assertEquals(0, result.getTotal());
+        assertTrue(result.getList().isEmpty());
+    }
+
+    @Test
+    @DisplayName("群聊-群组不存在时回退显示名称")
+    void getConversations_group_shouldFallback_whenGroupNotFound() {
+        Message groupMsg = new Message();
+        groupMsg.setSessionId("g_9999");
+        groupMsg.setContent("消息");
+        groupMsg.setType(0);
+        groupMsg.setCreateTime(LocalDateTime.now());
+        groupMsg.setIsDeleted(0);
+
+        when(messageService.getUserSessionIds(1001L)).thenReturn(List.of("g_9999"));
+        when(messageService.getLastMessage("g_9999")).thenReturn(groupMsg);
+        when(messageService.getUnreadCount(1001L, "g_9999")).thenReturn(0L);
+        when(groupMapper.selectById(9999L)).thenReturn(null);
+
+        PageResult<ConversationResponse> result = conversationService.getConversations(1001L, 1, 20);
+
+        assertEquals("群聊", result.getList().get(0).getTargetName());
+        assertNull(result.getList().get(0).getTargetAvatar());
     }
 }

@@ -16,8 +16,7 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -52,7 +51,7 @@ class ConversationControllerTest {
                                 .unreadCount(5)
                                 .build();
                 PageResult<ConversationResponse> pageResult = new PageResult<>(List.of(conv), 1, 20, 1);
-                when(conversationService.getConversations(eq(1L), anyInt(), anyInt())).thenReturn(pageResult);
+                when(conversationService.getConversations(eq(1L), anyInt(), anyInt(), isNull())).thenReturn(pageResult);
 
                 mockMvc.perform(get("/api/conversation/list")
                                 .param("page", "1")
@@ -62,32 +61,32 @@ class ConversationControllerTest {
                                 .andExpect(jsonPath("$.data.list[0].sessionId").value("session-1"))
                                 .andExpect(jsonPath("$.data.list[0].unreadCount").value(5));
 
-                verify(conversationService).getConversations(1L, 1, 20);
+                verify(conversationService).getConversations(1L, 1, 20, null);
         }
 
         @Test
         @DisplayName("获取会话列表 - 默认分页")
         void getConversations_shouldUseDefaultPagination() throws Exception {
-                when(conversationService.getConversations(eq(1L), anyInt(), anyInt()))
+                when(conversationService.getConversations(eq(1L), anyInt(), anyInt(), isNull()))
                                 .thenReturn(new PageResult<>(Collections.emptyList(), 1, 20, 0));
 
                 mockMvc.perform(get("/api/conversation/list"))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.code").value(200));
 
-                verify(conversationService).getConversations(1L, 1, 20);
+                verify(conversationService).getConversations(1L, 1, 20, null);
         }
 
         @Test
         @DisplayName("获取会话列表 - 无认证返回 null")
         void getConversations_noAuth() throws Exception {
                 SecurityContextHolder.clearContext();
-                when(conversationService.getConversations(eq(null), anyInt(), anyInt()))
+                when(conversationService.getConversations(isNull(), anyInt(), anyInt(), isNull()))
                                 .thenReturn(new PageResult<>(Collections.emptyList(), 1, 20, 0));
 
                 mockMvc.perform(get("/api/conversation/list"))
                                 .andExpect(status().isOk());
 
-                verify(conversationService).getConversations(null, 1, 20);
+                verify(conversationService).getConversations(null, 1, 20, null);
         }
 }

@@ -4,13 +4,16 @@ import com.voluntary.chat.common.dto.PageResult;
 import com.voluntary.chat.server.dto.request.MarkReadRequest;
 import com.voluntary.chat.server.dto.request.RecallMessageRequest;
 import com.voluntary.chat.server.dto.request.SendMessageRequest;
+import com.voluntary.chat.server.dto.response.ImageUploadResponse;
 import com.voluntary.chat.server.dto.response.MessageResponse;
 import com.voluntary.chat.server.dto.response.SendMessageResponse;
+import com.voluntary.chat.server.service.ImageUploadService;
 import com.voluntary.chat.server.service.MessageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -23,6 +26,7 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -31,11 +35,13 @@ class MessageControllerTest {
 
         private MockMvc mockMvc;
         private MessageService messageService;
+        private ImageUploadService imageUploadService;
 
         @BeforeEach
         void setUp() {
                 messageService = mock(MessageService.class);
-                MessageController controller = new MessageController(messageService);
+                imageUploadService = mock(ImageUploadService.class);
+                MessageController controller = new MessageController(messageService, imageUploadService);
                 mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
 
                 SecurityContextHolder.clearContext();
@@ -143,5 +149,32 @@ class MessageControllerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"sessionId\":\"\",\"messageIds\":[]}"))
                                 .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("上传图片 - 成功")
+        void uploadImage_shouldReturnOk() throws Exception {
+                ImageUploadResponse mockResp = ImageUploadResponse.builder()
+                                .fileId("file_001")
+                                .url("http://localhost:8080/files/2026/06/21/test.jpg")
+                                .thumbnailUrl("http://localhost:8080/files/2026/06/21/test_thumb.jpg")
+                                .width(800)
+                                .height(600)
+                                .size(1024000L)
+                                .fileType("image/jpeg")
+                                .build();
+                when(imageUploadService.uploadImage(any())).thenReturn(mockResp);
+
+                MockMultipartFile file = new MockMultipartFile(
+                                "file", "test.jpg", "image/jpeg", "fake-image-content".getBytes());
+
+                mockMvc.perform(multipart("/api/message/upload/image")
+                                .file(file))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.code").value(200))
+                                .andExpect(jsonPath("$.message").value("上传成功"))
+                                .andExpect(jsonPath("$.data.fileId").value("file_001"))
+                                .andExpect(jsonPath("$.data.fileType").value("image/jpeg"))
+                                .andExpect(jsonPath("$.data.width").value(800));
         }
 }

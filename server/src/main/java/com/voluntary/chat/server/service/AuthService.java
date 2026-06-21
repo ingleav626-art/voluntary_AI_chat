@@ -41,7 +41,7 @@ public class AuthService {
     @Value("${jwt.refresh-token-expiration:604800000}")
     private long refreshTokenExpiration;
 
-    private static final String SMS_CODE_PREFIX = "sms:code:";
+    public static final String SMS_CODE_PREFIX = "sms:code:";
     private static final long SMS_CODE_TTL_MINUTES = 5;
 
     public void sendSmsCode(String phone) {
@@ -50,22 +50,66 @@ public class AuthService {
         log.info("验证码已发送: phone={}, code={}（仅开发环境打印）", phone, code);
     }
 
-    @Transactional
-    public LoginResponse register(RegisterRequest request) {
-        String cachedCode = smsCodeStorage.get(SMS_CODE_PREFIX + request.getPhone());
-        if (cachedCode == null || !cachedCode.equals(request.getCode())) {
+    /**
+     * 验证手机号的短信验证码
+     *
+     * @param phone 手机号
+     * @param code  验证码
+     */
+    public void verifySmsCode(String phone, String code) {
+        String cachedCode = smsCodeStorage.get(SMS_CODE_PREFIX + phone);
+        if (cachedCode == null || !cachedCode.equals(code)) {
             throw new BusinessException(ErrorCode.VERIFICATION_CODE_ERROR);
         }
+        smsCodeStorage.delete(SMS_CODE_PREFIX + phone);
+    }
 
+    @Transactional
+    public LoginResponse register(RegisterRequest request) {
+        verifySmsCode(request.getPhone(), request.getCode());
         User user = userService.register(request);
-        smsCodeStorage.delete(SMS_CODE_PREFIX + request.getPhone());
-
         return generateLoginResponse(user);
     }
 
     public LoginResponse login(LoginRequest request) {
         User user = userService.login(request.getPhone(), request.getPassword());
         return generateLoginResponse(user);
+    }
+
+    /**
+     * 登录用户修改密码（验证当前手机号短信码）
+     */
+    @Transactional
+    public void changePassword(Long userId, String smsCode, String newPassword, String confirmPassword) {
+        User user = userService.findById(userId);
+        verifySmsCode(user.getPhone(), smsCode);
+        userService.changePassword(userId, newPassword, confirmPassword);
+    }
+
+    /**
+     * 登录用户修改手机号（验证旧手机和新手机短信码）
+     */
+    @Transactional
+    public void changePhone(Long userId, String smsCode, String newPhone, String newSmsCode) {
+        // 新手机号不能与当前相同
+        User user = userService.findById(userId);
+        if (user.getPhone().equals(newPhone)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "新手机号与当前手机号相同");
+        }
+        // 验证当前手机号短信码
+        verifySmsCode(user.getPhone(), smsCode);
+        // 验证新手机号短信码
+        verifySmsCode(newPhone, newSmsCode);
+        userService.changePhone(userId, newPhone);
+    }
+
+    /**
+     * 忘记密码 - 通过手机号+短信码重置密码
+     */
+    @Transactional
+    public void forgotPassword(String phone, String code, String newPassword, String confirmPassword) {
+        verifySmsCode(phone, code);
+        userService.resetPassword(phone, newPassword, confirmPassword);
     }
 
     public RefreshTokenResponse refresh(RefreshTokenRequest request) {

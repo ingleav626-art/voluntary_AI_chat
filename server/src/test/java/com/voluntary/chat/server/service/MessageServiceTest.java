@@ -11,6 +11,7 @@ import com.voluntary.chat.server.dto.response.SendMessageResponse;
 import com.voluntary.chat.server.entity.Message;
 import com.voluntary.chat.server.entity.MessageRead;
 import com.voluntary.chat.server.entity.User;
+import com.voluntary.chat.server.mapper.GroupMemberMapper;
 import com.voluntary.chat.server.mapper.MessageMapper;
 import com.voluntary.chat.server.mapper.MessageReadMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +36,11 @@ import static org.mockito.Mockito.*;
 @DisplayName("MessageService 单元测试")
 class MessageServiceTest {
 
+    private static final Long USER_ID = 1001L;
+    private static final Long OTHER_USER_ID = 1002L;
+    private static final Long GROUP_ID = 2001L;
+    private static final Long MESSAGE_ID = 2001L;
+
     @Mock
     private MessageMapper messageMapper;
 
@@ -43,6 +49,9 @@ class MessageServiceTest {
 
     @Mock
     private UserService userService;
+
+    @Mock
+    private GroupMemberMapper groupMemberMapper;
 
     @InjectMocks
     private MessageService messageService;
@@ -247,4 +256,113 @@ class MessageServiceTest {
         assertNotNull(result);
         assertEquals("你好", result.getContent());
     }
+
+    // =================== 群聊撤回测试 ===================
+
+    @Test
+    @DisplayName("群消息撤回-群主可撤回他人消息")
+    void recallMessage_group_ownerCanRecallOthers() {
+        mockMessage.setSessionId("g_" + GROUP_ID);
+        mockMessage.setSenderId(OTHER_USER_ID);
+        mockMessage.setCreateTime(LocalDateTime.now().minusMinutes(10));
+
+        when(messageMapper.selectById(MESSAGE_ID)).thenReturn(mockMessage);
+        when(groupMemberMapper.selectRoleByGroupIdAndUserId(GROUP_ID, USER_ID))
+                .thenReturn(2); // OWNER
+
+        assertDoesNotThrow(() -> messageService.recallMessage(USER_ID, MESSAGE_ID));
+        verify(messageMapper).updateById(any(Message.class));
+    }
+
+    @Test
+    @DisplayName("群消息撤回-群主可撤回超时消息")
+    void recallMessage_group_ownerCanRecallAfterTimeout() {
+        mockMessage.setSessionId("g_" + GROUP_ID);
+        mockMessage.setSenderId(OTHER_USER_ID);
+        mockMessage.setCreateTime(LocalDateTime.now().minusHours(2));
+
+        when(messageMapper.selectById(MESSAGE_ID)).thenReturn(mockMessage);
+        when(groupMemberMapper.selectRoleByGroupIdAndUserId(GROUP_ID, USER_ID))
+                .thenReturn(2); // OWNER
+
+        assertDoesNotThrow(() -> messageService.recallMessage(USER_ID, MESSAGE_ID));
+        verify(messageMapper).updateById(any(Message.class));
+    }
+
+    @Test
+    @DisplayName("群消息撤回-普通成员不能撤回他人消息")
+    void recallMessage_group_memberCannotRecallOthers() {
+        mockMessage.setSessionId("g_" + GROUP_ID);
+        mockMessage.setSenderId(OTHER_USER_ID);
+        mockMessage.setCreateTime(LocalDateTime.now().minusMinutes(1));
+
+        when(messageMapper.selectById(MESSAGE_ID)).thenReturn(mockMessage);
+        when(groupMemberMapper.selectRoleByGroupIdAndUserId(GROUP_ID, USER_ID))
+                .thenReturn(0); // MEMBER
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> messageService.recallMessage(USER_ID, MESSAGE_ID));
+        assertEquals(ErrorCode.NO_PERMISSION_TO_RECALL, exception.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("群消息撤回-普通成员可撤回自己的消息（2分钟内）")
+    void recallMessage_group_memberCanRecallOwn_withinTimeout() {
+        mockMessage.setSessionId("g_" + GROUP_ID);
+        mockMessage.setSenderId(USER_ID);
+        mockMessage.setCreateTime(LocalDateTime.now().minusMinutes(1));
+
+        when(messageMapper.selectById(MESSAGE_ID)).thenReturn(mockMessage);
+        when(groupMemberMapper.selectRoleByGroupIdAndUserId(GROUP_ID, USER_ID))
+                .thenReturn(0); // MEMBER
+
+        assertDoesNotThrow(() -> messageService.recallMessage(USER_ID, MESSAGE_ID));
+        verify(messageMapper).updateById(any(Message.class));
+    }
+
+    @Test
+    @DisplayName("群消息撤回-普通成员撤回自己的消息超时")
+    void recallMessage_group_memberRecallOwn_afterTimeout() {
+        mockMessage.setSessionId("g_" + GROUP_ID);
+        mockMessage.setSenderId(USER_ID);
+        mockMessage.setCreateTime(LocalDateTime.now().minusMinutes(5));
+
+        when(messageMapper.selectById(MESSAGE_ID)).thenReturn(mockMessage);
+        when(groupMemberMapper.selectRoleByGroupIdAndUserId(GROUP_ID, USER_ID))
+                .thenReturn(0); // MEMBER
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> messageService.recallMessage(USER_ID, MESSAGE_ID));
+        assertEquals(ErrorCode.MESSAGE_RECALL_TIMEOUT, exception.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("群消息撤回-非群成员无权撤回")
+    void recallMessage_group_nonMemberCannotRecall() {
+        mockMessage.setSessionId("g_" + GROUP_ID);
+        mockMessage.setSenderId(OTHER_USER_ID);
+
+        when(messageMapper.selectById(MESSAGE_ID)).thenReturn(mockMessage);
+        when(groupMemberMapper.selectRoleByGroupIdAndUserId(GROUP_ID, USER_ID))
+                .thenReturn(null); // 不在群中
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> messageService.recallMessage(USER_ID, MESSAGE_ID));
+        assertEquals(ErrorCode.NO_PERMISSION_TO_RECALL, exception.getErrorCode());
+    }
+
+    // =================== AI 消息撤回测试 ===================
+
+    @Test
+    @DisplayName("AI消息可随时撤回")
+    void recallMessage_ai_alwaysAllowed() {
+        mockMessage.setSenderType(1); // AI
+        mockMessage.setCreateTime(LocalDateTime.now().minusHours(24));
+
+        when(messageMapper.selectById(MESSAGE_ID)).thenReturn(mockMessage);
+
+        assertDoesNotThrow(() -> messageService.recallMessage(USER_ID, MESSAGE_ID));
+        verify(messageMapper).updateById(any(Message.class));
+    }
+
 }

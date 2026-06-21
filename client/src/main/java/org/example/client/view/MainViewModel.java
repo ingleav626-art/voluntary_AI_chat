@@ -30,7 +30,9 @@ import javafx.collections.ObservableList;
 /**
  * 主界面视图模型（MVVM）
  *
- * <p>管理当前用户信息、会话列表、WebSocket 连接和消息分发。</p>
+ * <p>
+ * 管理当前用户信息、会话列表、WebSocket 连接和消息分发。
+ * </p>
  *
  * @author voluntary-ai-chat
  * @since 1.0.0
@@ -43,11 +45,14 @@ public final class MainViewModel {
     private final ObjectProperty<UserInfo> currentUser = new SimpleObjectProperty<>();
 
     /** 会话列表 */
-    private final ListProperty<ConversationInfo> conversations =
-            new SimpleListProperty<>(FXCollections.observableArrayList());
+    private final ListProperty<ConversationInfo> conversations = new SimpleListProperty<>(
+            FXCollections.observableArrayList());
 
     /** 当前选中的会话 */
     private final ObjectProperty<ConversationInfo> selectedConversation = new SimpleObjectProperty<>();
+
+    /** 搜索关键词 */
+    private final StringProperty searchKeyword = new SimpleStringProperty("");
 
     /** WebSocket 连接状态 */
     private final BooleanProperty connected = new SimpleBooleanProperty(false);
@@ -98,16 +103,34 @@ public final class MainViewModel {
      * 加载会话列表
      */
     public void loadConversations() {
+        loadConversations(searchKeyword.get());
+    }
+
+    /**
+     * 按关键词搜索会话
+     */
+    public void searchConversations(final String keyword) {
+        searchKeyword.set(keyword != null ? keyword : "");
+        loadConversations(keyword);
+    }
+
+    /**
+     * 加载会话列表（带搜索关键词）
+     *
+     * @param keyword 搜索关键词，为空则返回全部
+     */
+    private void loadConversations(final String keyword) {
         loading.set(true);
         errorMessage.set("");
 
-        ChatService.getInstance().getConversations()
+        ChatService.getInstance().getConversations(keyword)
                 .thenAccept(response -> {
                     loading.set(false);
 
                     if (response != null && response.isSuccess()) {
                         final List<ConversationInfo> list = response.getData() != null
-                                ? response.getData().getList() : new ArrayList<>();
+                                ? response.getData().getList()
+                                : new ArrayList<>();
                         conversations.setAll(list);
                         LOG.info("会话列表加载成功: count={}", list.size());
                     } else {
@@ -265,7 +288,7 @@ public final class MainViewModel {
      * 更新会话最后消息
      *
      * @param sessionId 会话ID
-     * @param content 消息内容
+     * @param content   消息内容
      */
     private void updateConversationLastMessage(final String sessionId, final String content) {
         for (final ConversationInfo conv : conversations) {
@@ -376,6 +399,10 @@ public final class MainViewModel {
 
     public UserInfo getCurrentUser() {
         return currentUser.get();
+    }
+
+    public StringProperty searchKeywordProperty() {
+        return searchKeyword;
     }
 
     public void setOnLogout(final Consumer<Void> callback) {
