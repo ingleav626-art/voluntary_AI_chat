@@ -49,6 +49,9 @@ public class MessageInfo {
     /** 是否已撤回 */
     private boolean recalled;
 
+    /** 额外信息（图片尺寸、转发消息等 JSON） */
+    private String extra;
+
     /** 是否已读（仅自己发送的消息有效） */
     private boolean read;
 
