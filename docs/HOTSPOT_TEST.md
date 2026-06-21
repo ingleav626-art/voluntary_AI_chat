@@ -68,21 +68,28 @@ mvn spring-boot:run -pl server -Dspring-boot.run.profiles=hotspot
 
 ### 2.4 启动客户端
 
+> **重要**：热点模式下必须设置 `SKIP_EMBEDDED_SERVER=true` 跳过内嵌后端启动，否则客户端会启动本地后端而不是连接远程服务器。
+
 **方式一：自动发现（推荐）**
 ```bash
+# Windows PowerShell
+$env:SKIP_EMBEDDED_SERVER="true"
 mvn javafx:run -pl client
+
+# Linux/Mac
+SKIP_EMBEDDED_SERVER=true mvn javafx:run -pl client
 ```
 客户端启动时会自动监听UDP广播或扫描局域网，发现服务器地址。
 
-**方式二：使用环境变量**
+**方式二：手动配置IP**
 ```bash
 # Windows PowerShell
+$env:SKIP_EMBEDDED_SERVER="true"
 $env:CLIENT_CONFIG="application-hotspot.properties"
 mvn javafx:run -pl client
 
 # Linux/Mac
-export CLIENT_CONFIG=application-hotspot.properties
-mvn javafx:run -pl client
+SKIP_EMBEDDED_SERVER=true CLIENT_CONFIG=application-hotspot.properties mvn javafx:run -pl client
 ```
 
 **方式三：修改默认配置文件**
@@ -90,10 +97,18 @@ mvn javafx:run -pl client
 # 临时替换配置文件
 cp client/src/main/resources/application-client.properties client/src/main/resources/application-client.properties.bak
 cp client/src/main/resources/application-hotspot.properties client/src/main/resources/application-client.properties
+$env:SKIP_EMBEDDED_SERVER="true"
 mvn javafx:run -pl client
 # 测试完成后恢复
 mv client/src/main/resources/application-client.properties.bak client/src/main/resources/application-client.properties
 ```
+
+### 2.5 环境变量说明
+
+| 环境变量 | 说明 | 默认值 |
+|---------|------|--------|
+| `SKIP_EMBEDDED_SERVER` | 设为 `true` 跳过内嵌后端启动 | 未设置（启动本地后端） |
+| `CLIENT_CONFIG` | 指定客户端配置文件名称 | `application-client.properties` |
 
 ---
 
@@ -230,18 +245,19 @@ sudo firewall-cmd --reload
 ## 八、启动命令汇总
 
 ```bash
-# 本地开发（服务器和客户端在同一台电脑）
-mvn spring-boot:run -pl server
+# 本地开发（服务器和客户端在同一台电脑，内嵌后端）
 mvn javafx:run -pl client
 
 # 热点测试（局域网环境，自动发现）
-# 服务器
+# 1. 先在服务器电脑启动后端
 mvn spring-boot:run -pl server -Dspring-boot.run.profiles=hotspot
 
-# 客户端（自动发现服务器）
+# 2. 在客户端电脑启动前端（跳过内嵌后端）
+$env:SKIP_EMBEDDED_SERVER="true"  # Windows PowerShell
 mvn javafx:run -pl client
 
-# 客户端（手动配置）
-$env:CLIENT_CONFIG="application-hotspot.properties"  # Windows PowerShell
+# 热点测试（手动配置IP）
+$env:SKIP_EMBEDDED_SERVER="true"
+$env:CLIENT_CONFIG="application-hotspot.properties"
 mvn javafx:run -pl client
 ```
