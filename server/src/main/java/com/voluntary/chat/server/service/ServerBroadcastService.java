@@ -19,7 +19,9 @@ import jakarta.annotation.PreDestroy;
 /**
  * 服务器广播服务
  *
- * <p>通过UDP广播向局域网宣告服务器地址，便于客户端自动发现。</p>
+ * <p>
+ * 通过UDP广播向局域网宣告服务器地址，便于客户端自动发现。
+ * </p>
  *
  * @author voluntary-ai-chat
  * @since 1.0.0
@@ -119,8 +121,16 @@ public class ServerBroadcastService {
             while (interfaces.hasMoreElements()) {
                 final NetworkInterface networkInterface = interfaces.nextElement();
 
-                // 跳过回环接口和未启用的接口
+                // 跳过回环接口、未启用的接口、虚拟接口
                 if (networkInterface.isLoopback() || !networkInterface.isUp()) {
+                    continue;
+                }
+
+                // 过滤掉常见的虚拟网卡（WSL、VMware、VirtualBox等）
+                final String interfaceName = networkInterface.getName().toLowerCase();
+                if (interfaceName.contains("wsl") || interfaceName.contains("vmware")
+                        || interfaceName.contains("virtualbox") || interfaceName.contains("docker")) {
+                    LOG.debug("跳过虚拟网卡: {}", interfaceName);
                     continue;
                 }
 
@@ -134,6 +144,15 @@ public class ServerBroadcastService {
                     }
 
                     final String ipAddress = address.getHostAddress();
+
+                    // 过滤掉虚拟网络地址（VPN、Hyper-V等）
+                    // 26.x.x.x - Radmin VPN
+                    // 172.16-31.x.x - Hyper-V/Docker私有网络
+                    if (isVirtualNetworkAddress(ipAddress)) {
+                        LOG.debug("跳过虚拟网络地址: {}", ipAddress);
+                        continue;
+                    }
+
                     final String message = String.format(BROADCAST_MESSAGE_FORMAT, ipAddress, SERVER_PORT);
                     final byte[] data = message.getBytes();
 
@@ -150,6 +169,36 @@ public class ServerBroadcastService {
         } catch (final IOException e) {
             LOG.error("广播失败", e);
         }
+    }
+
+    /**
+     * 判断是否为虚拟网络地址
+     *
+     * @param ipAddress IP地址
+     * @return true表示虚拟网络地址，应跳过
+     */
+    private boolean isVirtualNetworkAddress(final String ipAddress) {
+        // Radmin VPN地址段：26.0.0.0/8
+        if (ipAddress.startsWith("26.")) {
+            return true;
+        }
+
+        // Hyper-V/Docker私有网络：172.16-31.0.0/12
+        if (ipAddress.startsWith("172.")) {
+            final String[] parts = ipAddress.split("\\.");
+            if (parts.length >= 2) {
+                try {
+                    final int secondOctet = Integer.parseInt(parts[1]);
+                    if (secondOctet >= 16 && secondOctet <= 31) {
+                        return true;
+                    }
+                } catch (final NumberFormatException e) {
+                    // 忽略解析错误
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
