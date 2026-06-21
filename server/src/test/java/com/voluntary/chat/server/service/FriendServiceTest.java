@@ -10,6 +10,7 @@ import com.voluntary.chat.server.entity.FriendApply;
 import com.voluntary.chat.server.entity.User;
 import com.voluntary.chat.server.mapper.FriendApplyMapper;
 import com.voluntary.chat.server.mapper.FriendMapper;
+import com.voluntary.chat.server.mapper.MessageMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,9 @@ class FriendServiceTest {
 
     @Mock
     private UserService userService;
+
+    @Mock
+    private MessageMapper messageMapper;
 
     @InjectMocks
     private FriendService friendService;
