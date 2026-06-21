@@ -76,8 +76,8 @@ public class UserService {
 
     public User findByPhone(String phone) {
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(User::getPhone, phone)
-                .eq(User::getIsDeleted, 0);
+        wrapper.eq(User::getPhone, phone);
+        // @TableLogic 会自动添加 is_deleted = 0 条件，无需手动指定
         return userMapper.selectOne(wrapper);
     }
 
@@ -97,7 +97,8 @@ public class UserService {
             return Collections.emptyMap();
         }
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
-        wrapper.in(User::getId, userIds).eq(User::getIsDeleted, 0);
+        wrapper.in(User::getId, userIds);
+        // @TableLogic 会自动添加 is_deleted = 0 条件，无需手动指定
         List<User> users = userMapper.selectList(wrapper);
         return users.stream().collect(Collectors.toMap(User::getId, Function.identity()));
     }
@@ -203,7 +204,7 @@ public class UserService {
         wrapper.like(User::getUsername, keyword)
                 .or()
                 .like(User::getPhone, keyword)
-                .eq(User::getIsDeleted, 0)
+                // @TableLogic 会自动添加 is_deleted = 0 条件，无需手动指定
                 .orderByDesc(User::getCreateTime);
 
         long total = userMapper.selectCount(wrapper);
@@ -219,7 +220,8 @@ public class UserService {
 
     void checkPhoneNotExists(String phone) {
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(User::getPhone, phone).eq(User::getIsDeleted, 0);
+        wrapper.eq(User::getPhone, phone);
+        // @TableLogic 会自动添加 is_deleted = 0 条件，无需手动指定
         if (userMapper.selectCount(wrapper) > 0) {
             throw new BusinessException(ErrorCode.PHONE_ALREADY_REGISTERED);
         }
@@ -227,7 +229,8 @@ public class UserService {
 
     private void checkUsernameNotExists(String username) {
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(User::getUsername, username).eq(User::getIsDeleted, 0);
+        wrapper.eq(User::getUsername, username);
+        // @TableLogic 会自动添加 is_deleted = 0 条件，无需手动指定
         if (userMapper.selectCount(wrapper) > 0) {
             throw new BusinessException(ErrorCode.USERNAME_ALREADY_EXISTS);
         }

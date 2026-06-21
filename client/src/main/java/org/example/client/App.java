@@ -34,6 +34,9 @@ public class App extends Application {
     /** 注册窗口高度 */
     private static final int REGISTER_WINDOW_HEIGHT = 620;
 
+    /** 忘记密码窗口高度 */
+    private static final int FORGOT_PASSWORD_WINDOW_HEIGHT = 580;
+
     /** 主界面窗口宽度 */
     private static final int MAIN_WINDOW_WIDTH = 1000;
 
@@ -48,6 +51,9 @@ public class App extends Application {
 
     /** 注册界面 FXML */
     private static final String REGISTER_FXML = "/fxml/register.fxml";
+
+    /** 忘记密码界面 FXML */
+    private static final String FORGOT_PASSWORD_FXML = "/fxml/forgot_password.fxml";
 
     /** 主界面 FXML */
     private static final String MAIN_FXML = "/fxml/main.fxml";
@@ -131,6 +137,46 @@ public class App extends Application {
         } catch (final IOException e) {
             LOG.error("加载注册界面失败", e);
         }
+    }
+
+    /**
+     * 切换到忘记密码界面
+     */
+    public static void switchToForgotPassword() {
+        try {
+            final FXMLLoader loader = new FXMLLoader(App.class.getResource(FORGOT_PASSWORD_FXML));
+            final VBox root = loader.load();
+            final Scene scene = createScene(root, WINDOW_WIDTH, FORGOT_PASSWORD_WINDOW_HEIGHT);
+            primaryStage.setTitle("AI 聊天 - 重置密码");
+            primaryStage.setScene(scene);
+            primaryStage.setWidth(WINDOW_WIDTH);
+            primaryStage.setHeight(FORGOT_PASSWORD_WINDOW_HEIGHT);
+            primaryStage.setResizable(false);
+            LOG.info("已切换到忘记密码界面");
+        } catch (final IOException e) {
+            LOG.error("加载忘记密码界面失败", e);
+        }
+    }
+
+    /**
+     * 切换到登录界面并预填手机号
+     *
+     * @param phone 手机号
+     */
+    public static void switchToLoginWithPhone(final String phone) {
+        switchToLogin();
+        // 登录界面加载后设置手机号
+        // 通过事件机制在下一帧设置，确保控制器已初始化
+        javafx.application.Platform.runLater(() -> {
+            final javafx.scene.Scene scene = primaryStage.getScene();
+            if (scene != null) {
+                final javafx.scene.control.TextField phoneField = (javafx.scene.control.TextField) scene
+                        .lookup("#phoneField");
+                if (phoneField != null) {
+                    phoneField.setText(phone);
+                }
+            }
+        });
     }
 
     /**

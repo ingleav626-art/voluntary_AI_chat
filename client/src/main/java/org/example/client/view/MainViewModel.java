@@ -93,8 +93,14 @@ public final class MainViewModel {
         // 设置当前用户
         currentUser.set(loginResponse.getUser());
 
-        // 建立 WebSocket 连接
-        WebSocketClient.getInstance().connect(loginResponse.getAccessToken());
+        // 建立 WebSocket 连接（仅在未连接时）
+        if (!WebSocketClient.getInstance().isConnected()) {
+            WebSocketClient.getInstance().connect(loginResponse.getAccessToken());
+        } else {
+            LOG.info("WebSocket 已连接，跳过重新建立连接");
+            // 同步连接状态到当前 ViewModel
+            connected.set(true);
+        }
 
         // 加载会话列表
         loadConversations();
