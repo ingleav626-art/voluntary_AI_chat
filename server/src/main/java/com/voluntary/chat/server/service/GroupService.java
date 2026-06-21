@@ -1,0 +1,401 @@
+package com.voluntary.chat.server.service;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.voluntary.chat.common.dto.PageResult;
+import com.voluntary.chat.common.enums.GroupRole;
+import com.voluntary.chat.common.exception.BusinessException;
+import com.voluntary.chat.common.exception.ErrorCode;
+import com.voluntary.chat.server.dto.request.CreateGroupRequest;
+import com.voluntary.chat.server.dto.request.InviteMemberRequest;
+import com.voluntary.chat.server.dto.request.UpdateGroupRequest;
+import com.voluntary.chat.server.dto.response.CreateGroupResponse;
+import com.voluntary.chat.server.dto.response.GroupMemberResponse;
+import com.voluntary.chat.server.dto.response.GroupResponse;
+import com.voluntary.chat.server.entity.GroupEntity;
+import com.voluntary.chat.server.entity.GroupMember;
+import com.voluntary.chat.server.entity.User;
+import com.voluntary.chat.server.mapper.GroupMapper;
+import com.voluntary.chat.server.mapper.GroupMemberMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * 群组服务
+ *
+ * <p>处理群组的创建、管理、成员操作等业务逻辑。</p>
+ *
+ * @author voluntary-ai-chat
+ * @since 1.0.0
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class GroupService {
+
+    private final GroupMapper groupMapper;
+    private final GroupMemberMapper groupMemberMapper;
+    private final UserService userService;
+
+    /** 默认最大成员数 */
+    private static final int DEFAULT_MAX_MEMBER_COUNT = 200;
+
+    /**
+     * 创建群组
+     *
+     * <p>创建者自动成为群主，memberIds 中的用户自动成为普通成员。</p>
+     *
+     * @param userId  创建者ID
+     * @param request 创建请求
+     * @return 创建结果
+     */
+    @Transactional
+    public CreateGroupResponse createGroup(final Long userId, final CreateGroupRequest request) {
+        // 1. 创建群组
+        GroupEntity group = new GroupEntity();
+        group.setName(request.getName());
+        group.setOwnerId(userId);
+        group.setMaxMemberCount(DEFAULT_MAX_MEMBER_COUNT);
+        groupMapper.insert(group);
+
+        // 2. 添加创建者为群主
+        GroupMember owner = new GroupMember();
+        owner.setGroupId(group.getId());
+        owner.setUserId(userId);
+        owner.setRole(GroupRole.OWNER.getCode());
+        groupMemberMapper.insert(owner);
+
+        // 3. 添加初始成员（去重，排除创建者自己）
+        Set<Long> memberIds = request.getMemberIds().stream()
+                .filter(id -> !id.equals(userId))
+                .collect(Collectors.toSet());
+        if (!memberIds.isEmpty()) {
+            // 验证用户是否存在
+            Map<Long, User> userMap = userService.findByIds(memberIds);
+            for (Long memberId : memberIds) {
+                if (!userMap.containsKey(memberId)) {
+                    throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在: " + memberId);
+                }
+                GroupMember member = new GroupMember();
+                member.setGroupId(group.getId());
+                member.setUserId(memberId);
+                member.setRole(GroupRole.MEMBER.getCode());
+                groupMemberMapper.insert(member);
+            }
+        }
+
+        log.info("群组创建成功: groupId={}, name={}, ownerId={}, memberCount={}",
+                group.getId(), request.getName(), userId, memberIds.size() + 1);
+        return CreateGroupResponse.builder()
+                .groupId(group.getId())
+                .name(group.getName())
+                .build();
+    }
+
+    /**
+     * 获取用户加入的群组列表（分页）
+     *
+     * @param userId 用户ID
+     * @param page   页码
+     * @param size   每页数量
+     * @return 分页结果
+     */
+    public PageResult<GroupResponse> getGroupList(final Long userId, final int page, final int size) {
+        // 1. 查询用户加入的群组ID列表
+        List<Long> groupIds = groupMemberMapper.selectGroupIdsByUserId(userId);
+        if (groupIds.isEmpty()) {
+            return PageResult.of(Collections.emptyList(), 0, page, size);
+        }
+
+        // 2. 分页查询群组信息
+        LambdaQueryWrapper<GroupEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(GroupEntity::getId, groupIds)
+                .eq(GroupEntity::getIsDeleted, 0)
+                .orderByDesc(GroupEntity::getCreateTime);
+
+        long total = groupMapper.selectCount(wrapper);
+        int offset = (page - 1) * size;
+        List<GroupEntity> groups = groupMapper.selectList(
+                wrapper.last("LIMIT " + offset + ", " + size));
+
+        // 3. 批量查询成员数量
+        List<GroupResponse> list = groups.stream()
+                .map(this::toGroupResponse)
+                .toList();
+
+        return PageResult.of(list, total, page, size);
+    }
+
+    /**
+     * 获取群组成员列表（分页）
+     *
+     * @param groupId 群组ID
+     * @param page    页码
+     * @param size    每页数量
+     * @return 分页结果
+     */
+    public PageResult<GroupMemberResponse> getGroupMembers(final Long groupId, final int page, final int size) {
+        GroupEntity group = findGroupById(groupId);
+
+        LambdaQueryWrapper<GroupMember> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(GroupMember::getGroupId, groupId)
+                .eq(GroupMember::getIsDeleted, 0)
+                .orderByAsc(GroupMember::getRole)
+                .orderByAsc(GroupMember::getCreateTime);
+
+        long total = groupMemberMapper.selectCount(wrapper);
+        int offset = (page - 1) * size;
+        List<GroupMember> members = groupMemberMapper.selectList(
+                wrapper.last("LIMIT " + offset + ", " + size));
+
+        if (members.isEmpty()) {
+            return PageResult.of(Collections.emptyList(), total, page, size);
+        }
+
+        // 批量查询用户信息
+        Set<Long> userIds = members.stream()
+                .map(GroupMember::getUserId)
+                .collect(Collectors.toSet());
+        Map<Long, User> userMap = userService.findByIds(userIds);
+
+        List<GroupMemberResponse> list = members.stream()
+                .map(member -> toGroupMemberResponse(member, userMap))
+                .toList();
+
+        return PageResult.of(list, total, page, size);
+    }
+
+    /**
+     * 修改群信息
+     *
+     * <p>仅群主可修改。</p>
+     *
+     * @param userId  当前用户ID
+     * @param groupId 群组ID
+     * @param request 修改请求
+     */
+    @Transactional
+    public void updateGroup(final Long userId, final Long groupId, final UpdateGroupRequest request) {
+        GroupEntity group = findGroupById(groupId);
+
+        // 仅群主可修改
+        if (!group.getOwnerId().equals(userId)) {
+            throw new BusinessException(ErrorCode.NO_PERMISSION);
+        }
+
+        boolean changed = false;
+        if (request.getName() != null) {
+            group.setName(request.getName());
+            changed = true;
+        }
+        if (request.getAnnouncement() != null) {
+            group.setAnnouncement(request.getAnnouncement());
+            changed = true;
+        }
+        if (request.getAnnouncementPinned() != null) {
+            group.setAnnouncementPinned(request.getAnnouncementPinned());
+            changed = true;
+        }
+
+        if (changed) {
+            groupMapper.updateById(group);
+            log.info("群信息已修改: groupId={}, userId={}", groupId, userId);
+        }
+    }
+
+    /**
+     * 邀请成员加入群组
+     *
+     * <p>群成员均可邀请，需检查群成员上限和被邀请人是否已在群中。</p>
+     *
+     * @param userId  当前用户ID
+     * @param groupId 群组ID
+     * @param request 邀请请求
+     */
+    @Transactional
+    public void inviteMembers(final Long userId, final Long groupId, final InviteMemberRequest request) {
+        GroupEntity group = findGroupById(groupId);
+
+        // 验证邀请者是否为群成员
+        checkMember(groupId, userId);
+
+        // 验证被邀请用户是否存在
+        Set<Long> inviteUserIds = request.getUserIds().stream()
+                .filter(id -> !id.equals(userId))
+                .collect(Collectors.toSet());
+        Map<Long, User> userMap = userService.findByIds(inviteUserIds);
+        for (Long inviteUserId : inviteUserIds) {
+            if (!userMap.containsKey(inviteUserId)) {
+                throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在: " + inviteUserId);
+            }
+        }
+
+        // 检查群成员上限
+        int currentCount = groupMemberMapper.countMembers(groupId);
+        if (currentCount + inviteUserIds.size() > group.getMaxMemberCount()) {
+            throw new BusinessException(ErrorCode.GROUP_MEMBER_FULL);
+        }
+
+        // 批量添加成员（跳过已在群中的用户）
+        for (Long inviteUserId : inviteUserIds) {
+            if (isMember(groupId, inviteUserId)) {
+                continue;
+            }
+            GroupMember member = new GroupMember();
+            member.setGroupId(groupId);
+            member.setUserId(inviteUserId);
+            member.setRole(GroupRole.MEMBER.getCode());
+            groupMemberMapper.insert(member);
+        }
+
+        log.info("成员邀请成功: groupId={}, inviter={}, invitees={}",
+                groupId, userId, inviteUserIds);
+    }
+
+    /**
+     * 移除群成员
+     *
+     * <p>仅群主和管理员可移除普通成员，群主不可被移除。</p>
+     *
+     * @param userId        当前用户ID
+     * @param groupId       群组ID
+     * @param targetUserId  被移除的用户ID
+     */
+    @Transactional
+    public void removeMember(final Long userId, final Long groupId, final Long targetUserId) {
+        GroupEntity group = findGroupById(groupId);
+
+        // 不能移除群主
+        if (group.getOwnerId().equals(targetUserId)) {
+            throw new BusinessException(ErrorCode.NO_PERMISSION, "不能移除群主");
+        }
+
+        // 检查操作者权限（群主或管理员）
+        Integer operatorRole = groupMemberMapper.selectRoleByGroupIdAndUserId(groupId, userId);
+        if (operatorRole == null || operatorRole < GroupRole.ADMIN.getCode()) {
+            throw new BusinessException(ErrorCode.NO_PERMISSION);
+        }
+
+        // 管理员只能移除普通成员，不能移除其他管理员
+        if (operatorRole == GroupRole.ADMIN.getCode()) {
+            Integer targetRole = groupMemberMapper.selectRoleByGroupIdAndUserId(groupId, targetUserId);
+            if (targetRole != null && targetRole > GroupRole.MEMBER.getCode()) {
+                throw new BusinessException(ErrorCode.NO_PERMISSION, "无权移除管理员");
+            }
+        }
+
+        // 移除成员
+        LambdaQueryWrapper<GroupMember> deleteWrapper = new LambdaQueryWrapper<>();
+        deleteWrapper.eq(GroupMember::getGroupId, groupId)
+                .eq(GroupMember::getUserId, targetUserId);
+        groupMemberMapper.delete(deleteWrapper);
+
+        log.info("成员已移除: groupId={}, targetUserId={}, operatorId={}",
+                groupId, targetUserId, userId);
+    }
+
+    /**
+     * 退出群组
+     *
+     * <p>群主不可退出，需先转让群主或解散群组。</p>
+     *
+     * @param userId  当前用户ID
+     * @param groupId 群组ID
+     */
+    @Transactional
+    public void leaveGroup(final Long userId, final Long groupId) {
+        GroupEntity group = findGroupById(groupId);
+
+        // 群主不能退出
+        if (group.getOwnerId().equals(userId)) {
+            throw new BusinessException(ErrorCode.NO_PERMISSION, "群主不可退出群组，请先转让群主");
+        }
+
+        // 删除成员记录
+        LambdaQueryWrapper<GroupMember> deleteWrapper = new LambdaQueryWrapper<>();
+        deleteWrapper.eq(GroupMember::getGroupId, groupId)
+                .eq(GroupMember::getUserId, userId);
+        groupMemberMapper.delete(deleteWrapper);
+
+        log.info("用户退出群组: groupId={}, userId={}", groupId, userId);
+    }
+
+    /**
+     * 按ID查找群组
+     *
+     * @param groupId 群组ID
+     * @return 群组实体
+     */
+    private GroupEntity findGroupById(final Long groupId) {
+        GroupEntity group = groupMapper.selectById(groupId);
+        if (group == null || group.getIsDeleted() != null && group.getIsDeleted() == 1) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "群组不存在");
+        }
+        return group;
+    }
+
+    /**
+     * 检查用户是否为群成员
+     *
+     * @param groupId 群组ID
+     * @param userId  用户ID
+     */
+    private void checkMember(final Long groupId, final Long userId) {
+        if (!isMember(groupId, userId)) {
+            throw new BusinessException(ErrorCode.NO_PERMISSION, "不在群中");
+        }
+    }
+
+    /**
+     * 判断用户是否为群成员
+     *
+     * @param groupId 群组ID
+     * @param userId  用户ID
+     * @return 是否在群中
+     */
+    private boolean isMember(final Long groupId, final Long userId) {
+        return groupMemberMapper.selectRoleByGroupIdAndUserId(groupId, userId) != null;
+    }
+
+    /**
+     * 转换为群组响应
+     */
+    private GroupResponse toGroupResponse(final GroupEntity group) {
+        int memberCount = groupMemberMapper.countMembers(group.getId());
+        return GroupResponse.builder()
+                .groupId(group.getId())
+                .name(group.getName())
+                .avatar(group.getAvatar())
+                .memberCount(memberCount)
+                .ownerId(group.getOwnerId())
+                .build();
+    }
+
+    /**
+     * 转换为群成员响应
+     */
+    private GroupMemberResponse toGroupMemberResponse(final GroupMember member, final Map<Long, User> userMap) {
+        User user = userMap.get(member.getUserId());
+        String roleStr = switch (member.getRole()) {
+            case 2 -> "OWNER";
+            case 1 -> "ADMIN";
+            default -> "MEMBER";
+        };
+        return GroupMemberResponse.builder()
+                .userId(member.getUserId())
+                .username(user != null ? user.getUsername() : null)
+                .avatar(user != null ? user.getAvatar() : null)
+                .role(roleStr)
+                .joinTime(member.getCreateTime())
+                .build();
+    }
+}

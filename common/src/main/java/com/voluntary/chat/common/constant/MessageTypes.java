@@ -11,10 +11,12 @@ public class MessageTypes {
     public static final String AI_CHAT = "AI_CHAT";
     public static final String AI_STREAM = "AI_STREAM";
     public static final String MESSAGE_ACK = "MESSAGE_ACK";
+    public static final String MESSAGE_RECALL = "MESSAGE_RECALL";
     public static final String STATUS_CHANGE = "STATUS_CHANGE";
     public static final String READ_RECEIPT = "READ_RECEIPT";
     public static final String PING = "PING";
     public static final String PONG = "PONG";
     public static final String RECONNECT = "RECONNECT";
     public static final String RECONNECT_ACK = "RECONNECT_ACK";
+    public static final String FORCE_LOGOUT = "FORCE_LOGOUT";
 }

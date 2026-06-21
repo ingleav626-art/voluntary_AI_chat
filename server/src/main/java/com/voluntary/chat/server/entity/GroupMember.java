@@ -10,40 +10,30 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/**
+ * 群成员实体
+ *
+ * @author voluntary-ai-chat
+ * @since 1.0.0
+ */
 @Data
-@TableName("user")
-public class User {
+@TableName("group_member")
+public class GroupMember {
 
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
-    private String phone;
+    /** 群组ID */
+    private Long groupId;
 
-    private String username;
+    /** 用户ID */
+    private Long userId;
 
-    private String passwordHash;
+    /** 角色：0-普通成员，1-管理员，2-群主 */
+    private Integer role;
 
-    private String salt;
-
-    private String avatar;
-
-    private String bio;
-
-    /** 性别：0-未知，1-男，2-女 */
-    private Integer gender;
-
-    /** 年龄 */
-    private Integer age;
-
-    /** 生日 */
-    private java.time.LocalDate birthday;
-
-    /** 个人详细说明 */
-    private String detailBio;
-
-    private Integer status;
-
-    private LocalDateTime lastLoginTime;
+    /** 群昵称 */
+    private String nickname;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;

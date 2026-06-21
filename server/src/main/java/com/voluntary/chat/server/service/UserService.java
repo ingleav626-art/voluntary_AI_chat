@@ -15,6 +15,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -44,6 +45,7 @@ public class UserService {
         user.setUsername(request.getUsername());
         user.setPasswordHash(passwordHash);
         user.setSalt(salt);
+        user.setGender(0); // 默认未知
         user.setStatus(0);
         user.setIsDeleted(0);
         userMapper.insert(user);
@@ -119,8 +121,81 @@ public class UserService {
         if (request.getBio() != null) {
             user.setBio(request.getBio());
         }
+        // 个人信息新字段
+        if (request.getGender() != null) {
+            user.setGender(request.getGender());
+        }
+        if (request.getAge() != null) {
+            user.setAge(request.getAge());
+        }
+        if (request.getBirthday() != null) {
+            user.setBirthday(LocalDate.parse(request.getBirthday()));
+        }
+        if (request.getDetailBio() != null) {
+            user.setDetailBio(request.getDetailBio());
+        }
 
         userMapper.updateById(user);
+    }
+
+    /**
+     * 修改密码（登录用户通过短信验证码）
+     */
+    @Transactional
+    public void changePassword(Long userId, String newPassword, String confirmPassword) {
+        if (!newPassword.equals(confirmPassword)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "两次密码不一致");
+        }
+        User user = findById(userId);
+
+        // 新密码不能与旧密码相同
+        if (passwordEncoder.matches(newPassword + user.getSalt(), user.getPasswordHash())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "新密码不能与旧密码相同");
+        }
+
+        // 修改密码
+        String newSalt = UUID.randomUUID().toString().replace("-", "");
+        String newPasswordHash = passwordEncoder.encode(newPassword + newSalt);
+        user.setPasswordHash(newPasswordHash);
+        user.setSalt(newSalt);
+        userMapper.updateById(user);
+        log.info("密码修改成功: userId={}", userId);
+    }
+
+    /**
+     * 修改手机号
+     */
+    @Transactional
+    public void changePhone(Long userId, String newPhone) {
+        // 新手机号不能已被注册
+        checkPhoneNotExists(newPhone);
+
+        User user = findById(userId);
+        user.setPhone(newPhone);
+        userMapper.updateById(user);
+        log.info("手机号修改成功: userId={}, newPhone={}", userId, newPhone);
+    }
+
+    /**
+     * 忘记密码-重置密码（未登录用户）
+     */
+    @Transactional
+    public void resetPassword(String phone, String newPassword, String confirmPassword) {
+        if (!newPassword.equals(confirmPassword)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "两次密码不一致");
+        }
+
+        User user = findByPhone(phone);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
+        }
+
+        String newSalt = UUID.randomUUID().toString().replace("-", "");
+        String newPasswordHash = passwordEncoder.encode(newPassword + newSalt);
+        user.setPasswordHash(newPasswordHash);
+        user.setSalt(newSalt);
+        userMapper.updateById(user);
+        log.info("密码重置成功: userId={}", user.getId());
     }
 
     public PageResult<UserResponse> searchUsers(String keyword, int page, int size) {
@@ -142,7 +217,7 @@ public class UserService {
         return PageResult.of(list, total, page, size);
     }
 
-    private void checkPhoneNotExists(String phone) {
+    void checkPhoneNotExists(String phone) {
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(User::getPhone, phone).eq(User::getIsDeleted, 0);
         if (userMapper.selectCount(wrapper) > 0) {
@@ -158,7 +233,7 @@ public class UserService {
         }
     }
 
-    private UserResponse toResponse(User user) {
+    UserResponse toResponse(User user) {
         String maskedPhone = user.getPhone().substring(0, 3)
                 + "****" + user.getPhone().substring(7);
         return UserResponse.builder()
@@ -167,6 +242,10 @@ public class UserService {
                 .username(user.getUsername())
                 .avatar(user.getAvatar())
                 .bio(user.getBio())
+                .gender(user.getGender())
+                .age(user.getAge())
+                .birthday(user.getBirthday())
+                .detailBio(user.getDetailBio())
                 .createTime(user.getCreateTime())
                 .build();
     }

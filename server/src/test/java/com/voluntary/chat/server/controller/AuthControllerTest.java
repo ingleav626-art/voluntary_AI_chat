@@ -1,5 +1,6 @@
 package com.voluntary.chat.server.controller;
 
+import com.voluntary.chat.server.dto.request.ForgotPasswordRequest;
 import com.voluntary.chat.server.dto.request.LoginRequest;
 import com.voluntary.chat.server.dto.request.RefreshTokenRequest;
 import com.voluntary.chat.server.dto.request.RegisterRequest;
@@ -120,6 +121,42 @@ class AuthControllerTest {
                 mockMvc.perform(post("/api/auth/sms/send")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"phone\":\"\"}"))
+                                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("忘记密码 - 成功")
+        void forgotPassword_shouldReturnOk() throws Exception {
+                doNothing().when(authService).forgotPassword(anyString(), anyString(), anyString(), anyString());
+
+                mockMvc.perform(post("/api/auth/forgot-password")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"phone\":\"13800138000\",\"code\":\"123456\","
+                                                + "\"newPassword\":\"newPass123\",\"confirmPassword\":\"newPass123\"}"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.code").value(200))
+                                .andExpect(jsonPath("$.message").value("密码重置成功"));
+
+                verify(authService).forgotPassword("13800138000", "123456", "newPass123", "newPass123");
+        }
+
+        @Test
+        @DisplayName("忘记密码 - 手机号格式错误")
+        void forgotPassword_shouldReturnBadRequest_whenPhoneInvalid() throws Exception {
+                mockMvc.perform(post("/api/auth/forgot-password")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"phone\":\"123\",\"code\":\"123456\","
+                                                + "\"newPassword\":\"newPass123\",\"confirmPassword\":\"newPass123\"}"))
+                                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("忘记密码 - 验证码为空")
+        void forgotPassword_shouldReturnBadRequest_whenCodeBlank() throws Exception {
+                mockMvc.perform(post("/api/auth/forgot-password")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"phone\":\"13800138000\",\"code\":\"\","
+                                                + "\"newPassword\":\"newPass123\",\"confirmPassword\":\"newPass123\"}"))
                                 .andExpect(status().isBadRequest());
         }
 }

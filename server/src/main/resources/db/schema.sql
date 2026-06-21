@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS `user` (
     `gender` TINYINT DEFAULT 0 COMMENT '性别：0-未知，1-男，2-女',
     `age` INT DEFAULT NULL COMMENT '年龄',
     `birthday` DATE DEFAULT NULL COMMENT '生日',
-    `detail_bio` VARCHAR(1000) DEFAULT NULL COMMENT '个人详细说明',
+    `detail_bio` TEXT DEFAULT NULL COMMENT '个人详细说明',
     `status` TINYINT DEFAULT 0 COMMENT '状态：0-正常，1-禁用',
     `last_login_time` DATETIME DEFAULT NULL COMMENT '最后登录时间',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -127,4 +127,4 @@ CREATE TABLE IF NOT EXISTS `group_member` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_group_user` (`group_id`, `user_id`),
     KEY `idx_user_id` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='群组成员表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='群成员表';

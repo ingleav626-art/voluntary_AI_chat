@@ -21,9 +21,10 @@ public class ConversationController {
     @GetMapping("/list")
     public ApiResult<PageResult<ConversationResponse>> getConversations(
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String keyword) {
         Long userId = SecurityUtils.getCurrentUserId();
-        PageResult<ConversationResponse> result = conversationService.getConversations(userId, page, size);
+        PageResult<ConversationResponse> result = conversationService.getConversations(userId, page, size, keyword);
         return ApiResult.ok(result);
     }
 }

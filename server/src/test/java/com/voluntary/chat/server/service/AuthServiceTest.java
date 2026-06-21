@@ -70,6 +70,28 @@ class AuthServiceTest {
     }
 
     @Test
+    @DisplayName("验证短信码成功")
+    void verifySmsCode_shouldSucceed() {
+        when(smsCodeStorage.get("sms:code:13800138000")).thenReturn("123456");
+        assertDoesNotThrow(() -> authService.verifySmsCode("13800138000", "123456"));
+        verify(smsCodeStorage).delete("sms:code:13800138000");
+    }
+
+    @Test
+    @DisplayName("验证短信码失败-验证码错误")
+    void verifySmsCode_shouldFail_whenCodeWrong() {
+        when(smsCodeStorage.get("sms:code:13800138000")).thenReturn("123456");
+        assertThrows(BusinessException.class, () -> authService.verifySmsCode("13800138000", "000000"));
+    }
+
+    @Test
+    @DisplayName("验证短信码失败-验证码过期")
+    void verifySmsCode_shouldFail_whenCodeExpired() {
+        when(smsCodeStorage.get("sms:code:13800138000")).thenReturn(null);
+        assertThrows(BusinessException.class, () -> authService.verifySmsCode("13800138000", "123456"));
+    }
+
+    @Test
     @DisplayName("注册成功")
     void register_shouldSucceed() {
         RegisterRequest request = new RegisterRequest();
@@ -140,6 +162,79 @@ class AuthServiceTest {
         assertEquals(TEST_ACCESS_TOKEN, response.getAccessToken());
         assertNotNull(response.getUser());
     }
+
+    // ===== 修改密码 =====
+
+    @Test
+    @DisplayName("修改密码成功")
+    void changePassword_shouldSucceed() {
+        when(userService.findById(1001L)).thenReturn(mockUser);
+        when(smsCodeStorage.get("sms:code:13800138000")).thenReturn("654321");
+
+        authService.changePassword(1001L, "654321", "newPass123", "newPass123");
+
+        verify(userService).changePassword(1001L, "newPass123", "newPass123");
+    }
+
+    @Test
+    @DisplayName("修改密码失败-短信码错误")
+    void changePassword_shouldFail_whenSmsCodeWrong() {
+        when(userService.findById(1001L)).thenReturn(mockUser);
+        when(smsCodeStorage.get("sms:code:13800138000")).thenReturn("654321");
+
+        assertThrows(BusinessException.class,
+                () -> authService.changePassword(1001L, "000000", "newPass123", "newPass123"));
+        verify(userService, never()).changePassword(anyLong(), anyString(), anyString());
+    }
+
+    // ===== 修改手机号 =====
+
+    @Test
+    @DisplayName("修改手机号成功")
+    void changePhone_shouldSucceed() {
+        when(userService.findById(1001L)).thenReturn(mockUser);
+        when(smsCodeStorage.get("sms:code:13800138000")).thenReturn("111111");
+        when(smsCodeStorage.get("sms:code:13900139000")).thenReturn("222222");
+
+        authService.changePhone(1001L, "111111", "13900139000", "222222");
+
+        verify(userService).changePhone(1001L, "13900139000");
+    }
+
+    @Test
+    @DisplayName("修改手机号失败-新旧手机号相同")
+    void changePhone_shouldFail_whenSamePhone() {
+        when(userService.findById(1001L)).thenReturn(mockUser);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> authService.changePhone(1001L, "111111", "13800138000", "222222"));
+        assertEquals(ErrorCode.BAD_REQUEST, exception.getErrorCode());
+        verify(userService, never()).changePhone(anyLong(), anyString());
+    }
+
+    // ===== 忘记密码 =====
+
+    @Test
+    @DisplayName("忘记密码-重置成功")
+    void forgotPassword_shouldSucceed() {
+        when(smsCodeStorage.get("sms:code:13800138000")).thenReturn("123456");
+
+        authService.forgotPassword("13800138000", "123456", "newPass123", "newPass123");
+
+        verify(userService).resetPassword("13800138000", "newPass123", "newPass123");
+    }
+
+    @Test
+    @DisplayName("忘记密码-短信码错误")
+    void forgotPassword_shouldFail_whenSmsCodeWrong() {
+        when(smsCodeStorage.get("sms:code:13800138000")).thenReturn("123456");
+
+        assertThrows(BusinessException.class,
+                () -> authService.forgotPassword("13800138000", "000000", "newPass123", "newPass123"));
+        verify(userService, never()).resetPassword(anyString(), anyString(), anyString());
+    }
+
+    // ===== 刷新Token =====
 
     @Test
     @DisplayName("刷新Token成功")
