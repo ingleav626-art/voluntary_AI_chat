@@ -11,6 +11,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.TextField;
+import org.example.client.model.LoginResponse;
 import org.example.client.model.RegisterResponse;
 import org.example.client.view.RegisterViewModel;
 import org.slf4j.Logger;
@@ -108,17 +109,15 @@ public final class RegisterController implements Initializable {
 
     private void handleRegisterSuccess(final RegisterResponse response) {
         Platform.runLater(() -> {
-            LOG.info("注册成功，准备返回登录页面");
-            // 延迟1秒后返回登录页面，让用户看到成功提示
-            new Thread(() -> {
-                try {
-                    Thread.sleep(RETURN_DELAY_MS);
-                } catch (final InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
-                Platform.runLater(() -> org.example.client.App.switchToLogin());
-            }).start();
+            LOG.info("注册成功，自动登录并跳转主界面");
+            // 注册即登录：将 RegisterResponse 转换为 LoginResponse，直接进入主界面
+            final LoginResponse loginResponse = new LoginResponse(
+                    response.getAccessToken(),
+                    response.getRefreshToken(),
+                    response.getExpiresIn(),
+                    response.getUser()
+            );
+            org.example.client.App.switchToMain(loginResponse);
         });
     }
 }

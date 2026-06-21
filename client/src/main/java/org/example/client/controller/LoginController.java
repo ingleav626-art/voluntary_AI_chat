@@ -99,7 +99,7 @@ public final class LoginController implements Initializable {
     private void handleLoginSuccess(final LoginResponse response) {
         Platform.runLater(() -> {
             LOG.info("登录成功，准备跳转主界面");
-            // TODO: 跳转到主聊天界面
+            org.example.client.App.switchToMain(response);
         });
     }
 
