@@ -114,6 +114,8 @@ POST /auth/sms/send
 POST /auth/register
 ```
 
+**说明**: 注册成功后自动登录，返回完整登录态（与登录接口响应结构一致）。
+
 **请求参数**:
 ```json
 {
@@ -128,10 +130,17 @@ POST /auth/register
 ```json
 {
   "code": 200,
-  "message": "注册成功",
+  "message": "success",
   "data": {
-    "userId": "user_001",
-    "username": "张三"
+    "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+    "refreshToken": "eyJhbGciOiJIUzI1NiJ9...",
+    "expiresIn": 7200,
+    "user": {
+      "userId": 1001,
+      "phone": "138****8000",
+      "username": "张三",
+      "avatar": "http://minio.example.com/avatar/001.jpg"
+    }
   }
 }
 ```
@@ -154,13 +163,14 @@ POST /auth/login
 ```json
 {
   "code": 200,
-  "message": "登录成功",
+  "message": "success",
   "data": {
     "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
     "refreshToken": "eyJhbGciOiJIUzI1NiJ9...",
     "expiresIn": 7200,
     "user": {
-      "userId": "user_001",
+      "userId": 1001,
+      "phone": "138****8000",
       "username": "张三",
       "avatar": "http://minio.example.com/avatar/001.jpg"
     }
@@ -195,6 +205,32 @@ POST /auth/refresh
 }
 ```
 
+### 1.5 忘记密码
+```
+POST /auth/forgot-password
+```
+
+**说明**: 通过手机号+短信验证码重置密码，无需登录态。
+
+**请求参数**:
+```json
+{
+  "phone": "13800138000",
+  "code": "123456",
+  "newPassword": "newpassword123",
+  "confirmPassword": "newpassword123"
+}
+```
+
+**响应**:
+```json
+{
+  "code": 200,
+  "message": "密码重置成功",
+  "data": null
+}
+```
+
 ---
 
 ## 二、用户模块
@@ -210,14 +246,33 @@ GET /user/profile
   "code": 200,
   "message": "success",
   "data": {
-    "userId": "user_001",
+    "userId": 1001,
     "phone": "138****8000",
     "username": "张三",
     "avatar": "http://minio.example.com/avatar/001.jpg",
     "bio": "这个人很懒，什么都没写",
+    "gender": 0,
+    "age": null,
+    "birthday": null,
+    "detailBio": null,
     "createTime": "2024-01-01T00:00:00Z"
   }
 }
+```
+
+**字段说明**:
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| userId | Long | 用户ID |
+| phone | String | 手机号（脱敏） |
+| username | String | 用户名 |
+| avatar | String | 头像URL |
+| bio | String | 个人简介 |
+| gender | Integer | 性别：0-未知，1-男，2-女 |
+| age | Integer | 年龄 |
+| birthday | String | 生日（yyyy-MM-dd） |
+| detailBio | String | 个人详细说明 |
+| createTime | String | 注册时间 |
 ```
 
 ### 2.2 修改个人信息
@@ -225,13 +280,29 @@ GET /user/profile
 PUT /user/profile
 ```
 
-**请求参数**:
+**请求参数**（所有字段可选，仅传需要修改的字段）:
 ```json
 {
   "username": "张三三",
   "avatar": "http://minio.example.com/avatar/002.jpg",
-  "bio": "我是一个程序员"
+  "bio": "我是一个程序员",
+  "gender": 1,
+  "age": 25,
+  "birthday": "1999-01-01",
+  "detailBio": "热爱编程和音乐"
 }
+```
+
+**字段说明**:
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| username | String | 否 | 用户名（2-50字符） |
+| avatar | String | 否 | 头像URL（最长500字符） |
+| bio | String | 否 | 个人简介（最长500字符） |
+| gender | Integer | 否 | 性别：0-未知，1-男，2-女 |
+| age | Integer | 否 | 年龄（0-200） |
+| birthday | String | 否 | 生日（yyyy-MM-dd） |
+| detailBio | String | 否 | 个人详细说明（最长2000字符） |
 ```
 
 **响应**:
@@ -269,6 +340,56 @@ GET /user/search?keyword=张三&page=1&size=20
 }
 ```
 
+### 2.4 修改密码
+```
+PUT /user/password
+```
+
+**说明**: 需验证当前手机号短信验证码。
+
+**请求参数**:
+```json
+{
+  "smsCode": "123456",
+  "newPassword": "newpassword123",
+  "confirmPassword": "newpassword123"
+}
+```
+
+**响应**:
+```json
+{
+  "code": 200,
+  "message": "密码修改成功",
+  "data": null
+}
+```
+
+### 2.5 修改手机号
+```
+PUT /user/phone
+```
+
+**说明**: 需同时验证旧手机号和新手机号的短信验证码。
+
+**请求参数**:
+```json
+{
+  "smsCode": "123456",
+  "newPhone": "13900139000",
+  "newSmsCode": "654321"
+}
+```
+
+**响应**:
+```json
+{
+  "code": 200,
+  "message": "手机号修改成功",
+  "data": null
+}
+```
+
 ---
 
 ## 三、好友模块
@@ -278,12 +399,12 @@ GET /user/search?keyword=张三&page=1&size=20
 POST /friend/apply
 ```
 
-**说明**: 如果已存在待处理的申请，返回错误码 `2001`。如果对方已发送过申请，自动接受并建立好友关系。
+**说明**: 通过手机号查找目标用户。如果已存在待处理的申请，返回错误码 `2001`。如果对方已发送过申请，自动接受并建立好友关系。
 
 **请求参数**:
 ```json
 {
-  "targetUserId": "user_002",
+  "targetPhone": "13900139000",
   "message": "我是张三，加个好友"
 }
 ```
@@ -400,10 +521,10 @@ DELETE /friend/{friendId}
 
 ### 4.1 获取会话列表
 ```
-GET /conversation/list?page=1&size=20
+GET /conversation/list?page=1&size=20&keyword=
 ```
 
-**说明**: 获取当前用户所有会话，按最后一条消息时间倒序排列。客户端首页使用此接口。
+**说明**: 获取当前用户所有会话，按最后一条消息时间倒序排列。客户端首页使用此接口。`keyword` 参数可选，用于按会话名称模糊搜索过滤。
 
 **响应**:
 ```json
@@ -513,11 +634,12 @@ POST /message/recall
 - 人-人消息：发送后 2 分钟内可撤回，超时返回错误码 `4001`
 - 人-AI 消息：可随时撤回
 - 群消息撤回：仅群主和管理员可撤回他人消息，普通成员只能撤回自己的消息，否则返回错误码 `4002`
+- 撤回成功后，服务端会通过 WebSocket 推送 `MESSAGE_RECALL` 通知给对方（私聊）或群成员（群聊），前端据此更新消息显示为"已撤回"
 
 **请求参数**:
 ```json
 {
-  "messageId": "msg_001"
+  "messageId": "100"
 }
 ```
 
@@ -526,7 +648,11 @@ POST /message/recall
 {
   "code": 200,
   "message": "已撤回",
-  "data": null
+  "data": {
+    "messageId": 100,
+    "sessionId": "p_1001_1002",
+    "senderId": 1001
+  }
 }
 ```
 
@@ -535,13 +661,13 @@ POST /message/recall
 POST /message/read
 ```
 
-**说明**: 客户端打开会话时批量上报已读消息。
+**说明**: 客户端打开会话时批量上报已读消息。上报后服务端会通过 WebSocket 推送 `READ_RECEIPT` 通知给消息发送者。
 
 **请求参数**:
 ```json
 {
   "sessionId": "p_1001_1002",
-  "messageIds": ["msg_001", "msg_002", "msg_003"]
+  "messageIds": [1, 2, 3]
 }
 ```
 
@@ -1087,6 +1213,22 @@ ws://localhost:8080/ws?token={jwt_token}
 }
 ```
 
+#### 消息撤回通知（服务端 → 客户端）
+```json
+{
+  "id": "服务端生成的消息ID",
+  "type": "MESSAGE_RECALL",
+  "data": {
+    "messageId": 100,
+    "sessionId": "p_1001_1002",
+    "senderId": 1001,
+    "recallTime": "2024-01-01T10:05:00Z"
+  }
+}
+```
+
+**说明**: 当有人撤回消息时，服务端推送此通知。私聊时推送给对方和撤回者自己（多端同步），群聊时推送给群内所有成员（排除撤回操作者）。前端收到后应将对应消息的显示内容替换为"对方撤回了一条消息"或"你撤回了一条消息"。
+
 #### 已读通知（服务端 → 客户端）
 ```json
 {
@@ -1126,31 +1268,22 @@ ws://localhost:8080/ws?token={jwt_token}
   "id": "550e8400-e29b-41d4-a716-446655440002",
   "type": "RECONNECT",
   "data": {
-    "lastMessageId": "msg_010"
+    "lastMessageId": 10
   }
 }
 ```
 
-**说明**: 客户端断线重连后发送此消息，`lastMessageId` 为断线前收到的最后一条消息的服务端消息ID。服务端据此推送增量消息。
+**说明**: `lastMessageId` 为客户端最后收到的消息ID（Long 类型），服务端会补发该ID之后的所有离线消息，然后发送 `RECONNECT_ACK` 确认。
 
-#### 重连响应（服务端 → 客户端）
+#### 重连确认（服务端 → 客户端）
 ```json
 {
   "id": "服务端生成的消息ID",
   "type": "RECONNECT_ACK",
   "data": {
-    "missedMessages": [
-      {
-        "messageId": "msg_011",
-        "sessionId": "p_1001_1002",
-        "senderId": "user_002",
-        "senderName": "李四",
-        "senderType": "USER",
-        "msgType": "TEXT",
-        "content": "你去哪了？",
-        "createTime": "2024-01-01T10:05:00Z"
-      }
-    ]
+    "missedCount": 5
   }
 }
 ```
+
+**说明**: `missedCount` 为补发的离线消息数量。

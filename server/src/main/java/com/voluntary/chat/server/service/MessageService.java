@@ -11,6 +11,7 @@ import com.voluntary.chat.common.exception.ErrorCode;
 import com.voluntary.chat.server.dto.request.MarkReadRequest;
 import com.voluntary.chat.server.dto.request.SendMessageRequest;
 import com.voluntary.chat.server.dto.response.MessageResponse;
+import com.voluntary.chat.server.dto.response.RecallMessageResponse;
 import com.voluntary.chat.server.dto.response.SendMessageResponse;
 import com.voluntary.chat.server.entity.Message;
 import com.voluntary.chat.server.entity.MessageRead;
@@ -112,7 +113,7 @@ public class MessageService {
      * 群消息：仅群主和管理员可撤回他人消息，普通成员只能撤回自己的消息
      */
     @Transactional
-    public void recallMessage(Long userId, Long messageId) {
+    public RecallMessageResponse recallMessage(Long userId, Long messageId) {
         Message message = messageMapper.selectById(messageId);
         if (message == null || message.getIsDeleted() == 1) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "消息不存在");
@@ -122,7 +123,11 @@ public class MessageService {
         if (message.getSenderType() == SenderType.AI.ordinal()) {
             message.setRecallTime(LocalDateTime.now());
             messageMapper.updateById(message);
-            return;
+            return RecallMessageResponse.builder()
+                    .messageId(message.getId())
+                    .sessionId(message.getSessionId())
+                    .senderId(message.getSenderId())
+                    .build();
         }
 
         // 群消息：群主/管理员可撤回他人消息
@@ -157,6 +162,12 @@ public class MessageService {
         messageMapper.updateById(message);
 
         log.info("消息撤回成功: messageId={}, userId={}", messageId, userId);
+
+        return RecallMessageResponse.builder()
+                .messageId(message.getId())
+                .sessionId(message.getSessionId())
+                .senderId(message.getSenderId())
+                .build();
     }
 
     /**
@@ -165,8 +176,7 @@ public class MessageService {
      */
     @Transactional
     public void markRead(Long userId, MarkReadRequest request) {
-        for (String messageIdStr : request.getMessageIds()) {
-            Long messageId = Long.parseLong(messageIdStr);
+        for (Long messageId : request.getMessageIds()) {
             // 检查是否已标记
             LambdaQueryWrapper<MessageRead> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(MessageRead::getMessageId, messageId)
@@ -306,6 +316,45 @@ public class MessageService {
             return new SessionInfo(Long.parseLong(parts[1]), TargetType.USER);
         }
         throw new BusinessException(ErrorCode.BAD_REQUEST, "无效的会话ID格式");
+    }
+
+    /**
+     * 获取用户在指定 messageId 之后的离线消息（用于断线重连补发）
+     *
+     * @param userId        用户ID
+     * @param lastMessageId 客户端最后收到的消息ID
+     * @return 离线消息列表
+     */
+    public List<MessageResponse> getOfflineMessages(Long userId, Long lastMessageId) {
+        // 获取用户参与的所有会话ID
+        List<String> sessionIds = getUserSessionIds(userId);
+
+        if (sessionIds.isEmpty()) {
+            return List.of();
+        }
+
+        // 查询这些会话中 ID 大于 lastMessageId 的消息
+        LambdaQueryWrapper<Message> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(Message::getSessionId, sessionIds)
+                .gt(Message::getId, lastMessageId)
+                .eq(Message::getIsDeleted, 0)
+                .orderByAsc(Message::getCreateTime);
+
+        List<Message> messages = messageMapper.selectList(wrapper);
+
+        if (messages.isEmpty()) {
+            return List.of();
+        }
+
+        // 批量获取发送者信息
+        Set<Long> senderIds = messages.stream()
+                .map(Message::getSenderId)
+                .collect(Collectors.toSet());
+        Map<Long, User> userMap = userService.findByIds(senderIds);
+
+        return messages.stream()
+                .map(msg -> toResponse(msg, userMap))
+                .toList();
     }
 
     /**

@@ -5,6 +5,7 @@ import com.voluntary.chat.common.constant.MessageTypes;
 import com.voluntary.chat.common.enums.SenderType;
 import com.voluntary.chat.common.model.WebSocketMessage;
 import com.voluntary.chat.server.dto.request.SendMessageRequest;
+import com.voluntary.chat.server.dto.response.MessageResponse;
 import com.voluntary.chat.server.dto.response.SendMessageResponse;
 import com.voluntary.chat.server.entity.User;
 import com.voluntary.chat.server.mapper.GroupMemberMapper;
@@ -88,6 +89,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     switch (wsMessage.getType()) {
       case MessageTypes.SEND_MESSAGE -> handleSendMessage(userId, wsMessage);
       case MessageTypes.PING -> handlePing(session, wsMessage);
+      case MessageTypes.RECONNECT -> handleReconnect(userId, wsMessage);
       default -> log.warn("未知的消息类型: type={}, userId={}", wsMessage.getType(), userId);
     }
   }
@@ -235,6 +237,71 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
+   * 处理断线重连
+   * 根据 lastMessageId 补发离线期间的消息，并回复 RECONNECT_ACK
+   */
+  private void handleReconnect(Long userId, WebSocketMessage wsMessage) {
+    @SuppressWarnings("unchecked")
+    Map<String, Object> data = (Map<String, Object>) wsMessage.getData();
+    Object lastMsgIdObj = data.get("lastMessageId");
+    if (lastMsgIdObj == null) {
+      log.warn("RECONNECT 请求缺少 lastMessageId: userId={}", userId);
+      return;
+    }
+
+    Long lastMessageId;
+    try {
+      lastMessageId = Long.parseLong(String.valueOf(lastMsgIdObj));
+    } catch (NumberFormatException e) {
+      log.warn("RECONNECT lastMessageId 格式错误: userId={}, value={}", userId, lastMsgIdObj);
+      return;
+    }
+
+    // 查询离线消息
+    List<MessageResponse> offlineMessages = messageService.getOfflineMessages(userId, lastMessageId);
+
+    // 逐条推送离线消息
+    for (MessageResponse msg : offlineMessages) {
+      String wsType = msg.getSessionId().startsWith("g_")
+          ? MessageTypes.GROUP_MESSAGE
+          : MessageTypes.RECEIVE_MESSAGE;
+
+      Map<String, Object> msgData = new java.util.LinkedHashMap<>();
+      msgData.put("messageId", msg.getMessageId());
+      msgData.put("sessionId", msg.getSessionId());
+      msgData.put("senderId", msg.getSenderId());
+      msgData.put("senderName", msg.getSenderName());
+      msgData.put("senderAvatar", msg.getSenderAvatar() != null ? msg.getSenderAvatar() : "");
+      msgData.put("senderType", msg.getSenderType());
+      msgData.put("msgType", msg.getType());
+      msgData.put("content", msg.getContent());
+      msgData.put("createTime", msg.getCreateTime() != null ? msg.getCreateTime().toString() : "");
+
+      if (msg.getSessionId().startsWith("g_")) {
+        String[] parts = msg.getSessionId().split("_");
+        msgData.put("groupId", Long.parseLong(parts[1]));
+      }
+
+      WebSocketMessage offlineMsg = WebSocketMessage.builder()
+          .id(String.valueOf(msg.getMessageId()))
+          .type(wsType)
+          .data(msgData)
+          .build();
+      sendToUser(userId, offlineMsg);
+    }
+
+    // 发送 RECONNECT_ACK 确认
+    WebSocketMessage ack = WebSocketMessage.builder()
+        .id(String.valueOf(System.currentTimeMillis()))
+        .type(MessageTypes.RECONNECT_ACK)
+        .data(Map.of("missedCount", offlineMessages.size()))
+        .build();
+    sendToUser(userId, ack);
+
+    log.info("断线重连补发完成: userId={}, missedCount={}", userId, offlineMessages.size());
+  }
+
+  /**
    * 广播用户在线状态变更
    */
   private void broadcastStatusChange(Long userId, boolean online) {
@@ -289,6 +356,26 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     }
     // 群聊和AI聊天的转发逻辑在后续迭代中实现
     return null;
+  }
+
+  /**
+   * 向群内所有在线成员广播消息（排除指定用户）
+   *
+   * @param sessionId     群会话ID，格式 g_{groupId}
+   * @param excludeUserId 排除的用户ID（通常是操作者自己）
+   * @param message       WebSocket 消息
+   */
+  public void broadcastToGroupExcept(String sessionId, Long excludeUserId, WebSocketMessage message) {
+    if (!sessionId.startsWith("g_")) {
+      return;
+    }
+    Long groupId = Long.parseLong(sessionId.split("_")[1]);
+    List<Long> memberIds = groupMemberMapper.selectGroupMemberUserIds(groupId);
+    for (Long memberId : memberIds) {
+      if (!memberId.equals(excludeUserId)) {
+        sendToUser(memberId, message);
+      }
+    }
   }
 
   private Long getUserId(WebSocketSession session) {

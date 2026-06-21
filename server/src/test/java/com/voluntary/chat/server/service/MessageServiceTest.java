@@ -201,7 +201,7 @@ class MessageServiceTest {
     void markRead_shouldSucceed() {
         MarkReadRequest request = new MarkReadRequest();
         request.setSessionId("p_1001_1002");
-        request.setMessageIds(List.of("2001", "2002"));
+        request.setMessageIds(List.of(2001L, 2002L));
 
         when(messageReadMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(messageReadMapper.insert(any(MessageRead.class))).thenReturn(1);
@@ -215,7 +215,7 @@ class MessageServiceTest {
     void markRead_shouldSkip_alreadyRead() {
         MarkReadRequest request = new MarkReadRequest();
         request.setSessionId("p_1001_1002");
-        request.setMessageIds(List.of("2001"));
+        request.setMessageIds(List.of(2001L));
 
         when(messageReadMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
 

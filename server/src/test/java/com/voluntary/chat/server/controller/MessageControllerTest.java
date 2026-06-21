@@ -6,9 +6,11 @@ import com.voluntary.chat.server.dto.request.RecallMessageRequest;
 import com.voluntary.chat.server.dto.request.SendMessageRequest;
 import com.voluntary.chat.server.dto.response.ImageUploadResponse;
 import com.voluntary.chat.server.dto.response.MessageResponse;
+import com.voluntary.chat.server.dto.response.RecallMessageResponse;
 import com.voluntary.chat.server.dto.response.SendMessageResponse;
 import com.voluntary.chat.server.service.ImageUploadService;
 import com.voluntary.chat.server.service.MessageService;
+import com.voluntary.chat.server.websocket.ChatWebSocketHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,12 +38,15 @@ class MessageControllerTest {
         private MockMvc mockMvc;
         private MessageService messageService;
         private ImageUploadService imageUploadService;
+        private ChatWebSocketHandler chatWebSocketHandler;
 
         @BeforeEach
         void setUp() {
                 messageService = mock(MessageService.class);
                 imageUploadService = mock(ImageUploadService.class);
-                MessageController controller = new MessageController(messageService, imageUploadService);
+                chatWebSocketHandler = mock(ChatWebSocketHandler.class);
+                MessageController controller = new MessageController(messageService, imageUploadService,
+                                chatWebSocketHandler);
                 mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
 
                 SecurityContextHolder.clearContext();
@@ -112,7 +117,12 @@ class MessageControllerTest {
         @Test
         @DisplayName("撤回消息 - 成功")
         void recallMessage_shouldReturnOk() throws Exception {
-                doNothing().when(messageService).recallMessage(eq(1L), anyLong());
+                RecallMessageResponse mockResp = RecallMessageResponse.builder()
+                                .messageId(100L)
+                                .sessionId("p_1_2")
+                                .senderId(1L)
+                                .build();
+                when(messageService.recallMessage(eq(1L), anyLong())).thenReturn(mockResp);
 
                 mockMvc.perform(post("/api/message/recall")
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -137,7 +147,7 @@ class MessageControllerTest {
 
                 mockMvc.perform(post("/api/message/read")
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"sessionId\":\"session-1\",\"messageIds\":[\"100\",\"101\"]}"))
+                                .content("{\"sessionId\":\"session-1\",\"messageIds\":[100,101]}"))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.code").value(200));
         }
