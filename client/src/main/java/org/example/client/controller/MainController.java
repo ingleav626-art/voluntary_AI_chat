@@ -9,9 +9,11 @@ import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
@@ -101,6 +103,12 @@ public final class MainController implements Initializable {
     @FXML
     private Button sendButton;
 
+    @FXML
+    private Button imageButton;
+
+    @FXML
+    private Button plusButton;
+
     private MainViewModel viewModel;
 
     @Override
@@ -165,6 +173,17 @@ public final class MainController implements Initializable {
         // 设置消息列表 Cell
         messageList.setCellFactory(param -> new MessageCell());
 
+        // 监听消息列表滚动，滚动到顶部时加载更多历史消息
+        messageList.skinProperty().addListener((obs, oldSkin, newSkin) -> {
+            if (newSkin != null) {
+                setupScrollListener();
+            }
+        });
+
+        // 监听搜索框文本变化，实时过滤会话列表
+        searchField.textProperty().addListener((obs, oldVal, newVal) ->
+                viewModel.filterConversations(newVal));
+
         // 绑定输入框
         final ChatViewModel chatVm = viewModel.chatViewModelProperty().get();
         if (chatVm != null) {
@@ -217,6 +236,48 @@ public final class MainController implements Initializable {
     }
 
     /**
+     * 设置消息列表滚动监听
+     * 滚动到顶部时触发加载更多历史消息
+     */
+    private void setupScrollListener() {
+        final javafx.scene.Node virtualFlow = messageList.lookup(".virtual-flow");
+        if (virtualFlow instanceof javafx.scene.layout.Region region) {
+            region.heightProperty().addListener((obs, oldVal, newVal) -> {
+                // 检查是否滚动到顶部
+                final double scrollValue = region.getTranslateY();
+                if (scrollValue >= 0) {
+                    final ChatViewModel chatVm = viewModel.chatViewModelProperty().get();
+                    if (chatVm != null && !chatVm.loadingProperty().get()) {
+                        final int currentSize = chatVm.getMessages().size();
+                        chatVm.loadMoreHistory();
+                        // 加载后保持滚动位置
+                        maintainScrollPosition(currentSize);
+                    }
+                }
+            });
+        }
+    }
+
+    /**
+     * 加载更多后保持滚动位置
+     *
+     * @param previousSize 加载前的消息数量
+     */
+    private void maintainScrollPosition(final int previousSize) {
+        Platform.runLater(() -> {
+            final ChatViewModel chatVm = viewModel.chatViewModelProperty().get();
+            if (chatVm != null) {
+                final int newSize = chatVm.getMessages().size();
+                final int addedCount = newSize - previousSize;
+                if (addedCount > 0) {
+                    // 跳转到加载前的位置
+                    messageList.scrollTo(addedCount);
+                }
+            }
+        });
+    }
+
+    /**
      * 处理发送消息
      */
     @FXML
@@ -224,6 +285,35 @@ public final class MainController implements Initializable {
         final ChatViewModel chatVm = viewModel.chatViewModelProperty().get();
         if (chatVm != null) {
             chatVm.sendMessage();
+        }
+    }
+
+    /**
+     * 处理发送图片
+     * 打开文件选择器，选择图片后上传并发送
+     */
+    @FXML
+    private void handleSendImage() {
+        final ChatViewModel chatVm = viewModel.chatViewModelProperty().get();
+        if (chatVm == null) {
+            return;
+        }
+
+        final javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
+        fileChooser.setTitle("选择图片");
+        fileChooser.getExtensionFilters().addAll(
+                new javafx.stage.FileChooser.ExtensionFilter("图片文件", "*.jpg", "*.jpeg", "*.png", "*.gif", "*.webp"),
+                new javafx.stage.FileChooser.ExtensionFilter("所有文件", "*.*")
+        );
+
+        final java.io.File selectedFile = fileChooser.showOpenDialog(imageButton.getScene().getWindow());
+        if (selectedFile != null) {
+            // 校验文件大小（10MB）
+            if (selectedFile.length() > 10 * 1024 * 1024) {
+                errorLabel.setText("图片大小不能超过10MB");
+                return;
+            }
+            chatVm.sendImage(selectedFile.toPath());
         }
     }
 
@@ -238,6 +328,23 @@ public final class MainController implements Initializable {
             event.consume();
             handleSend();
         }
+    }
+
+    /**
+     * 处理 + 按钮点击
+     * 弹出快捷菜单，提供图片发送等更多功能入口
+     */
+    @FXML
+    private void handlePlusButton() {
+        final javafx.scene.control.ContextMenu menu = new javafx.scene.control.ContextMenu();
+        final javafx.scene.control.MenuItem imageItem = new javafx.scene.control.MenuItem("发送图片");
+        imageItem.setOnAction(e -> handleSendImage());
+        final javafx.scene.control.MenuItem fileItem = new javafx.scene.control.MenuItem("发送文件");
+        fileItem.setDisable(true);
+        final javafx.scene.control.MenuItem locationItem = new javafx.scene.control.MenuItem("发送位置");
+        locationItem.setDisable(true);
+        menu.getItems().addAll(imageItem, fileItem, locationItem);
+        menu.show(plusButton, javafx.geometry.Side.BOTTOM, 0, 0);
     }
 
     /**
@@ -348,8 +455,9 @@ public final class MainController implements Initializable {
 
     /**
      * 消息列表 Cell
+     * 非静态内部类，可访问外部类的 viewModel 实现撤回
      */
-    private static final class MessageCell extends ListCell<MessageInfo> {
+    private final class MessageCell extends ListCell<MessageInfo> {
 
         @Override
         protected void updateItem(final MessageInfo item, final boolean empty) {
@@ -358,6 +466,7 @@ public final class MainController implements Initializable {
             if (empty || item == null) {
                 setText(null);
                 setGraphic(null);
+                setContextMenu(null);
                 return;
             }
 
@@ -366,12 +475,14 @@ public final class MainController implements Initializable {
                 recalled.getStyleClass().add("message-recalled");
                 setGraphic(recalled);
                 setText(null);
+                setContextMenu(null);
                 return;
             }
 
             final VBox bubble = new VBox(4);
 
-            if (item.isSentByMe()) {
+            final boolean sentByMe = item.isSentByMe();
+            if (sentByMe) {
                 bubble.getStyleClass().add("message-bubble-sent");
                 bubble.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
             } else {
@@ -379,17 +490,118 @@ public final class MainController implements Initializable {
                 bubble.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
             }
 
-            final Label content = new Label(item.getContent() != null ? item.getContent() : "");
-            content.getStyleClass().add("message-content");
-            content.setWrapText(true);
-            content.setMaxWidth(400);
+            // 根据消息类型渲染内容
+            if ("IMAGE".equals(item.getType())) {
+                // 图片消息：渲染 ImageView
+                final javafx.scene.image.ImageView imageView = new javafx.scene.image.ImageView();
+                try {
+                    if (item.getContent() != null && !item.getContent().isEmpty()) {
+                        final javafx.scene.image.Image image = new javafx.scene.image.Image(item.getContent(), true);
+                        imageView.setImage(image);
+                        // 限制图片最大尺寸
+                        final double maxWidth = 300;
+                        final double maxHeight = 200;
+                        imageView.setPreserveRatio(true);
+                        imageView.setFitWidth(Math.min(image.getWidth(), maxWidth));
+                        imageView.setFitHeight(Math.min(image.getHeight(), maxHeight));
+                        imageView.getStyleClass().add("message-image");
+                    }
+                } catch (final Exception e) {
+                    // 图片加载失败时显示链接
+                    final Label fallback = new Label("[图片] " + item.getContent());
+                    fallback.getStyleClass().add("message-content");
+                    fallback.setWrapText(true);
+                    fallback.setMaxWidth(400);
+                    bubble.getChildren().add(fallback);
+                }
+                if (imageView.getImage() != null) {
+                    bubble.getChildren().add(imageView);
+                }
+            } else {
+                // 文本消息：渲染 Label
+                final Label content = new Label(item.getContent() != null ? item.getContent() : "");
+                content.getStyleClass().add("message-content");
+                content.setWrapText(true);
+                content.setMaxWidth(400);
+                bubble.getChildren().add(content);
+            }
 
             final Label time = new Label(formatTime(item.getCreateTime()));
             time.getStyleClass().add("message-time");
 
-            bubble.getChildren().addAll(content, time);
+            // 已读状态标签（仅自己发送的消息显示）
+            if (item.isSentByMe() && item.getMessageId() != null && item.getMessageId() > 0) {
+                final Label readStatus = new Label(item.isRead() ? "已读" : "未读");
+                readStatus.getStyleClass().add("message-read-status");
+                bubble.getChildren().addAll(time, readStatus);
+            } else {
+                bubble.getChildren().add(time);
+            }
+
             setGraphic(bubble);
             setText(null);
+
+            // 通过外层 HBox 控制气泡在单元格内的左右对齐
+            final HBox alignBox = new HBox(bubble);
+            HBox.setHgrow(bubble, javafx.scene.layout.Priority.NEVER);
+            if (sentByMe) {
+                alignBox.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
+            } else {
+                alignBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            }
+            alignBox.setMaxWidth(Double.MAX_VALUE);
+            setGraphic(alignBox);
+
+            // 为自己发送且未撤回的消息添加右键菜单
+            if (item.isSentByMe() && item.getMessageId() != null && item.getMessageId() > 0) {
+                final ContextMenu contextMenu = new ContextMenu();
+                final MenuItem recallItem = new MenuItem("撤回");
+                recallItem.setOnAction(e -> handleRecallMessage(item));
+                contextMenu.getItems().add(recallItem);
+                setContextMenu(contextMenu);
+            } else {
+                setContextMenu(null);
+            }
+
+            // 为所有文本消息添加复制菜单
+            if (item.getContent() != null && !item.getContent().isEmpty()
+                    && !"IMAGE".equals(item.getType())) {
+                final ContextMenu copyMenu = new ContextMenu();
+                final MenuItem copyItem = new MenuItem("复制");
+                copyItem.setOnAction(e -> copyMessageText(item.getContent()));
+                copyMenu.getItems().add(copyItem);
+
+                // 如果已有撤回菜单，合并到同一个菜单
+                if (getContextMenu() != null) {
+                    getContextMenu().getItems().add(new javafx.scene.control.SeparatorMenuItem());
+                    getContextMenu().getItems().add(copyItem);
+                } else {
+                    setContextMenu(copyMenu);
+                }
+            }
+        }
+
+        /**
+         * 处理撤回消息
+         *
+         * @param message 消息
+         */
+        private void handleRecallMessage(final MessageInfo message) {
+            final ChatViewModel chatVm = viewModel.chatViewModelProperty().get();
+            if (chatVm != null) {
+                chatVm.recallMessage(message.getMessageId());
+            }
+        }
+
+        /**
+         * 复制消息文本到剪贴板
+         *
+         * @param text 消息文本
+         */
+        private void copyMessageText(final String text) {
+            final javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+            content.putString(text);
+            javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
         }
 
         /**
