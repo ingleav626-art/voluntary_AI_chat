@@ -49,6 +49,9 @@ public class MessageInfo {
     /** 是否已撤回 */
     private boolean recalled;
 
+    /** 是否已读（仅自己发送的消息有效） */
+    private boolean read;
+
     /** 是否为当前用户发送（前端计算字段） */
     private boolean sentByMe;
 }

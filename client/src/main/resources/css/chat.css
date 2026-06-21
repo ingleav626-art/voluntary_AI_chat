@@ -1,0 +1,192 @@
+/* 聊天模块样式 - 消息气泡、输入区域（温馨主题） */
+
+/* 聊天区域 - 温暖米色背景 */
+.chat-area {
+    -fx-background-color: #FFF8F0;
+    -fx-spacing: 0;
+}
+
+/* 聊天标题栏 - 暖白 */
+.chat-header {
+    -fx-padding: 15 20;
+    -fx-background-color: #FFFEF8;
+    -fx-border-color: #E8D5C4;
+    -fx-border-width: 0 0 1 0;
+    -fx-spacing: 10;
+}
+
+.chat-title {
+    -fx-font-size: 16;
+    -fx-font-weight: bold;
+    -fx-text-fill: #4A3426;
+}
+
+.connection-label {
+    -fx-font-size: 12;
+    -fx-text-fill: #B08968;
+}
+
+/* 消息列表 */
+.message-list {
+    -fx-background-color: #FFF8F0;
+    -fx-padding: 10;
+}
+
+.message-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 5 15;
+}
+
+/* 消息气泡 - 发送（温暖珊瑚渐变） */
+.message-bubble-sent {
+    -fx-background-color: linear-gradient(from 0% 0% to 100% 0%, #F4A261 0%, #E76F51 100%);
+    -fx-background-radius: 10 10 0 10;
+    -fx-padding: 8 12;
+    -fx-max-width: 400;
+    -fx-alignment: center-right;
+    -fx-effect: dropshadow(gaussian, rgba(231,111,81,0.2), 4, 0, 0, 1);
+}
+
+.message-bubble-sent .message-content {
+    -fx-text-fill: white;
+    -fx-font-size: 14;
+}
+
+.message-bubble-sent .message-time {
+    -fx-text-fill: rgba(255, 248, 240, 0.8);
+    -fx-font-size: 10;
+}
+
+/* 消息气泡 - 接收（暖白带柔和边框） */
+.message-bubble-received {
+    -fx-background-color: #FFFEF8;
+    -fx-background-radius: 10 10 10 0;
+    -fx-padding: 8 12;
+    -fx-max-width: 400;
+    -fx-alignment: center-left;
+    -fx-border-color: #E8D5C4;
+    -fx-border-radius: 10 10 10 0;
+    -fx-border-width: 1;
+}
+
+.message-bubble-received .message-content {
+    -fx-text-fill: #4A3426;
+    -fx-font-size: 14;
+}
+
+.message-bubble-received .message-time {
+    -fx-text-fill: #B08968;
+    -fx-font-size: 10;
+}
+
+/* 撤回消息 */
+.message-recalled {
+    -fx-text-fill: #B08968;
+    -fx-font-size: 12;
+    -fx-italic: true;
+    -fx-alignment: center;
+}
+
+/* 图片消息 */
+.message-image {
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+}
+
+/* 已读状态 */
+.message-read-status {
+    -fx-font-size: 10;
+    -fx-text-fill: rgba(255, 248, 240, 0.7);
+}
+
+.message-bubble-received .message-read-status {
+    -fx-text-fill: #D4A373;
+}
+
+/* 输入区域 - 暖白 */
+.input-area {
+    -fx-padding: 10 15;
+    -fx-background-color: #FFFEF8;
+    -fx-border-color: #E8D5C4;
+    -fx-border-width: 1 0 0 0;
+    -fx-spacing: 8;
+}
+
+.input-textarea {
+    -fx-background-color: #FFF8F0;
+    -fx-background-radius: 8;
+    -fx-border-color: #E8D5C4;
+    -fx-border-radius: 8;
+    -fx-font-size: 14;
+    -fx-padding: 8;
+    -fx-pref-width: 999;
+}
+
+.input-textarea:focused {
+    -fx-border-color: #E76F51;
+    -fx-effect: dropshadow(gaussian, rgba(231,111,81,0.15), 4, 0, 0, 0);
+}
+
+.input-toolbar {
+    -fx-padding: 0 0 5 0;
+    -fx-spacing: 8;
+}
+
+/* 输入区底部行（错误提示 + 发送按钮） */
+.input-footer {
+    -fx-padding: 8 0 0 0;
+    -fx-spacing: 10;
+}
+
+/* 工具栏按钮 - 圆形暖色按钮 */
+.btn-tool {
+    -fx-background-color: #FFE8D6;
+    -fx-text-fill: #D4622A;
+    -fx-font-size: 14;
+    -fx-font-weight: bold;
+    -fx-background-radius: 16;
+    -fx-min-width: 32;
+    -fx-min-height: 32;
+    -fx-pref-width: 32;
+    -fx-pref-height: 32;
+    -fx-alignment: center;
+    -fx-cursor: hand;
+    -fx-border-color: transparent;
+}
+
+.btn-tool:hover {
+    -fx-background-color: #F4A261;
+    -fx-text-fill: white;
+}
+
+.btn-tool:pressed {
+    -fx-background-color: #E76F51;
+    -fx-text-fill: white;
+}
+
+/* 发送按钮 - 温暖珊瑚渐变 */
+.btn-send {
+    -fx-background-color: linear-gradient(from 0% 0% to 100% 0%, #F4A261 0%, #E76F51 100%);
+    -fx-text-fill: white;
+    -fx-font-size: 14;
+    -fx-font-weight: bold;
+    -fx-background-radius: 20;
+    -fx-padding: 8 25;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(231,111,81,0.3), 6, 0, 0, 1);
+}
+
+.btn-send:hover {
+    -fx-background-color: linear-gradient(from 0% 0% to 100% 0%, #E76F51 0%, #D4622A 100%);
+}
+
+.btn-send:pressed {
+    -fx-background-color: #D4622A;
+    -fx-effect: dropshadow(gaussian, rgba(231,111,81,0.15), 3, 0, 0, 1);
+}
+
+.btn-send:disabled {
+    -fx-background-color: #D4A373;
+    -fx-text-fill: #F5E6D3;
+    -fx-effect: none;
+}

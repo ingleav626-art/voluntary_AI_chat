@@ -13,18 +13,19 @@
 
 <VBox alignment="CENTER" maxHeight="-Infinity" maxWidth="-Infinity"
       minHeight="-Infinity" minWidth="-Infinity"
-      prefHeight="520.0" prefWidth="400.0" spacing="15.0"
+      prefHeight="520.0" prefWidth="400.0" spacing="16.0"
       styleClass="login-container"
       xmlns="http://javafx.com/javafx/17"
       xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="org.example.client.controller.LoginController">
 
     <padding>
-        <Insets bottom="40.0" left="40.0" right="40.0" top="40.0"/>
+        <Insets bottom="40.0" left="40.0" right="40.0" top="50.0"/>
     </padding>
 
-    <!-- 标题 -->
+    <!-- 标题区域 -->
     <Label styleClass="title" text="AI 聊天"/>
+    <Label styleClass="subtitle" text="温暖陪伴，轻松畅聊"/>
 
     <!-- 手机号输入框 -->
     <TextField fx:id="phoneField" promptText="请输入手机号" styleClass="input-field"
@@ -43,7 +44,7 @@
     <!-- 登录按钮 -->
     <StackPane>
         <Button fx:id="loginButton" mnemonicParsing="false"
-                onAction="#handleLogin" prefHeight="40.0" prefWidth="320.0"
+                onAction="#handleLogin" prefHeight="42.0" prefWidth="320.0"
                 styleClass="btn-primary" text="登 录"/>
         <ProgressIndicator fx:id="loadingIndicator" prefHeight="30.0" prefWidth="30.0"
                            visible="false"/>

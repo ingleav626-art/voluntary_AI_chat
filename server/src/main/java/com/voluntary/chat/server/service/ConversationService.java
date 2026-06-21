@@ -4,8 +4,10 @@ import com.voluntary.chat.common.dto.PageResult;
 import com.voluntary.chat.common.enums.MessageType;
 import com.voluntary.chat.common.enums.TargetType;
 import com.voluntary.chat.server.dto.response.ConversationResponse;
+import com.voluntary.chat.server.entity.GroupEntity;
 import com.voluntary.chat.server.entity.Message;
 import com.voluntary.chat.server.entity.User;
+import com.voluntary.chat.server.mapper.GroupMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,12 +23,22 @@ public class ConversationService {
 
     private final MessageService messageService;
     private final UserService userService;
+    private final GroupMapper groupMapper;
+
+    /**
+     * 获取当前用户的会话列表（兼容：无关键词搜索）
+     */
+    public PageResult<ConversationResponse> getConversations(Long userId, int page, int size) {
+        return getConversations(userId, page, size, null);
+    }
 
     /**
      * 获取当前用户的会话列表
      * 查询用户参与的所有会话，按最后消息时间倒序排列
+     *
+     * @param keyword 可选搜索关键词，按会话名称过滤
      */
-    public PageResult<ConversationResponse> getConversations(Long userId, int page, int size) {
+    public PageResult<ConversationResponse> getConversations(Long userId, int page, int size, String keyword) {
         // 查询用户参与的所有会话ID（去重）
         List<String> sessionIds = messageService.getUserSessionIds(userId);
 
@@ -45,6 +57,14 @@ public class ConversationService {
             long unreadCount = messageService.getUnreadCount(userId, sessionId);
             ConversationResponse conv = buildConversationResponse(userId, sessionId, lastMsg, unreadCount);
             conversations.add(conv);
+        }
+
+        // 搜索过滤：按 targetName 匹配关键词（大小写不敏感）
+        if (keyword != null && !keyword.isBlank()) {
+            String kw = keyword.trim().toLowerCase();
+            conversations = conversations.stream()
+                    .filter(c -> c.getTargetName() != null && c.getTargetName().toLowerCase().contains(kw))
+                    .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
         }
 
         // 按最后消息时间倒序
@@ -80,13 +100,21 @@ public class ConversationService {
                     .targetName(target.getUsername())
                     .targetAvatar(target.getAvatar());
         } else if (sessionId.startsWith("g_")) {
-            // 群聊
+            // 群聊：查询真实群名称和头像
             String[] parts = sessionId.split("_");
             Long groupId = Long.parseLong(parts[1]);
-            builder.targetId(groupId)
-                    .targetType(TargetType.GROUP.name())
-                    .targetName("群聊")
-                    .targetAvatar(null);
+            GroupEntity group = groupMapper.selectById(groupId);
+            if (group != null) {
+                builder.targetId(groupId)
+                        .targetType(TargetType.GROUP.name())
+                        .targetName(group.getName())
+                        .targetAvatar(group.getAvatar());
+            } else {
+                builder.targetId(groupId)
+                        .targetType(TargetType.GROUP.name())
+                        .targetName("群聊")
+                        .targetAvatar(null);
+            }
         } else if (sessionId.startsWith("a_")) {
             // AI单聊
             String[] parts = sessionId.split("_");

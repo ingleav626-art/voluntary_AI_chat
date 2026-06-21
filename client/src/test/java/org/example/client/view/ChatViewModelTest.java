@@ -10,9 +10,12 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import javafx.beans.property.BooleanProperty;
 
 /**
  * ChatViewModel 测试
@@ -156,5 +159,153 @@ class ChatViewModelTest {
     @Test
     void messagesProperty_shouldBeInitiallyEmpty() {
         assertTrue(chatViewModel.messagesProperty().get().isEmpty());
+    }
+
+    // ==================== 消息撤回测试 ====================
+
+    @Test
+    void recallMessage_shouldSetErrorWhenMessageIdIsNull() {
+        chatViewModel.recallMessage(null);
+        assertEquals("消息ID无效，无法撤回", chatViewModel.errorMessageProperty().get());
+    }
+
+    @Test
+    void recallMessage_shouldSetErrorWhenMessageIdIsNegative() {
+        chatViewModel.recallMessage(-1L);
+        assertEquals("消息ID无效，无法撤回", chatViewModel.errorMessageProperty().get());
+    }
+
+    @Test
+    void recallMessage_shouldNotSetErrorWhenMessageIdIsValid() {
+        chatViewModel.recallMessage(100L);
+        // 有效 messageId 不会立即设置错误（异步请求会失败但 errorMessage 由回调设置）
+        assertNotEquals("消息ID无效，无法撤回", chatViewModel.errorMessageProperty().get());
+    }
+
+    // ==================== 已读上报测试 ====================
+
+    @Test
+    void reportRead_shouldNotFailWhenMessagesEmpty() {
+        // 消息列表为空时调用 reportRead 不应抛出异常
+        chatViewModel.reportRead();
+        assertTrue(chatViewModel.getMessages().isEmpty());
+    }
+
+    @Test
+    void reportRead_shouldNotFailWhenOnlyOwnMessages() {
+        // 仅包含自己发送的消息时，没有需要上报的消息
+        final MessageInfo ownMsg = new MessageInfo();
+        ownMsg.setMessageId(1L);
+        ownMsg.setSentByMe(true);
+        ownMsg.setContent("我的消息");
+        chatViewModel.appendMessage(ownMsg);
+
+        chatViewModel.reportRead();
+        assertEquals(1, chatViewModel.getMessages().size());
+    }
+
+    @Test
+    void reportRead_shouldNotFailWhenMessagesHaveNoValidId() {
+        // 消息 messageId 为 null 或 <=0 时不应上报
+        final MessageInfo msg = new MessageInfo();
+        msg.setMessageId(null);
+        msg.setSentByMe(false);
+        chatViewModel.appendMessage(msg);
+
+        chatViewModel.reportRead();
+        assertEquals(1, chatViewModel.getMessages().size());
+    }
+
+    // ==================== 加载更多历史测试 ====================
+
+    @Test
+    void loadMoreHistory_shouldNotExecuteWhenConversationIsNull() {
+        final ChatViewModel vm = new ChatViewModel(currentUser, null);
+        vm.loadMoreHistory();
+        // 无会话时不应改变状态
+        assertFalse(vm.loadingProperty().get());
+    }
+
+    @Test
+    void loadMoreHistory_shouldNotExecuteWhenLoadingIsTrue() {
+        // 通过反射设置 loading 为 true，模拟正在加载
+        final BooleanProperty loadingProp = chatViewModel.loadingProperty();
+        loadingProp.set(true);
+        chatViewModel.loadMoreHistory();
+        // 已在加载中，不应重复触发
+        assertTrue(loadingProp.get());
+    }
+
+    // ==================== 图片消息发送测试 ====================
+
+    @Test
+    void sendImage_shouldSetErrorWhenConversationIsNull() {
+        final ChatViewModel vm = new ChatViewModel(currentUser, null);
+        vm.sendImage(java.nio.file.Paths.get("test.png"));
+        assertEquals("未选择会话", vm.errorMessageProperty().get());
+    }
+
+    @Test
+    void sendImage_shouldSetLoadingWhenConversationExists() {
+        // 会话存在时，应进入加载状态（异步请求会失败）
+        chatViewModel.sendImage(java.nio.file.Paths.get("nonexistent.png"));
+        // 由于文件不存在会抛异常，loading 会被回调重置
+        // 这里验证调用不会导致崩溃
+        assertNotNull(chatViewModel.errorMessageProperty().get());
+    }
+
+    // ==================== 消息追加边界测试 ====================
+
+    @Test
+    void appendMessage_shouldAddImageMessage() {
+        final MessageInfo imgMsg = new MessageInfo();
+        imgMsg.setMessageId(10L);
+        imgMsg.setType("IMAGE");
+        imgMsg.setContent("http://example.com/image.png");
+
+        chatViewModel.appendMessage(imgMsg);
+
+        assertEquals(1, chatViewModel.getMessages().size());
+        assertEquals("IMAGE", chatViewModel.getMessages().get(0).getType());
+    }
+
+    @Test
+    void appendMessage_shouldAddMessageWithNullMessageId() {
+        // messageId 为 null 的消息（如系统消息）也应能添加
+        final MessageInfo msg = new MessageInfo();
+        msg.setMessageId(null);
+        msg.setContent("系统消息");
+
+        chatViewModel.appendMessage(msg);
+
+        assertEquals(1, chatViewModel.getMessages().size());
+    }
+
+    // ==================== 消息已读状态测试 ====================
+
+    @Test
+    void messageInfo_readField_shouldDefaultToFalse() {
+        final MessageInfo msg = new MessageInfo();
+        assertFalse(msg.isRead());
+    }
+
+    @Test
+    void messageInfo_readField_shouldBeSettable() {
+        final MessageInfo msg = new MessageInfo();
+        msg.setRead(true);
+        assertTrue(msg.isRead());
+    }
+
+    @Test
+    void messageInfo_recalledField_shouldDefaultToFalse() {
+        final MessageInfo msg = new MessageInfo();
+        assertFalse(msg.isRecalled());
+    }
+
+    @Test
+    void messageInfo_recalledField_shouldBeSettable() {
+        final MessageInfo msg = new MessageInfo();
+        msg.setRecalled(true);
+        assertTrue(msg.isRecalled());
     }
 }

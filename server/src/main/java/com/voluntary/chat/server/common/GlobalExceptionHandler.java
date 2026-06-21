@@ -36,7 +36,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResult<Void> handleHttpMessageNotReadableException(HttpMessageNotReadableException e) {
-        String detail = e.getMostSpecificCause() != null ? e.getMostSpecificCause().getMessage() : e.getMessage();
+        String detail = e.getMostSpecificCause().getMessage();
         log.warn("请求体解析失败: {}", detail);
         return ApiResult.error(ErrorCode.BAD_REQUEST.getCode(), "请求体格式错误，请确保使用双引号的JSON格式");
     }

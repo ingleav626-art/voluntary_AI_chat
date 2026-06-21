@@ -1,6 +1,9 @@
 package com.voluntary.chat.server.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.voluntary.chat.common.enums.MessageType;
+import com.voluntary.chat.common.enums.SenderType;
+import com.voluntary.chat.common.enums.TargetType;
 import com.voluntary.chat.common.exception.BusinessException;
 import com.voluntary.chat.common.exception.ErrorCode;
 import com.voluntary.chat.server.dto.request.FriendApplyRequest;
@@ -8,9 +11,11 @@ import com.voluntary.chat.server.dto.response.FriendApplyResponse;
 import com.voluntary.chat.server.dto.response.FriendResponse;
 import com.voluntary.chat.server.entity.Friend;
 import com.voluntary.chat.server.entity.FriendApply;
+import com.voluntary.chat.server.entity.Message;
 import com.voluntary.chat.server.entity.User;
 import com.voluntary.chat.server.mapper.FriendApplyMapper;
 import com.voluntary.chat.server.mapper.FriendMapper;
+import com.voluntary.chat.server.mapper.MessageMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,6 +43,7 @@ public class FriendService {
 
     private final FriendApplyMapper friendApplyMapper;
     private final FriendMapper friendMapper;
+    private final MessageMapper messageMapper;
     private final UserService userService;
 
     /** 申请状态：待处理 */
@@ -51,6 +57,9 @@ public class FriendService {
     private static final String ACTION_ACCEPT = "ACCEPT";
     /** 处理动作：拒绝 */
     private static final String ACTION_REJECT = "REJECT";
+
+    /** 加好友成功后的欢迎消息内容 */
+    private static final String WELCOME_MESSAGE = "你好";
 
     /**
      * 发送好友申请
@@ -198,7 +207,8 @@ public class FriendService {
     /**
      * 删除好友
      *
-     * <p>双向删除好友关系记录。</p>
+     * <p>双向删除好友关系记录，并逻辑删除双方之间的所有消息记录，
+     * 使主界面会话列表不再展示已删除好友的会话。</p>
      *
      * @param userId   当前用户ID
      * @param friendId 好友ID
@@ -219,7 +229,13 @@ public class FriendService {
         reverseWrapper.eq(Friend::getUserId, friendId).eq(Friend::getFriendId, userId);
         friendMapper.delete(reverseWrapper);
 
-        log.info("好友关系已删除: user1={}, user2={}", userId, friendId);
+        // 逻辑删除双方之间的所有消息记录，使会话列表不再展示该好友
+        String sessionId = buildSessionId(userId, friendId);
+        LambdaQueryWrapper<Message> messageWrapper = new LambdaQueryWrapper<>();
+        messageWrapper.eq(Message::getSessionId, sessionId);
+        messageMapper.delete(messageWrapper);
+
+        log.info("好友关系已删除并清理会话: user1={}, user2={}, sessionId={}", userId, friendId, sessionId);
     }
 
     /**
@@ -248,14 +264,58 @@ public class FriendService {
 
     /**
      * 接受申请并建立双向好友关系
+     *
+     * <p>建立好友关系后，向双方各发送一条"你好"消息，作为会话初始消息。</p>
      */
     private void acceptApplyAndCreateFriendship(FriendApply apply) {
         apply.setStatus(STATUS_ACCEPTED);
         friendApplyMapper.updateById(apply);
 
+        Long user1 = apply.getUserId();
+        Long user2 = apply.getTargetUserId();
+
         // 建立双向好友关系
-        createFriendIfNotExists(apply.getUserId(), apply.getTargetUserId());
-        createFriendIfNotExists(apply.getTargetUserId(), apply.getUserId());
+        createFriendIfNotExists(user1, user2);
+        createFriendIfNotExists(user2, user1);
+
+        // 向双方各发送一条"你好"消息，作为会话初始消息
+        sendWelcomeMessage(user1, user2);
+        sendWelcomeMessage(user2, user1);
+    }
+
+    /**
+     * 发送欢迎消息
+     *
+     * <p>加好友成功后，由发送方给对方发一条"你好"文本消息。</p>
+     *
+     * @param senderId 发送者ID
+     * @param receiverId 接收者ID
+     */
+    private void sendWelcomeMessage(Long senderId, Long receiverId) {
+        String sessionId = buildSessionId(senderId, receiverId);
+
+        Message message = new Message();
+        message.setSessionId(sessionId);
+        message.setSenderId(senderId);
+        message.setSenderType(SenderType.USER.ordinal());
+        message.setTargetId(receiverId);
+        message.setTargetType(TargetType.USER.ordinal());
+        message.setType(MessageType.TEXT.ordinal());
+        message.setContent(WELCOME_MESSAGE);
+
+        messageMapper.insert(message);
+        log.info("欢迎消息已发送: from={}, to={}, sessionId={}", senderId, receiverId, sessionId);
+    }
+
+    /**
+     * 构建单聊会话ID
+     *
+     * <p>格式：p_{min(userId1,userId2)}_{max(userId1,userId2)}</p>
+     */
+    private String buildSessionId(Long userId1, Long userId2) {
+        long min = Math.min(userId1, userId2);
+        long max = Math.max(userId1, userId2);
+        return "p_" + min + "_" + max;
     }
 
     /**

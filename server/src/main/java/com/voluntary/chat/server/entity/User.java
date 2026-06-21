@@ -29,6 +29,18 @@ public class User {
 
     private String bio;
 
+    /** 性别：0-未知，1-男，2-女 */
+    private Integer gender;
+
+    /** 年龄 */
+    private Integer age;
+
+    /** 生日 */
+    private java.time.LocalDate birthday;
+
+    /** 个人详细说明 */
+    private String detailBio;
+
     private Integer status;
 
     private LocalDateTime lastLoginTime;

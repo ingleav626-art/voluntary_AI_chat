@@ -1,0 +1,153 @@
+/* 主界面模块样式 - 侧边栏、会话列表（温馨主题） */
+
+/* 主根容器 - 温暖米色背景 */
+.main-root {
+    -fx-background-color: #FFF8F0;
+}
+
+/* 侧边栏 - 温暖深棕 */
+.sidebar {
+    -fx-background-color: #4A3426;
+    -fx-padding: 0;
+    -fx-spacing: 0;
+}
+
+/* 用户卡片 - 略浅暖棕 */
+.user-card {
+    -fx-padding: 15;
+    -fx-background-color: #5C4033;
+    -fx-spacing: 10;
+}
+
+.avatar-text {
+    -fx-text-fill: #FFF8F0;
+    -fx-font-size: 16;
+    -fx-font-weight: bold;
+}
+
+.username-label {
+    -fx-text-fill: #FFF8F0;
+    -fx-font-size: 14;
+    -fx-font-weight: bold;
+}
+
+.status-label {
+    -fx-text-fill: #D4A373;
+    -fx-font-size: 11;
+}
+
+/* 图标按钮 */
+.btn-icon {
+    -fx-background-color: transparent;
+    -fx-text-fill: #D4A373;
+    -fx-font-size: 12;
+    -fx-cursor: hand;
+    -fx-border-color: transparent;
+}
+
+.btn-icon:hover {
+    -fx-text-fill: #FFF8F0;
+    -fx-background-color: #6B4E3D;
+    -fx-background-radius: 4;
+}
+
+/* 搜索框 */
+.search-box {
+    -fx-padding: 10 15;
+    -fx-background-color: #4A3426;
+    -fx-spacing: 8;
+}
+
+.search-icon {
+    -fx-text-fill: #D4A373;
+    -fx-font-size: 14;
+}
+
+.search-input {
+    -fx-background-color: #5C4033;
+    -fx-text-fill: #FFF8F0;
+    -fx-background-radius: 8;
+    -fx-border-color: transparent;
+    -fx-font-size: 13;
+    -fx-prompt-text-fill: #B08968;
+}
+
+.search-input:focused {
+    -fx-border-color: #E76F51;
+}
+
+/* 会话列表 */
+.conversation-list {
+    -fx-background-color: #4A3426;
+    -fx-padding: 0;
+    -fx-border-color: transparent;
+}
+
+.conversation-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #FFF8F0;
+    -fx-padding: 10 15;
+    -fx-cursor: hand;
+}
+
+.conversation-list .list-cell:filled:selected {
+    -fx-background-color: #6B4E3D;
+}
+
+.conversation-list .list-cell:filled:hover {
+    -fx-background-color: #5C4033;
+}
+
+.conversation-cell {
+    -fx-padding: 0;
+}
+
+.conv-name {
+    -fx-text-fill: #FFF8F0;
+    -fx-font-size: 14;
+    -fx-font-weight: bold;
+}
+
+.conv-time {
+    -fx-text-fill: #B08968;
+    -fx-font-size: 11;
+}
+
+.conv-last-msg {
+    -fx-text-fill: #D4A373;
+    -fx-font-size: 12;
+}
+
+/* 未读徽章 - 温暖珊瑚色 */
+.unread-badge {
+    -fx-background-color: #E76F51;
+    -fx-text-fill: white;
+    -fx-font-size: 10;
+    -fx-font-weight: bold;
+    -fx-background-radius: 10;
+    -fx-padding: 2 6;
+    -fx-min-width: 20;
+    -fx-alignment: center;
+}
+
+/* 侧边栏底部 */
+.sidebar-footer {
+    -fx-padding: 10 15;
+    -fx-background-color: #5C4033;
+    -fx-spacing: 10;
+}
+
+.btn-logout {
+    -fx-background-color: transparent;
+    -fx-text-fill: #E76F51;
+    -fx-font-size: 12;
+    -fx-cursor: hand;
+    -fx-border-color: #E76F51;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+}
+
+.btn-logout:hover {
+    -fx-background-color: #E76F51;
+    -fx-text-fill: white;
+}

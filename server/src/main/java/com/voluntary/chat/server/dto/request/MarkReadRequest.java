@@ -13,5 +13,5 @@ public class MarkReadRequest {
     private String sessionId;
 
     @NotEmpty(message = "消息ID列表不能为空")
-    private List<String> messageIds;
+    private List<Long> messageIds;
 }

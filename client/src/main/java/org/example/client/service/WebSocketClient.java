@@ -3,6 +3,7 @@ package org.example.client.service;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -78,6 +79,9 @@ public final class WebSocketClient {
 
     /** 是否主动关闭 */
     private volatile boolean manualClose;
+
+    /** 最后收到的服务端消息ID，用于断线重连补发 */
+    private volatile String lastMessageId;
 
     /** 消息回调 */
     private Consumer<WebSocketMessage> onMessage;
@@ -181,6 +185,12 @@ public final class WebSocketClient {
             reconnectAttempts = 0;
             startHeartbeat(webSocket);
             notifyConnectionChange(true);
+
+            // 断线重连后发送 RECONNECT 请求，拉取离线期间的消息
+            if (lastMessageId != null && !lastMessageId.isEmpty()) {
+                sendReconnectRequest();
+            }
+
             webSocket.request(1);
         }
 
@@ -238,6 +248,11 @@ public final class WebSocketClient {
                 return;
             }
 
+            // 记录最后收到的服务端消息ID，用于断线重连补发
+            if (wsMessage.getId() != null && !wsMessage.getId().isEmpty()) {
+                lastMessageId = wsMessage.getId();
+            }
+
             LOG.debug("收到消息: type={}", wsMessage.getType());
 
             if (onMessage != null) {
@@ -278,6 +293,21 @@ public final class WebSocketClient {
         } catch (final Exception e) {
             LOG.error("发送消息失败: type={}", type, e);
         }
+    }
+
+    /**
+     * 发送断线重连请求
+     * 携带最后收到的消息ID，服务端返回离线期间的消息
+     */
+    private void sendReconnectRequest() {
+        if (lastMessageId == null || lastMessageId.isEmpty()) {
+            return;
+        }
+
+        final Map<String, Object> data = new HashMap<>();
+        data.put("lastMessageId", lastMessageId);
+        send(MessageTypes.RECONNECT, data);
+        LOG.info("发送断线重连请求: lastMessageId={}", lastMessageId);
     }
 
     /**
