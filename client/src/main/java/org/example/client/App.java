@@ -54,6 +54,9 @@ public class App extends Application {
     /** 好友面板 FXML */
     private static final String FRIEND_FXML = "/fxml/friend_panel.fxml";
 
+    /** 群组面板 FXML */
+    private static final String GROUP_FXML = "/fxml/group_panel.fxml";
+
     /** 主舞台引用，用于页面切换 */
     private static Stage primaryStage;
 
@@ -169,6 +172,38 @@ public class App extends Application {
      * 从好友面板返回主聊天界面
      */
     public static void switchToMainFromFriend() {
+        if (currentLoginResponse != null) {
+            switchToMain(currentLoginResponse);
+        } else {
+            switchToLogin();
+        }
+    }
+
+    /**
+     * 切换到群组面板
+     */
+    public static void switchToGroup() {
+        try {
+            final FXMLLoader loader = new FXMLLoader(App.class.getResource(GROUP_FXML));
+            final Parent root = loader.load();
+
+            final Scene scene = createScene(root, MAIN_WINDOW_WIDTH, MAIN_WINDOW_HEIGHT);
+            primaryStage.setTitle("AI 聊天 - 群组管理");
+            primaryStage.setScene(scene);
+            primaryStage.setWidth(MAIN_WINDOW_WIDTH);
+            primaryStage.setHeight(MAIN_WINDOW_HEIGHT);
+            primaryStage.setResizable(true);
+            primaryStage.centerOnScreen();
+            LOG.info("已切换到群组面板");
+        } catch (final Exception e) {
+            LOG.error("加载群组面板失败", e);
+        }
+    }
+
+    /**
+     * 从群组面板返回主聊天界面
+     */
+    public static void switchToMainFromGroup() {
         if (currentLoginResponse != null) {
             switchToMain(currentLoginResponse);
         } else {

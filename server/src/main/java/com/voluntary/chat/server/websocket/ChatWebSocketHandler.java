@@ -378,6 +378,116 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     }
   }
 
+  /**
+   * 广播群成员加入通知
+   *
+   * @param groupId 群组ID
+   * @param userId  加入的用户ID
+   * @param username 用户名
+   * @param avatar   用户头像
+   */
+  public void broadcastMemberJoin(Long groupId, Long userId, String username, String avatar) {
+    WebSocketMessage message = WebSocketMessage.builder()
+        .id(String.valueOf(System.currentTimeMillis()))
+        .type(MessageTypes.GROUP_MEMBER_JOIN)
+        .data(Map.of(
+            "groupId", groupId,
+            "userId", userId,
+            "username", username,
+            "avatar", avatar != null ? avatar : ""))
+        .build();
+    broadcastToGroup("g_" + groupId, message);
+  }
+
+  /**
+   * 广播群成员离开通知
+   *
+   * @param groupId  群组ID
+   * @param userId   离开的用户ID
+   * @param username 用户名
+   */
+  public void broadcastMemberLeave(Long groupId, Long userId, String username) {
+    WebSocketMessage message = WebSocketMessage.builder()
+        .id(String.valueOf(System.currentTimeMillis()))
+        .type(MessageTypes.GROUP_MEMBER_LEAVE)
+        .data(Map.of(
+            "groupId", groupId,
+            "userId", userId,
+            "username", username))
+        .build();
+    broadcastToGroup("g_" + groupId, message);
+  }
+
+  /**
+   * 广播群成员角色变更通知
+   *
+   * @param groupId  群组ID
+   * @param userId   角色变更的用户ID
+   * @param username 用户名
+   * @param role     新角色（OWNER/ADMIN/MEMBER）
+   */
+  public void broadcastRoleChange(Long groupId, Long userId, String username, String role) {
+    WebSocketMessage message = WebSocketMessage.builder()
+        .id(String.valueOf(System.currentTimeMillis()))
+        .type(MessageTypes.GROUP_MEMBER_ROLE_CHANGE)
+        .data(Map.of(
+            "groupId", groupId,
+            "userId", userId,
+            "username", username,
+            "role", role))
+        .build();
+    broadcastToGroup("g_" + groupId, message);
+  }
+
+  /**
+   * 广播群信息变更通知
+   *
+   * @param groupId      群组ID
+   * @param name         新的群名称（可 null）
+   * @param announcement 新的群公告（可 null）
+   */
+  public void broadcastGroupInfoChange(Long groupId, String name, String announcement) {
+    Map<String, Object> data = new java.util.LinkedHashMap<>();
+    data.put("groupId", groupId);
+    if (name != null) data.put("name", name);
+    if (announcement != null) data.put("announcement", announcement);
+
+    WebSocketMessage message = WebSocketMessage.builder()
+        .id(String.valueOf(System.currentTimeMillis()))
+        .type(MessageTypes.GROUP_INFO_CHANGE)
+        .data(data)
+        .build();
+    broadcastToGroup("g_" + groupId, message);
+  }
+
+  /**
+   * 广播群组解散通知
+   *
+   * @param groupId 群组ID
+   */
+  public void broadcastGroupDismissed(Long groupId) {
+    WebSocketMessage message = WebSocketMessage.builder()
+        .id(String.valueOf(System.currentTimeMillis()))
+        .type(MessageTypes.GROUP_DISMISSED)
+        .data(Map.of("groupId", groupId))
+        .build();
+    broadcastToGroup("g_" + groupId, message);
+  }
+
+  /**
+   * 向群内所有在线成员广播消息（包含所有成员）
+   */
+  private void broadcastToGroup(String sessionId, WebSocketMessage message) {
+    if (!sessionId.startsWith("g_")) {
+      return;
+    }
+    Long groupId = Long.parseLong(sessionId.split("_")[1]);
+    List<Long> memberIds = groupMemberMapper.selectGroupMemberUserIds(groupId);
+    for (Long memberId : memberIds) {
+      sendToUser(memberId, message);
+    }
+  }
+
   private Long getUserId(WebSocketSession session) {
     Object userId = session.getAttributes().get(JwtHandshakeInterceptor.USER_ID_KEY);
     return userId != null ? (Long) userId : null;

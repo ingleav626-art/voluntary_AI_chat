@@ -53,4 +53,22 @@ public interface GroupMemberMapper extends BaseMapper<GroupMember> {
      */
     @Select("SELECT user_id FROM group_member WHERE group_id = #{groupId} AND is_deleted = 0")
     List<Long> selectGroupMemberUserIds(@Param("groupId") Long groupId);
+
+    /**
+     * 查询用户在群组中的完整记录（含 role、nickname 等字段）
+     *
+     * @param groupId 群组ID
+     * @param userId  用户ID
+     * @return 群成员记录，不在群中则返回 null
+     */
+    @Select("SELECT * FROM group_member WHERE group_id = #{groupId} AND user_id = #{userId} AND is_deleted = 0")
+    GroupMember selectByGroupIdAndUserId(@Param("groupId") Long groupId, @Param("userId") Long userId);
+
+    /**
+     * 逻辑删除群组的所有成员
+     *
+     * @param groupId 群组ID
+     */
+    @org.apache.ibatis.annotations.Update("UPDATE group_member SET is_deleted = 1 WHERE group_id = #{groupId}")
+    void logicalDeleteByGroupId(@Param("groupId") Long groupId);
 }

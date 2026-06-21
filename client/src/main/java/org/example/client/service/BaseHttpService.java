@@ -111,6 +111,25 @@ public abstract class BaseHttpService {
     }
 
     /**
+     * 构建 PUT 请求
+     *
+     * @param path 接口路径
+     * @param body 请求体对象
+     * @return HttpRequest 构建器
+     */
+    protected HttpRequest.Builder buildPutRequest(final String path, final Object body) {
+        final String url = ClientConfig.getInstance().getBaseUrl() + path;
+        final String json = JsonUtils.toJson(body);
+        final HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE)
+                .timeout(Duration.ofSeconds(ClientConfig.getInstance().getReadTimeout()))
+                .PUT(HttpRequest.BodyPublishers.ofString(json != null ? json : "{}"));
+        addAuthHeader(builder);
+        return builder;
+    }
+
+    /**
      * 添加 Authorization 请求头
      *
      * @param builder 请求构建器
@@ -175,6 +194,15 @@ public abstract class BaseHttpService {
         if (statusCode == HTTP_FORBIDDEN) {
             LOG.warn("请求被拒绝: 403 Forbidden，可能未登录或 Token 无效");
             return createErrorResponse(HTTP_FORBIDDEN, "请先登录");
+        }
+
+        // 尝试从响应体中解析后端返回的具体错误消息
+        final ApiResponse<T> errorBody = JsonUtils.fromJson(
+                response.body(), getTypeFactory().constructParametricType(ApiResponse.class, Void.class));
+        if (errorBody != null && errorBody.getMessage() != null && !errorBody.getMessage().isEmpty()) {
+            LOG.error("请求失败: statusCode={}, errorCode={}, message={}",
+                    statusCode, errorBody.getCode(), errorBody.getMessage());
+            return errorBody;
         }
 
         LOG.error("请求失败: statusCode={}", statusCode);

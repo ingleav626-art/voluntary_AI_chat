@@ -132,9 +132,22 @@
 
 /* 侧边栏底部 */
 .sidebar-footer {
-    -fx-padding: 10 15;
+    -fx-padding: 8 12;
     -fx-background-color: #5C4033;
-    -fx-spacing: 10;
+}
+
+.sidebar-footer .btn-icon {
+    -fx-padding: 6 0;
+    -fx-font-size: 12;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+}
+
+.sidebar-footer .btn-logout {
+    -fx-padding: 6 0;
+    -fx-font-size: 12;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
 }
 
 .btn-logout {
@@ -143,7 +156,6 @@
     -fx-font-size: 12;
     -fx-cursor: hand;
     -fx-border-color: #E76F51;
-    -fx-border-radius: 8;
     -fx-border-width: 1;
 }
 

@@ -1,0 +1,148 @@
+/* ===== 创建群组对话框样式 ===== */
+
+.group-create-root {
+    -fx-background-color: #ffffff;
+    -fx-padding: 0;
+}
+
+.group-create-header {
+    -fx-padding: 15px 20px;
+    -fx-background-color: #5C4033;
+}
+
+.group-create-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #FFF8F0;
+}
+
+.group-create-name-section {
+    -fx-padding: 15px 20px 10px 20px;
+}
+
+.group-create-members-section {
+    -fx-padding: 10px 20px;
+}
+
+.group-create-label {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #555555;
+}
+
+.group-create-count {
+    -fx-font-size: 12px;
+    -fx-text-fill: #888888;
+}
+
+.group-create-input {
+    -fx-pref-height: 32px;
+    -fx-padding: 4px 10px;
+    -fx-border-color: #d0d0d0;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-font-size: 13px;
+}
+
+.group-create-input:focused {
+    -fx-border-color: #42A5F5;
+}
+
+/* 好友复选框列表 */
+.group-create-friend-list {
+    -fx-background-color: transparent;
+    -fx-border-color: #e0e0e0;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+}
+
+.group-create-friend-list .list-cell {
+    -fx-padding: 0;
+    -fx-background-color: transparent;
+}
+
+.group-create-friend-list .list-cell:selected {
+    -fx-background-color: #e3f2fd;
+}
+
+.friend-check-cell {
+    -fx-padding: 8px 10px;
+    -fx-border-color: transparent transparent #f0f0f0 transparent;
+    -fx-border-width: 0 0 1px 0;
+}
+
+.friend-check-cell:hover {
+    -fx-background-color: #f5f8ff;
+}
+
+.friend-check-name {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #333333;
+}
+
+.friend-check-remark {
+    -fx-font-size: 11px;
+    -fx-text-fill: #999999;
+}
+
+/* 底部 */
+.group-create-footer {
+    -fx-padding: 12px 20px;
+    -fx-background-color: #fafafa;
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 1px 0 0 0;
+}
+
+.error-message {
+    -fx-text-fill: #d32f2f;
+    -fx-font-size: 12px;
+}
+
+.btn-primary {
+    -fx-background-color: #42A5F5;
+    -fx-text-fill: #ffffff;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-padding: 8px 16px;
+    -fx-font-size: 13px;
+    -fx-cursor: hand;
+}
+
+.btn-primary:hover {
+    -fx-background-color: #1E88E5;
+}
+
+.btn-primary:disabled {
+    -fx-background-color: #bdbdbd;
+    -fx-cursor: default;
+}
+
+/* 默认文本框样式 */
+.text-field {
+    -fx-pref-height: 32px;
+    -fx-padding: 4px 10px;
+    -fx-border-color: #d0d0d0;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-font-size: 13px;
+}
+
+.text-field:focused {
+    -fx-border-color: #42A5F5;
+}
+
+/* 默认按钮样式 */
+.button {
+    -fx-background-color: #e0e0e0;
+    -fx-text-fill: #333333;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-padding: 8px 16px;
+    -fx-font-size: 13px;
+    -fx-cursor: hand;
+}
+
+.button:hover {
+    -fx-background-color: #d0d0d0;
+}

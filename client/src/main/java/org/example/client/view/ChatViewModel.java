@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import com.voluntary.chat.common.constant.MessageTypes;
 
+import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ListProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -68,6 +69,9 @@ public final class ChatViewModel {
     /** 待确认消息（clientId -> MessageInfo） */
     private final Map<String, MessageInfo> pendingMessages = new HashMap<>();
 
+    /** 待撤回消息的 clientId 集合（ACK 到达后自动执行 REST 撤回） */
+    private final java.util.Set<String> pendingRecallClientIds = new java.util.HashSet<>();
+
     /** 当前页码 */
     private int currentPage = 1;
 
@@ -89,32 +93,35 @@ public final class ChatViewModel {
 
         ChatService.getInstance().getHistory(conversation.getSessionId(), currentPage, DEFAULT_PAGE_SIZE)
                 .thenAccept(response -> {
-                    loading.set(false);
+                    // 异步回调在 HTTP 线程执行，UI 更新必须切回 JavaFX 线程
+                    Platform.runLater(() -> {
+                        loading.set(false);
 
-                    if (response != null && response.isSuccess() && response.getData() != null) {
-                        final List<MessageInfo> list = response.getData().getList();
-                        if (list != null) {
-                            // 标记是否为当前用户发送
-                            for (final MessageInfo msg : list) {
-                                msg.setSentByMe(currentUser != null
-                                        && currentUser.getUserId() != null
-                                        && currentUser.getUserId().equals(msg.getSenderId()));
+                        if (response != null && response.isSuccess() && response.getData() != null) {
+                            final List<MessageInfo> list = response.getData().getList();
+                            if (list != null) {
+                                // 标记是否为当前用户发送
+                                for (final MessageInfo msg : list) {
+                                    msg.setSentByMe(currentUser != null
+                                            && currentUser.getUserId() != null
+                                            && currentUser.getUserId().equals(msg.getSenderId()));
+                                }
+                                // 按时间升序排序（先发的在上方），服务端默认按时间倒序返回
+                                list.sort(java.util.Comparator.comparing(
+                                        MessageInfo::getCreateTime,
+                                        java.util.Comparator.nullsFirst(java.time.LocalDateTime::compareTo)));
+                                messages.setAll(list);
+                                LOG.info("历史消息加载成功: count={}", list.size());
+
+                                // 加载成功后上报已读
+                                reportRead();
                             }
-                            // 按时间升序排序（先发的在上方），服务端默认按时间倒序返回
-                            list.sort(java.util.Comparator.comparing(
-                                    MessageInfo::getCreateTime,
-                                    java.util.Comparator.nullsFirst(java.time.LocalDateTime::compareTo)));
-                            messages.setAll(list);
-                            LOG.info("历史消息加载成功: count={}", list.size());
-
-                            // 加载成功后上报已读
-                            reportRead();
+                        } else {
+                            final String msg = response != null ? response.getMessage() : "加载聊天记录失败";
+                            errorMessage.set(msg);
+                            LOG.warn("聊天记录加载失败: {}", msg);
                         }
-                    } else {
-                        final String msg = response != null ? response.getMessage() : "加载聊天记录失败";
-                        errorMessage.set(msg);
-                        LOG.warn("聊天记录加载失败: {}", msg);
-                    }
+                    });
                 });
     }
 
@@ -205,6 +212,19 @@ public final class ChatViewModel {
                 messages.set(index, pending);
             }
 
+            // 如果该消息注册了延迟撤回，ACK 到达后用真实 messageId 执行 REST 撤回
+            // 使用 .join() 同步等待，确保服务端更新完成后再允许刷新
+            if (pendingRecallClientIds.remove(clientId)) {
+                LOG.info("ACK 到达，执行延迟 REST 撤回: clientId={}, messageId={}", clientId, messageId);
+                try {
+                    final var recallResponse = ChatService.getInstance().recallMessage(messageId).join();
+                    LOG.info("延迟 REST 撤回完成: messageId={}, success={}",
+                            messageId, recallResponse != null && recallResponse.isSuccess());
+                } catch (final Exception e) {
+                    LOG.error("延迟 REST 撤回失败: messageId={}", messageId, e);
+                }
+            }
+
             LOG.debug("消息确认更新: clientId={}, messageId={}", clientId, messageId);
         }
     }
@@ -222,62 +242,87 @@ public final class ChatViewModel {
 
         ChatService.getInstance().getHistory(conversation.getSessionId(), currentPage, DEFAULT_PAGE_SIZE)
                 .thenAccept(response -> {
-                    loading.set(false);
+                    Platform.runLater(() -> {
+                        loading.set(false);
 
-                    if (response != null && response.isSuccess() && response.getData() != null) {
-                        final List<MessageInfo> list = response.getData().getList();
-                        if (list != null && !list.isEmpty()) {
-                            for (final MessageInfo msg : list) {
-                                msg.setSentByMe(currentUser != null
-                                        && currentUser.getUserId() != null
-                                        && currentUser.getUserId().equals(msg.getSenderId()));
+                        if (response != null && response.isSuccess() && response.getData() != null) {
+                            final List<MessageInfo> list = response.getData().getList();
+                            if (list != null && !list.isEmpty()) {
+                                for (final MessageInfo msg : list) {
+                                    msg.setSentByMe(currentUser != null
+                                            && currentUser.getUserId() != null
+                                            && currentUser.getUserId().equals(msg.getSenderId()));
+                                }
+                                // 按时间升序排序后插入顶部（先发的在上方）
+                                list.sort(java.util.Comparator.comparing(
+                                        MessageInfo::getCreateTime,
+                                        java.util.Comparator.nullsFirst(java.time.LocalDateTime::compareTo)));
+                                messages.addAll(0, list);
+                                LOG.info("加载更多消息: count={}", list.size());
                             }
-                            // 按时间升序排序后插入顶部（先发的在上方）
-                            list.sort(java.util.Comparator.comparing(
-                                    MessageInfo::getCreateTime,
-                                    java.util.Comparator.nullsFirst(java.time.LocalDateTime::compareTo)));
-                            messages.addAll(0, list);
-                            LOG.info("加载更多消息: count={}", list.size());
+                        } else {
+                            currentPage--;
+                            LOG.debug("没有更多历史消息");
                         }
-                    } else {
-                        currentPage--;
-                        LOG.debug("没有更多历史消息");
-                    }
+                    });
                 });
     }
 
     /**
      * 撤回消息
-     * 调用 REST API 撤回，成功后更新消息状态
+     * 调用 REST API 撤回，成功后更新消息状态。
+     * 如果消息还没被服务端确认（乐观消息，messageId < 0），
+     * 则立即标记为已撤回并注册延迟撤回，ACK 到达后自动执行 REST 撤回。
      *
-     * @param messageId 消息ID
+     * @param message 消息对象
      */
-    public void recallMessage(final Long messageId) {
-        if (messageId == null || messageId < 0) {
-            errorMessage.set("消息ID无效，无法撤回");
+    public void recallMessage(final MessageInfo message) {
+        if (message == null) {
             return;
         }
 
+        final Long messageId = message.getMessageId();
+
+        // 乐观消息：立即标记撤回，等 ACK 到达后自动执行 REST 撤回
+        if (messageId == null || messageId < 0) {
+            String clientId = null;
+            for (final java.util.Map.Entry<String, MessageInfo> entry : pendingMessages.entrySet()) {
+                if (entry.getValue() == message) {
+                    clientId = entry.getKey();
+                    break;
+                }
+            }
+            if (clientId != null) {
+                pendingRecallClientIds.add(clientId);
+                message.setRecalled(true);
+                final int index = messages.indexOf(message);
+                if (index >= 0) {
+                    messages.set(index, message);
+                }
+                LOG.info("乐观消息已标记撤回，等待 ACK 后执行 REST 撤回: clientId={}", clientId);
+                return;
+            }
+            LOG.warn("乐观消息未找到对应 clientId，忽略: messageId={}", messageId);
+            return;
+        }
+
+        // 已确认消息，直接调 REST 撤回
         ChatService.getInstance().recallMessage(messageId)
                 .thenAccept(response -> {
-                    if (response != null && response.isSuccess()) {
-                        // 更新消息状态为已撤回
-                        for (final MessageInfo msg : messages) {
-                            if (messageId.equals(msg.getMessageId())) {
-                                msg.setRecalled(true);
-                                final int index = messages.indexOf(msg);
-                                if (index >= 0) {
-                                    messages.set(index, msg);
-                                }
-                                break;
+                    Platform.runLater(() -> {
+                        if (response != null && response.isSuccess()) {
+                            message.setRecalled(true);
+                            final int index = messages.indexOf(message);
+                            if (index >= 0) {
+                                messages.set(index, message);
                             }
+                            LOG.info("消息撤回成功: messageId={}", messageId);
+                        } else {
+                            final String msg = response != null ? response.getMessage() : "撤回失败";
+                            errorMessage.set(msg);
+                            LOG.warn("消息撤回失败: {}", msg);
                         }
-                        LOG.info("消息撤回成功: messageId={}", messageId);
-                    } else {
-                        final String msg = response != null ? response.getMessage() : "撤回失败";
-                        errorMessage.set(msg);
-                        LOG.warn("消息撤回失败: {}", msg);
-                    }
+                    });
                 });
     }
 

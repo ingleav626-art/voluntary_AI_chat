@@ -2,8 +2,11 @@ package com.voluntary.chat.server.controller;
 
 import com.voluntary.chat.common.dto.PageResult;
 import com.voluntary.chat.server.common.ApiResult;
+import com.voluntary.chat.server.dto.request.AdminActionRequest;
 import com.voluntary.chat.server.dto.request.CreateGroupRequest;
 import com.voluntary.chat.server.dto.request.InviteMemberRequest;
+import com.voluntary.chat.server.dto.request.SetNicknameRequest;
+import com.voluntary.chat.server.dto.request.TransferOwnerRequest;
 import com.voluntary.chat.server.dto.request.UpdateGroupRequest;
 import com.voluntary.chat.server.dto.response.CreateGroupResponse;
 import com.voluntary.chat.server.dto.response.GroupMemberResponse;
@@ -113,5 +116,51 @@ public class GroupController {
         Long userId = SecurityUtils.getCurrentUserId();
         groupService.leaveGroup(userId, groupId);
         return ApiResult.ok("已退出", null);
+    }
+
+    /**
+     * 转让群主
+     */
+    @PostMapping("/{groupId}/transfer")
+    public ApiResult<Void> transferOwner(
+            @PathVariable Long groupId,
+            @Valid @RequestBody TransferOwnerRequest request) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        groupService.transferOwner(userId, groupId, request.getTargetUserId());
+        return ApiResult.ok("转让成功", null);
+    }
+
+    /**
+     * 解散群组
+     */
+    @DeleteMapping("/{groupId}")
+    public ApiResult<Void> dismissGroup(@PathVariable Long groupId) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        groupService.dismissGroup(userId, groupId);
+        return ApiResult.ok("群组已解散", null);
+    }
+
+    /**
+     * 设置/取消管理员
+     */
+    @PostMapping("/{groupId}/admin")
+    public ApiResult<Void> setAdmin(
+            @PathVariable Long groupId,
+            @Valid @RequestBody AdminActionRequest request) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        groupService.setAdmin(userId, groupId, request.getTargetUserId(), request.getAction());
+        return ApiResult.ok("操作成功", null);
+    }
+
+    /**
+     * 设置群成员昵称
+     */
+    @PutMapping("/{groupId}/nickname")
+    public ApiResult<Void> setNickname(
+            @PathVariable Long groupId,
+            @Valid @RequestBody SetNicknameRequest request) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        groupService.setNickname(userId, groupId, request.getNickname());
+        return ApiResult.ok("设置成功", null);
     }
 }

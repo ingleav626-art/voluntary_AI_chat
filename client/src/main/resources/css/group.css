@@ -1,0 +1,189 @@
+/* ===== 群组管理面板样式 ===== */
+
+.group-root {
+    -fx-background-color: #f5f5f5;
+}
+
+.group-header {
+    -fx-padding: 15px 20px;
+    -fx-background-color: #ffffff;
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 0 0 1px 0;
+}
+
+.group-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #333333;
+}
+
+.group-panel {
+    -fx-padding: 10px;
+    -fx-background-color: #ffffff;
+}
+
+.group-panel-header {
+    -fx-padding: 5px 0;
+}
+
+.group-panel-title {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #555555;
+}
+
+/* 创建群组表单 */
+.create-group-form {
+    -fx-padding: 10px;
+    -fx-background-color: #fafafa;
+    -fx-border-color: #e8e8e8;
+    -fx-border-width: 1px;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+}
+
+.group-input {
+    -fx-pref-height: 32px;
+    -fx-padding: 4px 10px;
+    -fx-border-color: #d0d0d0;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-font-size: 13px;
+}
+
+.group-input:focused {
+    -fx-border-color: #42A5F5;
+}
+
+/* 群组列表 */
+.group-list {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.group-list .list-cell {
+    -fx-padding: 0;
+    -fx-background-color: transparent;
+}
+
+.group-list .list-cell:selected {
+    -fx-background-color: #e3f2fd;
+}
+
+.group-cell {
+    -fx-padding: 10px 8px;
+    -fx-border-color: transparent transparent #f0f0f0 transparent;
+    -fx-border-width: 0 0 1px 0;
+}
+
+.group-cell:hover {
+    -fx-background-color: #f5f8ff;
+}
+
+.group-name {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #333333;
+}
+
+.group-meta {
+    -fx-font-size: 11px;
+    -fx-text-fill: #999999;
+}
+
+/* 成员列表 */
+.member-list {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.member-list .list-cell {
+    -fx-padding: 0;
+    -fx-background-color: transparent;
+}
+
+.member-list .list-cell:selected {
+    -fx-background-color: #e3f2fd;
+}
+
+.member-cell {
+    -fx-padding: 8px 8px;
+    -fx-border-color: transparent transparent #f0f0f0 transparent;
+    -fx-border-width: 0 0 1px 0;
+}
+
+.member-cell:hover {
+    -fx-background-color: #f5f8ff;
+}
+
+.member-name {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #333333;
+}
+
+.member-role {
+    -fx-font-size: 11px;
+    -fx-text-fill: #888888;
+}
+
+/* 底部状态栏 */
+.group-footer {
+    -fx-padding: 8px 20px;
+    -fx-background-color: #ffffff;
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 1px 0 0 0;
+}
+
+/* 按钮样式 - 复用 friend.css 中的样式类，在此补充 */
+.btn-icon {
+    -fx-background-color: transparent;
+    -fx-border-color: #d0d0d0;
+    -fx-border-radius: 4px;
+    -fx-padding: 6px 14px;
+    -fx-font-size: 13px;
+    -fx-cursor: hand;
+}
+
+.btn-icon:hover {
+    -fx-background-color: #e8e8e8;
+}
+
+.btn-primary {
+    -fx-background-color: #42A5F5;
+    -fx-text-fill: #ffffff;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-padding: 8px 16px;
+    -fx-font-size: 13px;
+    -fx-cursor: hand;
+    -fx-border: none;
+}
+
+.btn-primary:hover {
+    -fx-background-color: #1E88E5;
+}
+
+.btn-danger-sm {
+    -fx-background-color: #ef5350;
+    -fx-text-fill: #ffffff;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-padding: 4px 10px;
+    -fx-font-size: 12px;
+    -fx-cursor: hand;
+}
+
+.btn-danger-sm:hover {
+    -fx-background-color: #d32f2f;
+}
+
+.error-message {
+    -fx-text-fill: #d32f2f;
+    -fx-font-size: 12px;
+}
+
+.success-message {
+    -fx-text-fill: #388e3c;
+    -fx-font-size: 12px;
+}
