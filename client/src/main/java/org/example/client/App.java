@@ -62,6 +62,13 @@ public class App extends Application {
 
     @Override
     public void init() {
+        // 检查环境变量 CLIENT_CONFIG，支持热点测试环境
+        final String configEnv = System.getenv("CLIENT_CONFIG");
+        if (configEnv != null && !configEnv.isEmpty()) {
+            ClientConfig.getInstance().setConfigFile(configEnv);
+            LOG.info("使用自定义配置文件: {}", configEnv);
+        }
+
         ClientConfig.getInstance().load();
         LOG.info("客户端配置加载成功: baseUrl={}", ClientConfig.getInstance().getBaseUrl());
     }

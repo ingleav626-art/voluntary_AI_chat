@@ -19,13 +19,16 @@ public final class ClientConfig {
 
     private static final ClientConfig INSTANCE = new ClientConfig();
 
-    private static final String CONFIG_FILE = "application-client.properties";
+    private static final String DEFAULT_CONFIG_FILE = "application-client.properties";
 
     private static final String DEFAULT_BASE_URL = "http://localhost:8080/api";
 
     private static final int DEFAULT_CONNECT_TIMEOUT = 10;
 
     private static final int DEFAULT_READ_TIMEOUT = 30;
+
+    /** 配置文件名称 */
+    private String configFile = DEFAULT_CONFIG_FILE;
 
     /** 服务端 Base URL */
     private String baseUrl = DEFAULT_BASE_URL;
@@ -44,10 +47,19 @@ public final class ClientConfig {
         return INSTANCE;
     }
 
+    /**
+     * 设置配置文件名称
+     *
+     * @param configFile 配置文件名称（如 application-hotspot.properties）
+     */
+    public void setConfigFile(final String configFile) {
+        this.configFile = configFile;
+    }
+
     public void load() {
-        try (final InputStream is = getClass().getClassLoader().getResourceAsStream(CONFIG_FILE)) {
+        try (final InputStream is = getClass().getClassLoader().getResourceAsStream(configFile)) {
             if (is == null) {
-                LOG.warn("配置文件 {} 不存在，使用默认配置", CONFIG_FILE);
+                LOG.warn("配置文件 {} 不存在，使用默认配置", configFile);
                 return;
             }
 
@@ -81,4 +93,3 @@ public final class ClientConfig {
         return readTimeout;
     }
 }
-
