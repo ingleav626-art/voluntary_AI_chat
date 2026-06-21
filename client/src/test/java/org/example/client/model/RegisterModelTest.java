@@ -49,7 +49,8 @@ class RegisterModelTest {
     @Test
     @DisplayName("RegisterResponse 构造和 Getter")
     void testRegisterResponse() {
-        final UserInfo userInfo = new UserInfo(1L, null, "张三", null, null);
+        final UserInfo userInfo = new UserInfo(1L, null, "张三", null, null,
+                null, null, null, null, null);
         final RegisterResponse response = new RegisterResponse(
                 "token123", "refresh456", 7200L, userInfo);
 
@@ -68,7 +69,8 @@ class RegisterModelTest {
         response.setAccessToken("token789");
         response.setRefreshToken("refresh012");
         response.setExpiresIn(3600L);
-        response.setUser(new UserInfo(2L, null, "李四", null, null));
+        response.setUser(new UserInfo(2L, null, "李四", null, null,
+                null, null, null, null, null));
 
         assertEquals("token789", response.getAccessToken());
         assertEquals("refresh012", response.getRefreshToken());

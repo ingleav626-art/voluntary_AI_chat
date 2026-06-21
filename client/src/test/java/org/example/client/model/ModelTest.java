@@ -24,7 +24,8 @@ class ModelTest {
     @Test
     @DisplayName("LoginResponse 构造和 Getter")
     void testLoginResponse() {
-        final UserInfo user = new UserInfo(1L, null, "张三", "http://avatar.jpg", "程序员");
+        final UserInfo user = new UserInfo(1L, null, "张三", "http://avatar.jpg", "程序员",
+                null, null, null, null, null);
         final LoginResponse response = new LoginResponse("access-token", "refresh-token", 7200L, user);
 
         assertEquals("access-token", response.getAccessToken());
@@ -36,7 +37,8 @@ class ModelTest {
     @Test
     @DisplayName("UserInfo 构造和 Getter")
     void testUserInfo() {
-        final UserInfo user = new UserInfo(1L, null, "张三", "http://avatar.jpg", "程序员");
+        final UserInfo user = new UserInfo(1L, null, "张三", "http://avatar.jpg", "程序员",
+                null, null, null, null, null);
 
         assertEquals(1L, user.getUserId());
         assertEquals("张三", user.getUsername());
