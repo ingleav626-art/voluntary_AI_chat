@@ -43,9 +43,14 @@ public class AuthService {
 
     public static final String SMS_CODE_PREFIX = "sms:code:";
     private static final long SMS_CODE_TTL_MINUTES = 5;
+    private static final int SMS_CODE_MAX_VALUE = 1000000;
+    /** 手机号脱敏：前缀长度 */
+    private static final int PHONE_MASK_PREFIX_LENGTH = 3;
+    /** 手机号脱敏：后缀起始位置 */
+    private static final int PHONE_MASK_SUFFIX_START = 7;
 
     public void sendSmsCode(String phone) {
-        String code = String.format("%06d", ThreadLocalRandom.current().nextInt(1000000));
+        String code = String.format("%06d", ThreadLocalRandom.current().nextInt(SMS_CODE_MAX_VALUE));
         smsCodeStorage.put(SMS_CODE_PREFIX + phone, code, SMS_CODE_TTL_MINUTES);
         log.info("验证码已发送: phone={}, code={}（仅开发环境打印）", phone, code);
     }
@@ -139,7 +144,8 @@ public class AuthService {
 
         UserResponse userResponse = UserResponse.builder()
                 .userId(user.getId())
-                .phone(user.getPhone().substring(0, 3) + "****" + user.getPhone().substring(7))
+                .phone(user.getPhone().substring(0, PHONE_MASK_PREFIX_LENGTH) + "****"
+                        + user.getPhone().substring(PHONE_MASK_SUFFIX_START))
                 .username(user.getUsername())
                 .avatar(user.getAvatar())
                 .build();

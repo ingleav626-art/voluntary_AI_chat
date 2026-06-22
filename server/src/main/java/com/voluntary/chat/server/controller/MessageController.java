@@ -35,6 +35,13 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class MessageController {
 
+  /** 私聊sessionId分割后的部分数量（格式：p_{min}_{max}） */
+  private static final int PRIVATE_SESSION_PARTS_COUNT = 3;
+  /** 私聊sessionId中第一个用户ID的索引 */
+  private static final int PRIVATE_SESSION_ID1_INDEX = 1;
+  /** 私聊sessionId中第二个用户ID的索引 */
+  private static final int PRIVATE_SESSION_ID2_INDEX = 2;
+
   private final MessageService messageService;
   private final ImageUploadService imageUploadService;
   private final ChatWebSocketHandler chatWebSocketHandler;
@@ -109,11 +116,11 @@ public class MessageController {
    */
   private Long resolveTargetUserId(Long currentUserId, String sessionId) {
     String[] parts = sessionId.split("_");
-    if (parts.length != 3) {
+    if (parts.length != PRIVATE_SESSION_PARTS_COUNT) {
       return null;
     }
-    Long id1 = Long.parseLong(parts[1]);
-    Long id2 = Long.parseLong(parts[2]);
+    Long id1 = Long.parseLong(parts[PRIVATE_SESSION_ID1_INDEX]);
+    Long id2 = Long.parseLong(parts[PRIVATE_SESSION_ID2_INDEX]);
     return id1.equals(currentUserId) ? id2 : id1;
   }
 
