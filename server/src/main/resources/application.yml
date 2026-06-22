@@ -54,9 +54,9 @@ jwt:
 
 logging:
   level:
-    root: INFO
-    com.voluntary.chat: DEBUG
-    com.voluntary.chat.server.security: DEBUG
+    root: WARN
+    com.voluntary.chat: INFO
+    com.voluntary.chat.server.security: WARN
 
 server:
   port: 8080

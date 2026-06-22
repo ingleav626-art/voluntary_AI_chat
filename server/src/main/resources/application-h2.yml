@@ -1,0 +1,37 @@
+# H2 内嵌数据库配置（打包分发时使用）
+# 启动方式：--spring.profiles.active=h2
+spring:
+  main:
+    lazy-initialization: true
+
+  jmx:
+    enabled: false
+
+  datasource:
+    url: jdbc:h2:file:${app.data.dir:./data}/voluntary_ai_chat;AUTO_SERVER=TRUE;MODE=MySQL;NON_KEYWORDS=USER
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+
+  h2:
+    console:
+      enabled: false
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema-h2.sql
+      encoding: UTF-8
+
+  # H2 模式下不依赖 Redis（临时排除，后续启用 Redis 后需删除此行）
+  data:
+    redis:
+      enabled: false
+
+# 应用数据目录（Windows 标准 AppData 位置，回退到 ./data）
+app:
+  data:
+    dir: ${APPDATA:./data}/Voluntary-AI-Chat/data

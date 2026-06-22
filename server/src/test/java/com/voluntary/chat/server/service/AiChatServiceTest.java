@@ -6,7 +6,6 @@ import com.voluntary.chat.server.config.AiConfig;
 import com.voluntary.chat.server.entity.AiProfile;
 import com.voluntary.chat.server.entity.Message;
 import com.voluntary.chat.server.mapper.MessageMapper;
-import com.voluntary.chat.server.websocket.ChatWebSocketHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,16 +42,13 @@ class AiChatServiceTest {
     @Mock
     private MessageMapper messageMapper;
 
-    @Mock
-    private ChatWebSocketHandler webSocketHandler;
-
     private static final Long USER_ID = 1001L;
     private static final Long AI_ID = 3001L;
     private static final String SESSION_ID = "a_3001_1001";
 
     @BeforeEach
     void setUp() {
-        aiChatService = new AiChatService(aiService, openAiClient, aiConfig, messageMapper, webSocketHandler);
+        aiChatService = new AiChatService(aiService, openAiClient, aiConfig, messageMapper);
 
         final AiConfig.ContextConfig contextConfig = new AiConfig.ContextConfig();
         contextConfig.setMaxHistoryRounds(10);

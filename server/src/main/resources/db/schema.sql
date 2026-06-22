@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS `friend` (
     KEY `idx_friend_id` (`friend_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='好友关系表';
 
-CREATE TABLE IF NOT EXISTS `group` (
+CREATE TABLE IF NOT EXISTS `chat_group` (
     `id` BIGINT NOT NULL COMMENT '群组ID（雪花算法）',
     `name` VARCHAR(50) NOT NULL COMMENT '群组名称',
     `avatar` VARCHAR(500) DEFAULT NULL COMMENT '群头像URL',

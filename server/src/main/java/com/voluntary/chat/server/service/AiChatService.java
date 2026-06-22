@@ -9,6 +9,8 @@ import com.voluntary.chat.server.mapper.MessageMapper;
 import com.voluntary.chat.server.websocket.ChatWebSocketHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,7 +32,10 @@ public class AiChatService {
     private final OpenAiClient openAiClient;
     private final AiConfig aiConfig;
     private final MessageMapper messageMapper;
-    private final ChatWebSocketHandler webSocketHandler;
+
+    @Autowired
+    @Lazy
+    private ChatWebSocketHandler webSocketHandler;
 
     /**
      * 处理 AI 单聊（流式）

@@ -54,7 +54,15 @@ class AiGroupConfigServiceTest {
 
     @BeforeEach
     void setUp() {
-        aiGroupConfigService = new AiGroupConfigService(aiGroupConfigMapper, aiService, redisTemplate);
+        aiGroupConfigService = new AiGroupConfigService(aiGroupConfigMapper, aiService);
+        // 通过反射注入 redisTemplate（H2 模式下为 null 是正常的）
+        try {
+            java.lang.reflect.Field field = AiGroupConfigService.class.getDeclaredField("redisTemplate");
+            field.setAccessible(true);
+            field.set(aiGroupConfigService, redisTemplate);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
     }
 

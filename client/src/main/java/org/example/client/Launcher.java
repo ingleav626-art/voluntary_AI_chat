@@ -1,7 +1,13 @@
 package org.example.client;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 import javafx.application.Application;
 import org.slf4j.Logger;
@@ -12,9 +18,11 @@ import org.springframework.context.ConfigurableApplicationContext;
 /**
  * JavaFX 启动器
  *
- * <p>JavaFX 17 要求主类不能直接继承 {@link Application}，
+ * <p>
+ * JavaFX 17 要求主类不能直接继承 {@link Application}，
  * 否则启动时会报 "缺少 JavaFX 运行时组件"。
- * 此启动器作为入口，内嵌启动后端服务，再启动前端 GUI。</p>
+ * 此启动器作为入口，内嵌启动后端服务，再启动前端 GUI。
+ * </p>
  *
  * @author voluntary-ai-chat
  * @since 1.0.0
@@ -41,14 +49,22 @@ public final class Launcher {
      * @param args 命令行参数
      */
     public static void main(final String[] args) {
-        // 热点模式下跳过内嵌后端启动，连接远程服务器
-        final String skipServer = System.getenv("SKIP_EMBEDDED_SERVER");
-        if ("true".equalsIgnoreCase(skipServer)) {
-            LOG.info("SKIP_EMBEDDED_SERVER=true，跳过内嵌后端启动，将连接远程服务器");
-        } else {
-            startEmbeddedServer();
+        try {
+            // 启动前确保日志目录存在
+            ensureDataDirectory();
+
+            // 热点模式下跳过内嵌后端启动，连接远程服务器
+            final String skipServer = System.getenv("SKIP_EMBEDDED_SERVER");
+            if ("true".equalsIgnoreCase(skipServer)) {
+                LOG.info("SKIP_EMBEDDED_SERVER=true，跳过内嵌后端启动，将连接远程服务器");
+            } else {
+                startEmbeddedServer();
+            }
+            Application.launch(App.class, args);
+        } catch (final Throwable e) {
+            writeErrorToFile("启动失败", e);
+            throw e;
         }
-        Application.launch(App.class, args);
     }
 
     /**
@@ -63,14 +79,16 @@ public final class Launcher {
         final Thread serverThread = new Thread(() -> {
             try {
                 LOG.info("正在启动内嵌后端服务...");
+                // 打包分发时自动使用 H2 内嵌数据库；开发环境可设置 DB_PROFILE=local 使用 MySQL
+                final String dbProfile = System.getenv().getOrDefault("DB_PROFILE", "h2");
                 serverContext = SpringApplication.run(
                         org.example.client.server.EmbeddedServerStarter.class,
-                        "--spring.profiles.active=local",
-                        "--server.port=" + SERVER_PORT
-                );
+                        "--spring.profiles.active=" + dbProfile,
+                        "--server.port=" + SERVER_PORT);
                 LOG.info("内嵌后端服务启动成功，端口: {}", SERVER_PORT);
             } catch (final Exception e) {
                 LOG.error("内嵌后端服务启动失败", e);
+                writeErrorToFile("内嵌后端服务启动失败", e);
             }
         }, "embedded-server-thread");
         serverThread.setDaemon(true);
@@ -108,6 +126,66 @@ public final class Launcher {
             return true;
         } catch (final IOException e) {
             return false;
+        }
+    }
+
+    /**
+     * 确保 H2 数据目录存在，避免 H2 启动时因目录不存在而报错
+     */
+    private static void ensureDataDirectory() {
+        String dataDir = System.getProperty("app.data.dir");
+        if (dataDir == null) {
+            final String appdata = System.getenv("APPDATA");
+            if (appdata != null) {
+                dataDir = appdata + "/Voluntary-AI-Chat/data";
+            } else {
+                dataDir = "./data";
+            }
+        }
+        try {
+            final Path dir = Path.of(dataDir);
+            if (!Files.exists(dir)) {
+                Files.createDirectories(dir);
+                LOG.info("已创建数据目录: {}", dir.toAbsolutePath());
+            }
+        } catch (final IOException e) {
+            LOG.warn("创建数据目录失败: {}", dataDir, e);
+        }
+    }
+
+    /**
+     * 获取数据目录路径
+     */
+    private static Path getDataDir() {
+        String dataDir = System.getProperty("app.data.dir");
+        if (dataDir == null) {
+            final String appdata = System.getenv("APPDATA");
+            dataDir = appdata != null ? appdata + "/Voluntary-AI-Chat/data" : "./data";
+        }
+        return Path.of(dataDir);
+    }
+
+    /**
+     * 将启动错误写入文件，方便无控制台环境（如 jpackage exe）排查问题
+     */
+    private static void writeErrorToFile(final String context, final Throwable e) {
+        try {
+            final Path dir = getDataDir();
+            if (!Files.exists(dir)) {
+                Files.createDirectories(dir);
+            }
+            final Path logFile = dir.resolve("startup-error.log");
+            final StringWriter sw = new StringWriter();
+            final PrintWriter pw = new PrintWriter(sw);
+            pw.println("=== " + LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) + " ===");
+            pw.println("Context: " + context);
+            pw.println("Exception: " + e.getClass().getName() + ": " + e.getMessage());
+            e.printStackTrace(pw);
+            pw.println();
+            Files.writeString(logFile, sw.toString(), java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+            System.err.println("[Launcher] 错误已写入: " + logFile.toAbsolutePath());
+        } catch (final IOException ex) {
+            System.err.println("[Launcher] 无法写入错误日志: " + ex.getMessage());
         }
     }
 }

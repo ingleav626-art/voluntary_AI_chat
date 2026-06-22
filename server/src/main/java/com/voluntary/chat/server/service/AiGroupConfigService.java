@@ -10,6 +10,7 @@ import com.voluntary.chat.server.entity.AiProfile;
 import com.voluntary.chat.server.mapper.AiGroupConfigMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,7 +29,9 @@ public class AiGroupConfigService {
 
     private final AiGroupConfigMapper aiGroupConfigMapper;
     private final AiService aiService;
-    private final StringRedisTemplate redisTemplate;
+
+    @Autowired(required = false)
+    private StringRedisTemplate redisTemplate;
 
     private static final String COOLDOWN_KEY_PREFIX = "ai:cooldown:";
     /** 默认冷却时间（秒） */
@@ -161,6 +164,10 @@ public class AiGroupConfigService {
      * 检查是否在冷却中
      */
     private boolean isInCooldown(final Long groupId, final Long aiId, final int cooldownSeconds) {
+        // H2 模式下 Redis 不可用，跳过冷却检查
+        if (redisTemplate == null) {
+            return false;
+        }
         final String key = COOLDOWN_KEY_PREFIX + groupId + ":" + aiId;
         final String value = redisTemplate.opsForValue().get(key);
         if (value == null) {
@@ -176,6 +183,10 @@ public class AiGroupConfigService {
      * 设置冷却时间
      */
     private void setCooldown(final Long groupId, final Long aiId, final int cooldownSeconds) {
+        // H2 模式下 Redis 不可用，跳过
+        if (redisTemplate == null) {
+            return;
+        }
         final String key = COOLDOWN_KEY_PREFIX + groupId + ":" + aiId;
         redisTemplate.opsForValue().set(
                 key,
