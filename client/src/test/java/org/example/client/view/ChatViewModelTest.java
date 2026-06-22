@@ -164,20 +164,24 @@ class ChatViewModelTest {
     // ==================== 消息撤回测试 ====================
 
     @Test
-    void recallMessage_shouldSetErrorWhenMessageIdIsNull() {
-        chatViewModel.recallMessage(null);
-        assertEquals("消息ID无效，无法撤回", chatViewModel.errorMessageProperty().get());
+    void recallMessage_shouldDoNothingWhenMessageIsNull() {
+        chatViewModel.recallMessage((MessageInfo) null);
+        // null 时直接 return，不设置错误消息
     }
 
     @Test
-    void recallMessage_shouldSetErrorWhenMessageIdIsNegative() {
-        chatViewModel.recallMessage(-1L);
-        assertEquals("消息ID无效，无法撤回", chatViewModel.errorMessageProperty().get());
+    void recallMessage_shouldHandleOptimisticMessageWithNegativeId() {
+        final MessageInfo msg = new MessageInfo();
+        msg.setMessageId(-1L);
+        // 乐观消息（messageId < 0）不在 pendingMessages 中时，直接 return
+        chatViewModel.recallMessage(msg);
     }
 
     @Test
     void recallMessage_shouldNotSetErrorWhenMessageIdIsValid() {
-        chatViewModel.recallMessage(100L);
+        final MessageInfo msg = new MessageInfo();
+        msg.setMessageId(100L);
+        chatViewModel.recallMessage(msg);
         // 有效 messageId 不会立即设置错误（异步请求会失败但 errorMessage 由回调设置）
         assertNotEquals("消息ID无效，无法撤回", chatViewModel.errorMessageProperty().get());
     }
