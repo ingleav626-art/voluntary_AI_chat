@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox fx:id="rootPane" prefHeight="700.0" prefWidth="1000.0"
+      styleClass="group-root"
+      xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="org.example.client.controller.GroupController">
+
+    <!-- 顶部标题栏 -->
+    <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="group-header">
+        <Label styleClass="group-title" text="群组管理"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button fx:id="backButton" mnemonicParsing="false"
+                onAction="#handleBack" styleClass="btn-icon" text="返回"/>
+    </HBox>
+
+    <Separator/>
+
+    <!-- 主体内容：左右分栏 -->
+    <SplitPane dividerPositions="0.4" VBox.vgrow="ALWAYS">
+
+        <!-- 左侧：群组列表 -->
+        <VBox spacing="5.0" styleClass="group-panel">
+            <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="group-panel-header">
+                <Label styleClass="group-panel-title" text="我的群组"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Button fx:id="refreshGroupsButton" mnemonicParsing="false"
+                        onAction="#handleRefreshGroups" styleClass="btn-icon" text="刷新"/>
+            </HBox>
+
+            <!-- 创建群组按钮 -->
+            <VBox spacing="8.0" styleClass="create-group-section">
+                <Button fx:id="createGroupButton" mnemonicParsing="false"
+                        onAction="#handleCreateGroup" styleClass="btn-primary" text="＋ 创建群组" maxWidth="Infinity"/>
+            </VBox>
+
+            <Separator/>
+
+            <ListView fx:id="groupList" styleClass="group-list" VBox.vgrow="ALWAYS">
+                <placeholder>
+                    <Label text="暂无群组，创建一个吧"/>
+                </placeholder>
+            </ListView>
+        </VBox>
+
+        <!-- 右侧：群成员列表 -->
+        <VBox spacing="5.0" styleClass="group-panel">
+            <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="group-panel-header">
+                <Label fx:id="groupDetailTitle" styleClass="group-panel-title" text="请选择群组"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <!-- 操作按钮 -->
+                <Button fx:id="dismissGroupButton" mnemonicParsing="false"
+                        onAction="#handleDismissGroup" styleClass="btn-danger-sm" text="解散群组"
+                        visible="false" managed="false"/>
+                <Button fx:id="leaveGroupButton" mnemonicParsing="false"
+                        onAction="#handleLeaveGroup" styleClass="btn-danger-sm" text="退出群组"
+                        visible="false" managed="false"/>
+            </HBox>
+
+            <ListView fx:id="memberList" styleClass="member-list" VBox.vgrow="ALWAYS">
+                <placeholder>
+                    <Label text="请选择群组查看成员"/>
+                </placeholder>
+            </ListView>
+        </VBox>
+    </SplitPane>
+
+    <!-- 底部状态栏 -->
+    <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="group-footer">
+        <Label fx:id="errorLabel" styleClass="error-message" text=""/>
+        <Label fx:id="successLabel" styleClass="success-message" text=""/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <ProgressIndicator fx:id="loadingIndicator" prefWidth="20" prefHeight="20" visible="false"/>
+    </HBox>
+</VBox>

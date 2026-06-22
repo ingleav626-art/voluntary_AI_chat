@@ -117,6 +117,10 @@ public final class RegisterController implements Initializable {
                     response.getExpiresIn(),
                     response.getUser()
             );
+            // 保存 Token 到内存缓存，确保后续 HTTP 请求能携带 Authorization 头
+            org.example.client.util.TokenStorage.save(loginResponse);
+            // 关闭旧的 WebSocket 连接（可能是老用户的连接）
+            org.example.client.service.WebSocketClient.getInstance().close();
             org.example.client.App.switchToMain(loginResponse);
         });
     }

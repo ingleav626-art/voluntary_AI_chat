@@ -417,4 +417,232 @@ class GroupServiceTest {
                 () -> groupService.leaveGroup(OWNER_ID, GROUP_ID));
         assertEquals(ErrorCode.NO_PERMISSION, ex.getErrorCode());
     }
+
+    // ==================== 转让群主 ====================
+
+    @Test
+    @DisplayName("转让群主成功")
+    void transferOwner_shouldSucceed() {
+        GroupEntity group = new GroupEntity();
+        group.setId(GROUP_ID);
+        group.setOwnerId(OWNER_ID);
+
+        GroupMember oldOwnerMember = new GroupMember();
+        oldOwnerMember.setId(1L);
+        oldOwnerMember.setGroupId(GROUP_ID);
+        oldOwnerMember.setUserId(OWNER_ID);
+        oldOwnerMember.setRole(2);
+
+        GroupMember newOwnerMember = new GroupMember();
+        newOwnerMember.setId(2L);
+        newOwnerMember.setGroupId(GROUP_ID);
+        newOwnerMember.setUserId(MEMBER_ID_1);
+        newOwnerMember.setRole(0);
+
+        when(groupMapper.selectById(GROUP_ID)).thenReturn(group);
+        when(groupMemberMapper.selectRoleByGroupIdAndUserId(GROUP_ID, MEMBER_ID_1)).thenReturn(0);
+        when(groupMemberMapper.selectByGroupIdAndUserId(GROUP_ID, OWNER_ID)).thenReturn(oldOwnerMember);
+        when(groupMemberMapper.selectByGroupIdAndUserId(GROUP_ID, MEMBER_ID_1)).thenReturn(newOwnerMember);
+
+        groupService.transferOwner(OWNER_ID, GROUP_ID, MEMBER_ID_1);
+
+        // 验证群 ownerId 更新
+        verify(groupMapper).updateById(group);
+        assertEquals(MEMBER_ID_1, group.getOwnerId());
+        // 验证原群主角色变为 MEMBER
+        assertEquals(0, oldOwnerMember.getRole());
+        verify(groupMemberMapper).updateById(oldOwnerMember);
+        // 验证目标角色变为 OWNER
+        assertEquals(2, newOwnerMember.getRole());
+        verify(groupMemberMapper).updateById(newOwnerMember);
+    }
+
+    @Test
+    @DisplayName("转让群主-非群主无权限")
+    void transferOwner_shouldThrow_whenNotOwner() {
+        GroupEntity group = new GroupEntity();
+        group.setId(GROUP_ID);
+        group.setOwnerId(OWNER_ID);
+
+        when(groupMapper.selectById(GROUP_ID)).thenReturn(group);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> groupService.transferOwner(MEMBER_ID_1, GROUP_ID, MEMBER_ID_2));
+        assertEquals(ErrorCode.NO_PERMISSION, ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("转让群主-目标不在群中")
+    void transferOwner_shouldThrow_whenTargetNotMember() {
+        GroupEntity group = new GroupEntity();
+        group.setId(GROUP_ID);
+        group.setOwnerId(OWNER_ID);
+
+        when(groupMapper.selectById(GROUP_ID)).thenReturn(group);
+        when(groupMemberMapper.selectRoleByGroupIdAndUserId(GROUP_ID, MEMBER_ID_2)).thenReturn(null);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> groupService.transferOwner(OWNER_ID, GROUP_ID, MEMBER_ID_2));
+        assertEquals(ErrorCode.NOT_FOUND, ex.getErrorCode());
+    }
+
+    // ==================== 解散群组 ====================
+
+    @Test
+    @DisplayName("解散群组成功")
+    void dismissGroup_shouldSucceed() {
+        GroupEntity group = new GroupEntity();
+        group.setId(GROUP_ID);
+        group.setOwnerId(OWNER_ID);
+        group.setIsDeleted(0);
+
+        when(groupMapper.selectById(GROUP_ID)).thenReturn(group);
+
+        groupService.dismissGroup(OWNER_ID, GROUP_ID);
+
+        // 验证群组被逻辑删除
+        assertEquals(1, group.getIsDeleted().intValue());
+        verify(groupMapper).updateById(group);
+        // 验证所有成员被逻辑删除
+        verify(groupMemberMapper).logicalDeleteByGroupId(GROUP_ID);
+    }
+
+    @Test
+    @DisplayName("解散群组-非群主无权限")
+    void dismissGroup_shouldThrow_whenNotOwner() {
+        GroupEntity group = new GroupEntity();
+        group.setId(GROUP_ID);
+        group.setOwnerId(OWNER_ID);
+
+        when(groupMapper.selectById(GROUP_ID)).thenReturn(group);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> groupService.dismissGroup(MEMBER_ID_1, GROUP_ID));
+        assertEquals(ErrorCode.NO_PERMISSION, ex.getErrorCode());
+    }
+
+    // ==================== 设置/取消管理员 ====================
+
+    @Test
+    @DisplayName("设置管理员成功")
+    void setAdmin_shouldSucceed() {
+        GroupEntity group = new GroupEntity();
+        group.setId(GROUP_ID);
+        group.setOwnerId(OWNER_ID);
+
+        GroupMember targetMember = new GroupMember();
+        targetMember.setId(3L);
+        targetMember.setGroupId(GROUP_ID);
+        targetMember.setUserId(MEMBER_ID_1);
+        targetMember.setRole(0);
+
+        when(groupMapper.selectById(GROUP_ID)).thenReturn(group);
+        when(groupMemberMapper.selectByGroupIdAndUserId(GROUP_ID, MEMBER_ID_1)).thenReturn(targetMember);
+
+        groupService.setAdmin(OWNER_ID, GROUP_ID, MEMBER_ID_1, "SET");
+
+        assertEquals(1, targetMember.getRole().intValue());
+        verify(groupMemberMapper).updateById(targetMember);
+    }
+
+    @Test
+    @DisplayName("取消管理员成功")
+    void removeAdmin_shouldSucceed() {
+        GroupEntity group = new GroupEntity();
+        group.setId(GROUP_ID);
+        group.setOwnerId(OWNER_ID);
+
+        GroupMember targetMember = new GroupMember();
+        targetMember.setId(3L);
+        targetMember.setGroupId(GROUP_ID);
+        targetMember.setUserId(MEMBER_ID_1);
+        targetMember.setRole(1);
+
+        when(groupMapper.selectById(GROUP_ID)).thenReturn(group);
+        when(groupMemberMapper.selectByGroupIdAndUserId(GROUP_ID, MEMBER_ID_1)).thenReturn(targetMember);
+
+        groupService.setAdmin(OWNER_ID, GROUP_ID, MEMBER_ID_1, "REMOVE");
+
+        assertEquals(0, targetMember.getRole().intValue());
+        verify(groupMemberMapper).updateById(targetMember);
+    }
+
+    @Test
+    @DisplayName("设置管理员-非群主无权限")
+    void setAdmin_shouldThrow_whenNotOwner() {
+        GroupEntity group = new GroupEntity();
+        group.setId(GROUP_ID);
+        group.setOwnerId(OWNER_ID);
+
+        when(groupMapper.selectById(GROUP_ID)).thenReturn(group);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> groupService.setAdmin(MEMBER_ID_1, GROUP_ID, MEMBER_ID_2, "SET"));
+        assertEquals(ErrorCode.NO_PERMISSION, ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("设置管理员-目标不在群中")
+    void setAdmin_shouldThrow_whenTargetNotMember() {
+        GroupEntity group = new GroupEntity();
+        group.setId(GROUP_ID);
+        group.setOwnerId(OWNER_ID);
+
+        when(groupMapper.selectById(GROUP_ID)).thenReturn(group);
+        when(groupMemberMapper.selectByGroupIdAndUserId(GROUP_ID, MEMBER_ID_2)).thenReturn(null);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> groupService.setAdmin(OWNER_ID, GROUP_ID, MEMBER_ID_2, "SET"));
+        assertEquals(ErrorCode.NOT_FOUND, ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("设置管理员-不能对群主操作")
+    void setAdmin_shouldThrow_whenTargetIsOwner() {
+        GroupEntity group = new GroupEntity();
+        group.setId(GROUP_ID);
+        group.setOwnerId(OWNER_ID);
+
+        GroupMember ownerMember = new GroupMember();
+        ownerMember.setId(1L);
+        ownerMember.setGroupId(GROUP_ID);
+        ownerMember.setUserId(OWNER_ID);
+        ownerMember.setRole(2);
+
+        when(groupMapper.selectById(GROUP_ID)).thenReturn(group);
+        when(groupMemberMapper.selectByGroupIdAndUserId(GROUP_ID, OWNER_ID)).thenReturn(ownerMember);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> groupService.setAdmin(OWNER_ID, GROUP_ID, OWNER_ID, "SET"));
+        assertEquals(ErrorCode.NO_PERMISSION, ex.getErrorCode());
+    }
+
+    // ==================== 设置群昵称 ====================
+
+    @Test
+    @DisplayName("设置群昵称成功")
+    void setNickname_shouldSucceed() {
+        GroupMember member = new GroupMember();
+        member.setId(3L);
+        member.setGroupId(GROUP_ID);
+        member.setUserId(MEMBER_ID_1);
+        member.setRole(0);
+
+        when(groupMemberMapper.selectByGroupIdAndUserId(GROUP_ID, MEMBER_ID_1)).thenReturn(member);
+
+        groupService.setNickname(MEMBER_ID_1, GROUP_ID, "我的群昵称");
+
+        assertEquals("我的群昵称", member.getNickname());
+        verify(groupMemberMapper).updateById(member);
+    }
+
+    @Test
+    @DisplayName("设置群昵称-非成员无权限")
+    void setNickname_shouldThrow_whenNotMember() {
+        when(groupMemberMapper.selectByGroupIdAndUserId(GROUP_ID, MEMBER_ID_1)).thenReturn(null);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> groupService.setNickname(MEMBER_ID_1, GROUP_ID, "昵称"));
+        assertEquals(ErrorCode.NO_PERMISSION, ex.getErrorCode());
+    }
 }

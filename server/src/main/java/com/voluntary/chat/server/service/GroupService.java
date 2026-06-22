@@ -330,6 +330,153 @@ public class GroupService {
     }
 
     /**
+     * 转让群主
+     *
+     * <p>仅群主可操作。转让后原群主自动变为普通成员，被转让者变为群主。</p>
+     *
+     * @param userId        当前用户ID（必须是群主）
+     * @param groupId       群组ID
+     * @param targetUserId  目标用户ID
+     */
+    @Transactional
+    public void transferOwner(final Long userId, final Long groupId, final Long targetUserId) {
+        GroupEntity group = findGroupById(groupId);
+
+        // 仅群主可转让
+        if (!group.getOwnerId().equals(userId)) {
+            throw new BusinessException(ErrorCode.NO_PERMISSION, "仅群主可转让群主");
+        }
+
+        // 校验目标用户是否为群成员
+        Integer targetRole = groupMemberMapper.selectRoleByGroupIdAndUserId(groupId, targetUserId);
+        if (targetRole == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "目标用户不在群中");
+        }
+
+        // 转让群主：更新群 owner_id
+        group.setOwnerId(targetUserId);
+        groupMapper.updateById(group);
+
+        // 原群主角色改为 MEMBER
+        GroupMember oldOwner = groupMemberMapper.selectByGroupIdAndUserId(groupId, userId);
+        if (oldOwner != null) {
+            oldOwner.setRole(GroupRole.MEMBER.getCode());
+            groupMemberMapper.updateById(oldOwner);
+        }
+
+        // 目标用户角色改为 OWNER
+        GroupMember newOwner = groupMemberMapper.selectByGroupIdAndUserId(groupId, targetUserId);
+        if (newOwner != null) {
+            newOwner.setRole(GroupRole.OWNER.getCode());
+            groupMemberMapper.updateById(newOwner);
+        }
+
+        log.info("群主转让成功: groupId={}, oldOwnerId={}, newOwnerId={}",
+                groupId, userId, targetUserId);
+    }
+
+    /**
+     * 解散群组
+     *
+     * <p>仅群主可操作。逻辑删除群组及所有成员记录。</p>
+     *
+     * @param userId   当前用户ID（必须是群主）
+     * @param groupId  群组ID
+     */
+    @Transactional
+    public void dismissGroup(final Long userId, final Long groupId) {
+        GroupEntity group = findGroupById(groupId);
+
+        // 仅群主可解散
+        if (!group.getOwnerId().equals(userId)) {
+            throw new BusinessException(ErrorCode.NO_PERMISSION, "仅群主可解散群组");
+        }
+
+        // 逻辑删除群组
+        group.setIsDeleted(1);
+        groupMapper.updateById(group);
+
+        // 逻辑删除所有群成员
+        groupMemberMapper.logicalDeleteByGroupId(groupId);
+
+        log.info("群组已解散: groupId={}, ownerId={}", groupId, userId);
+    }
+
+    /**
+     * 设置/取消管理员
+     *
+     * <p>仅群主可操作。通过 action 参数控制设置或取消。</p>
+     *
+     * @param userId        当前用户ID（必须是群主）
+     * @param groupId       群组ID
+     * @param targetUserId  目标用户ID
+     * @param action        SET 设为管理员，REMOVE 取消管理员
+     */
+    @Transactional
+    public void setAdmin(final Long userId, final Long groupId, final Long targetUserId, final String action) {
+        GroupEntity group = findGroupById(groupId);
+
+        // 仅群主可操作
+        if (!group.getOwnerId().equals(userId)) {
+            throw new BusinessException(ErrorCode.NO_PERMISSION, "仅群主可设置管理员");
+        }
+
+        // 校验目标用户是否为群成员
+        GroupMember targetMember = groupMemberMapper.selectByGroupIdAndUserId(groupId, targetUserId);
+        if (targetMember == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "目标用户不在群中");
+        }
+
+        // 不能对群主操作
+        if (group.getOwnerId().equals(targetUserId)) {
+            throw new BusinessException(ErrorCode.NO_PERMISSION, "不能修改群主的角色");
+        }
+
+        if ("SET".equalsIgnoreCase(action)) {
+            // 已经是管理员则跳过
+            if (targetMember.getRole() == GroupRole.ADMIN.getCode()) {
+                log.warn("用户已是管理员: groupId={}, targetUserId={}", groupId, targetUserId);
+                return;
+            }
+            targetMember.setRole(GroupRole.ADMIN.getCode());
+            log.info("管理员设置成功: groupId={}, targetUserId={}", groupId, targetUserId);
+        } else if ("REMOVE".equalsIgnoreCase(action)) {
+            // 已经是普通成员则跳过
+            if (targetMember.getRole() == GroupRole.MEMBER.getCode()) {
+                log.warn("用户已是普通成员: groupId={}, targetUserId={}", groupId, targetUserId);
+                return;
+            }
+            targetMember.setRole(GroupRole.MEMBER.getCode());
+            log.info("管理员取消成功: groupId={}, targetUserId={}", groupId, targetUserId);
+        } else {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "无效的操作类型: " + action);
+        }
+
+        groupMemberMapper.updateById(targetMember);
+    }
+
+    /**
+     * 设置群成员昵称
+     *
+     * @param userId    当前用户ID
+     * @param groupId   群组ID
+     * @param nickname  群昵称
+     */
+    @Transactional
+    public void setNickname(final Long userId, final Long groupId, final String nickname) {
+        // 校验用户是否为群成员
+        GroupMember member = groupMemberMapper.selectByGroupIdAndUserId(groupId, userId);
+        if (member == null) {
+            throw new BusinessException(ErrorCode.NO_PERMISSION, "不在群中");
+        }
+
+        member.setNickname(nickname);
+        groupMemberMapper.updateById(member);
+
+        log.info("群昵称设置成功: groupId={}, userId={}, nickname={}", groupId, userId, nickname);
+    }
+
+    /**
      * 按ID查找群组
      *
      * @param groupId 群组ID

@@ -93,8 +93,14 @@ public final class MainViewModel {
         // 设置当前用户
         currentUser.set(loginResponse.getUser());
 
-        // 建立 WebSocket 连接
-        WebSocketClient.getInstance().connect(loginResponse.getAccessToken());
+        // 建立 WebSocket 连接（仅在未连接时）
+        if (!WebSocketClient.getInstance().isConnected()) {
+            WebSocketClient.getInstance().connect(loginResponse.getAccessToken());
+        } else {
+            LOG.info("WebSocket 已连接，跳过重新建立连接");
+            // 同步连接状态到当前 ViewModel
+            connected.set(true);
+        }
 
         // 加载会话列表
         loadConversations();
@@ -193,6 +199,7 @@ public final class MainViewModel {
             case MessageTypes.STATUS_CHANGE -> handleStatusChange(wsMessage);
             case MessageTypes.RECONNECT_ACK -> handleReconnectAck(wsMessage);
             case MessageTypes.READ_RECEIPT -> handleReadReceipt(wsMessage);
+            case MessageTypes.MESSAGE_RECALL -> handleMessageRecall(wsMessage);
             default -> LOG.debug("未处理的消息类型: {}", wsMessage.getType());
         }
     }
@@ -288,6 +295,46 @@ public final class MainViewModel {
         }
 
         LOG.info("收到已读回执: sessionId={}, lastReadMessageId={}", sessionId, lastReadMessageId);
+    }
+
+    /**
+     * 处理消息撤回通知
+     * 将对应消息标记为已撤回，UI 实时更新为"消息已撤回"
+     *
+     * @param wsMessage WebSocket 消息
+     */
+    @SuppressWarnings("unchecked")
+    private void handleMessageRecall(final WebSocketMessage wsMessage) {
+        final java.util.Map<String, Object> data = (java.util.Map<String, Object>) wsMessage.getData();
+        if (data == null) {
+            return;
+        }
+
+        final Object messageIdObj = data.get("messageId");
+        final String sessionId = (String) data.get("sessionId");
+
+        if (messageIdObj == null || sessionId == null) {
+            return;
+        }
+
+        final Long messageId = toLong(messageIdObj);
+
+        // 检查是否当前正在查看的会话
+        final ChatViewModel chatVm = chatViewModel.get();
+        if (chatVm != null && sessionId.equals(chatVm.getSessionId())) {
+            for (final MessageInfo msg : chatVm.getMessages()) {
+                if (messageId.equals(msg.getMessageId())) {
+                    msg.setRecalled(true);
+                    final int index = chatVm.getMessages().indexOf(msg);
+                    if (index >= 0) {
+                        chatVm.getMessages().set(index, msg);
+                    }
+                    break;
+                }
+            }
+        }
+
+        LOG.info("收到消息撤回通知: sessionId={}, messageId={}", sessionId, messageId);
     }
 
     /**

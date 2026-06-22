@@ -83,6 +83,9 @@ public final class MainController implements Initializable {
     private Button friendButton;
 
     @FXML
+    private Button groupButton;
+
+    @FXML
     private Button logoutButton;
 
     @FXML
@@ -380,6 +383,15 @@ public final class MainController implements Initializable {
     }
 
     /**
+     * 处理群组管理
+     */
+    @FXML
+    private void handleGroup() {
+        LOG.info("切换到群组面板");
+        org.example.client.App.switchToGroup();
+    }
+
+    /**
      * 处理退出登录
      */
     @FXML
@@ -558,7 +570,7 @@ public final class MainController implements Initializable {
             setGraphic(alignBox);
 
             // 为自己发送且未撤回的消息添加右键菜单
-            if (item.isSentByMe() && item.getMessageId() != null && item.getMessageId() > 0) {
+            if (item.isSentByMe() && item.getMessageId() != null) {
                 final ContextMenu contextMenu = new ContextMenu();
                 final MenuItem recallItem = new MenuItem("撤回");
                 recallItem.setOnAction(e -> handleRecallMessage(item));
@@ -594,7 +606,7 @@ public final class MainController implements Initializable {
         private void handleRecallMessage(final MessageInfo message) {
             final ChatViewModel chatVm = viewModel.chatViewModelProperty().get();
             if (chatVm != null) {
-                chatVm.recallMessage(message.getMessageId());
+                chatVm.recallMessage(message);
             }
         }
 

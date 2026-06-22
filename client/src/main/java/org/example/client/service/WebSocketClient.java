@@ -26,7 +26,9 @@ import javafx.application.Platform;
 /**
  * WebSocket 客户端
  *
- * <p>负责与服务端建立 WebSocket 连接，处理实时消息收发、心跳维持和断线重连。</p>
+ * <p>
+ * 负责与服务端建立 WebSocket 连接，处理实时消息收发、心跳维持和断线重连。
+ * </p>
  *
  * @author voluntary-ai-chat
  * @since 1.0.0
@@ -126,6 +128,18 @@ public final class WebSocketClient {
             return;
         }
 
+        // 先关闭旧连接，防止被服务端踢掉后触发重连循环
+        if (webSocket != null && connected) {
+            LOG.info("关闭旧连接，准备建立新连接");
+            manualClose = true;
+            try {
+                webSocket.sendClose(java.net.http.WebSocket.NORMAL_CLOSURE, "reconnect");
+            } catch (final Exception e) {
+                LOG.warn("关闭旧连接失败", e);
+            }
+            connected = false;
+        }
+
         this.currentToken = token;
         this.manualClose = false;
         this.reconnectAttempts = 0;
@@ -196,7 +210,7 @@ public final class WebSocketClient {
 
         @Override
         public java.util.concurrent.CompletionStage<?> onText(final java.net.http.WebSocket webSocket,
-                          final CharSequence data, final boolean last) {
+                final CharSequence data, final boolean last) {
             messageBuffer.append(data);
             if (last) {
                 final String message = messageBuffer.toString();
@@ -217,12 +231,13 @@ public final class WebSocketClient {
 
         @Override
         public java.util.concurrent.CompletionStage<?> onClose(final java.net.http.WebSocket webSocket,
-                           final int statusCode, final String reason) {
+                final int statusCode, final String reason) {
             LOG.info("WebSocket 连接关闭: statusCode={}, reason={}", statusCode, reason);
             connected = false;
             stopHeartbeat();
             notifyConnectionChange(false);
-            if (!manualClose) {
+            // 如果是主动重连（reason=reconnect），不触发自动重连逻辑
+            if (!manualClose && !"reconnect".equals(reason)) {
                 scheduleReconnect();
             }
             return null;
@@ -246,6 +261,17 @@ public final class WebSocketClient {
             if (MessageTypes.PONG.equals(wsMessage.getType())) {
                 LOG.debug("收到 PONG 心跳响应");
                 return;
+            }
+
+            // FORCE_LOGOUT 消息表示被踢下线，停止重连
+            if (MessageTypes.FORCE_LOGOUT.equals(wsMessage.getType())) {
+                LOG.warn("收到强制下线通知，停止重连");
+                manualClose = true;
+                connected = false;
+                stopHeartbeat();
+                if (reconnectTask != null && !reconnectTask.isDone()) {
+                    reconnectTask.cancel(false);
+                }
             }
 
             // 记录最后收到的服务端消息ID，用于断线重连补发

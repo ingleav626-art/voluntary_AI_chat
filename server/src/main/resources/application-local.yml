@@ -8,11 +8,18 @@ spring:
       maximum-pool-size: 20
       minimum-idle: 5
 
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema.sql
+      continue-on-error: true
+
   jpa:
     hibernate:
       ddl-auto: validate
     show-sql: true
     open-in-view: false
+    defer-datasource-initialization: true
 
   autoconfigure:
     exclude:
