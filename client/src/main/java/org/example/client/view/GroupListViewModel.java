@@ -1,6 +1,7 @@
 package org.example.client.view;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import org.example.client.model.CreateGroupRequest;
 import org.example.client.model.CreateGroupResponse;
@@ -33,6 +34,39 @@ import javafx.collections.ObservableList;
 public final class GroupListViewModel {
 
     private static final Logger LOG = LoggerFactory.getLogger(GroupListViewModel.class);
+
+    /** 群组事件监听器接口 */
+    public interface GroupEventListener {
+        /**
+         * 群成员变更通知（加入、离开、角色变更）
+         *
+         * @param groupId 群组ID
+         */
+        void onMemberChanged(Long groupId);
+    }
+
+    /** 全局群组事件监听器，由 GroupController 注册 */
+    private static GroupEventListener groupEventListener;
+
+    /**
+     * 设置全局群组事件监听器
+     *
+     * @param listener 监听器
+     */
+    public static void setGroupEventListener(final GroupEventListener listener) {
+        groupEventListener = listener;
+    }
+
+    /**
+     * 通知群成员变更事件（供 MainViewModel 调用）
+     *
+     * @param groupId 群组ID
+     */
+    public static void notifyMemberChanged(final Long groupId) {
+        if (groupEventListener != null) {
+            groupEventListener.onMemberChanged(groupId);
+        }
+    }
 
     /** 群组列表 */
     private final ListProperty<GroupInfo> groups =
@@ -85,6 +119,17 @@ public final class GroupListViewModel {
                     if (response != null && response.isSuccess() && response.getData() != null) {
                         final List<GroupInfo> list = response.getData().getList();
                         groups.setAll(list);
+
+                        // 刷新后同步更新 selectedGroup，确保 ownerId 等字段为最新值
+                        if (selectedGroup != null) {
+                            for (final GroupInfo g : list) {
+                                if (selectedGroup.getGroupId().equals(g.getGroupId())) {
+                                    selectedGroup = g;
+                                    break;
+                                }
+                            }
+                        }
+
                         LOG.info("群组列表加载成功: count={}", list.size());
                     } else {
                         final String msg = response != null ? response.getMessage() : "加载群组列表失败";
@@ -377,21 +422,51 @@ public final class GroupListViewModel {
         errorMessage.set("");
 
         GroupService.getInstance().transferOwner(groupId, targetUserId)
-                .thenAccept(response -> Platform.runLater(() -> {
-                    loading.set(false);
-
+                .thenCompose(response -> {
                     if (response != null && response.isSuccess()) {
-                        successMessage.set("群主已转让");
-                        loadGroups();
-                        // 重新加载群成员列表以更新角色显示
-                        loadMembers(groupId);
-                        LOG.info("群主已转让: groupId={}, newOwnerId={}", groupId, targetUserId);
-                    } else {
+                        // 先刷新群组列表以更新 ownerId，再刷新成员列表
+                        return GroupService.getInstance().getGroupList(1, 100)
+                                .thenAccept(groupResponse -> Platform.runLater(() -> {
+                                    if (groupResponse != null && groupResponse.isSuccess()
+                                            && groupResponse.getData() != null) {
+                                        final List<GroupInfo> list = groupResponse.getData().getList();
+                                        groups.setAll(list);
+
+                                        // 同步更新 selectedGroup
+                                        if (selectedGroup != null) {
+                                            for (final GroupInfo g : list) {
+                                                if (selectedGroup.getGroupId().equals(g.getGroupId())) {
+                                                    selectedGroup = g;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    loading.set(false);
+                                    successMessage.set("群主已转让");
+                                    // selectedGroup 已更新，再加载成员列表触发按钮刷新
+                                    loadMembers(groupId);
+                                }));
+                    }
+                    // 转让失败
+                    Platform.runLater(() -> {
+                        loading.set(false);
                         final String msg = response != null ? response.getMessage() : "转让群主失败";
                         errorMessage.set(msg);
                         LOG.warn("转让群主失败: {}", msg);
-                    }
-                }));
+                    });
+                    return CompletableFuture.completedFuture(null);
+                })
+                .exceptionally(ex -> {
+                    Platform.runLater(() -> {
+                        loading.set(false);
+                        errorMessage.set("转让群主失败");
+                        LOG.error("转让群主异常", ex);
+                    });
+                    return null;
+                });
+
+        LOG.info("转让群主请求已发送: groupId={}, targetUserId={}", groupId, targetUserId);
     }
 
     /**

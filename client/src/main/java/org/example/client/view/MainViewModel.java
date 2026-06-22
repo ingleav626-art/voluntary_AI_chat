@@ -278,12 +278,16 @@ public final class MainViewModel {
             return;
         }
 
-        final String sessionId = (String) data.get("sessionId");
-        final String lastReadMessageId = (String) data.get("lastReadMessageId");
+        // 服务端返回的 sessionId 和 lastReadMessageId 可能是 Long 类型，安全转换为 String
+        final Object sessionIdObj = data.get("sessionId");
+        final Object lastReadMsgIdObj = data.get("lastReadMessageId");
 
-        if (sessionId == null || lastReadMessageId == null) {
+        if (sessionIdObj == null || lastReadMsgIdObj == null) {
             return;
         }
+
+        final String sessionId = String.valueOf(sessionIdObj);
+        final String lastReadMessageId = String.valueOf(lastReadMsgIdObj);
 
         final ChatViewModel chatVm = chatViewModel.get();
         if (chatVm != null && sessionId.equals(chatVm.getSessionId())) {
@@ -358,6 +362,34 @@ public final class MainViewModel {
         final Long userId = toLong(data.get("userId"));
         final String username = (String) data.get("username");
         LOG.info("群成员加入: groupId={}, userId={}, username={}", groupId, userId, username);
+
+        // 构造系统消息
+        final String sessionId = "g_" + groupId;
+        final String content = (username != null ? username : "未知用户") + " 已加入群聊";
+        final MessageInfo sysMsg = new MessageInfo();
+        sysMsg.setMessageId(-System.currentTimeMillis());
+        sysMsg.setSessionId(sessionId);
+        sysMsg.setSenderId(-1L);
+        sysMsg.setSenderName("");
+        sysMsg.setSenderAvatar("");
+        sysMsg.setSenderType("SYSTEM");
+        sysMsg.setType("SYSTEM");
+        sysMsg.setContent(content);
+        sysMsg.setCreateTime(java.time.LocalDateTime.now());
+        sysMsg.setSentByMe(false);
+
+        // 追加到聊天区（如果正在查看）或加入待注入队列
+        final ChatViewModel chatVm = chatViewModel.get();
+        if (chatVm != null && sessionId.equals(chatVm.getSessionId())) {
+            chatVm.appendMessage(sysMsg);
+        } else {
+            // 用户未查看该群时，进入待注入队列，待下次打开群聊时自动注入
+            ChatViewModel.addPendingSystemMessage(sessionId, sysMsg);
+        }
+        updateConversationLastMessage(sessionId, content);
+
+        // 通知群组面板刷新成员列表
+        GroupListViewModel.notifyMemberChanged(groupId);
     }
 
     /**
@@ -372,6 +404,8 @@ public final class MainViewModel {
         final Long groupId = toLong(data.get("groupId"));
         final Long userId = toLong(data.get("userId"));
         LOG.info("群成员离开: groupId={}, userId={}", groupId, userId);
+        // 通知群组面板刷新成员列表（踢人后实时更新）
+        GroupListViewModel.notifyMemberChanged(groupId);
     }
 
     /**
@@ -387,6 +421,8 @@ public final class MainViewModel {
         final Long userId = toLong(data.get("userId"));
         final String newRole = (String) data.get("newRole");
         LOG.info("群成员角色变更: groupId={}, userId={}, newRole={}", groupId, userId, newRole);
+        // 通知群组面板刷新成员列表和按钮状态
+        GroupListViewModel.notifyMemberChanged(groupId);
     }
 
     /**
@@ -447,6 +483,9 @@ public final class MainViewModel {
         final String msgType = (String) data.get("msgType");
         final String content = (String) data.get("content");
         final String createTimeStr = (String) data.get("createTime");
+        final String thumbnailUrl = (String) data.get("thumbnailUrl");
+        final Integer width = data.get("width") != null ? toLong(data.get("width")).intValue() : null;
+        final Integer height = data.get("height") != null ? toLong(data.get("height")).intValue() : null;
 
         final MessageInfo message = new MessageInfo();
         message.setMessageId(messageId);
@@ -457,6 +496,9 @@ public final class MainViewModel {
         message.setSenderType(senderType);
         message.setType(msgType);
         message.setContent(content);
+        message.setThumbnailUrl(thumbnailUrl);
+        message.setWidth(width);
+        message.setHeight(height);
         message.setCreateTime(parseDateTime(createTimeStr));
         message.setSentByMe(currentUser.get() != null
                 && currentUser.get().getUserId() != null
@@ -515,6 +557,9 @@ public final class MainViewModel {
         final String msgType = (String) data.get("msgType");
         final String content = (String) data.get("content");
         final String createTimeStr = (String) data.get("createTime");
+        final String thumbnailUrl = (String) data.get("thumbnailUrl");
+        final Integer width = data.get("width") != null ? toLong(data.get("width")).intValue() : null;
+        final Integer height = data.get("height") != null ? toLong(data.get("height")).intValue() : null;
 
         final MessageInfo message = new MessageInfo();
         message.setMessageId(messageId);
@@ -525,6 +570,9 @@ public final class MainViewModel {
         message.setSenderType(senderType);
         message.setType(msgType);
         message.setContent(content);
+        message.setThumbnailUrl(thumbnailUrl);
+        message.setWidth(width);
+        message.setHeight(height);
         message.setCreateTime(parseDateTime(createTimeStr));
         message.setSentByMe(currentUser.get() != null
                 && currentUser.get().getUserId() != null
@@ -579,10 +627,15 @@ public final class MainViewModel {
 
         final ChatViewModel chatVm = chatViewModel.get();
         if (chatVm != null) {
-            chatVm.updateMessageAck(clientId, messageId, parseDateTime(createTimeStr));
+            try {
+                chatVm.updateMessageAck(clientId, messageId, parseDateTime(createTimeStr));
+                LOG.debug("消息确认: clientId={}, messageId={}", clientId, messageId);
+            } catch (final Exception e) {
+                LOG.error("处理消息确认时异常: clientId={}, messageId={}", clientId, messageId, e);
+            }
+        } else {
+            LOG.debug("消息确认时 ChatViewModel 为 null: clientId={}, messageId={}", clientId, messageId);
         }
-
-        LOG.debug("消息确认: clientId={}, messageId={}", clientId, messageId);
     }
 
     /**

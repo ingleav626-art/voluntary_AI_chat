@@ -4,6 +4,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import javafx.application.Platform;
@@ -19,9 +20,11 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 
 import org.example.client.model.FriendResponse;
+import org.example.client.model.GroupMemberInfo;
 import org.example.client.service.FriendService;
 import org.example.client.service.GroupService;
 import org.slf4j.Logger;
@@ -69,6 +72,9 @@ public final class GroupInviteController implements Initializable {
     /** 好友列表完整数据 */
     private List<FriendResponse> allFriends = new ArrayList<>();
 
+    /** 已在群中的用户ID集合 */
+    private Set<Long> existingMemberIds = Set.of();
+
     @Override
     public void initialize(final URL location, final ResourceBundle resources) {
         // 好友列表 Cell（带复选框）
@@ -94,6 +100,37 @@ public final class GroupInviteController implements Initializable {
     public void initData(final Long groupId, final Runnable onSuccess) {
         this.groupId = groupId;
         this.onSuccess = onSuccess;
+        // 加载当前群成员，用于标记已在群中的好友
+        loadExistingMembers();
+    }
+
+    /**
+     * 加载当前群成员列表，记录已在群中的用户ID
+     */
+    private void loadExistingMembers() {
+        if (groupId == null) {
+            return;
+        }
+
+        GroupService.getInstance().getGroupMembers(groupId, 1, 100)
+                .thenAccept(response -> Platform.runLater(() -> {
+                    if (response != null && response.isSuccess() && response.getData() != null) {
+                        final List<GroupMemberInfo> members = response.getData().getList();
+                        existingMemberIds = members.stream()
+                                .map(GroupMemberInfo::getUserId)
+                                .collect(Collectors.toSet());
+                        // 刷新好友列表以更新"已在群"标记
+                        refreshFriendListDisplay();
+                        LOG.info("已加载群成员: groupId={}, count={}", groupId, existingMemberIds.size());
+                    }
+                }));
+    }
+
+    /**
+     * 刷新好友列表显示（更新"已在群"标记）
+     */
+    private void refreshFriendListDisplay() {
+        friendCheckList.getItems().setAll(allFriends);
     }
 
     /**
@@ -149,13 +186,35 @@ public final class GroupInviteController implements Initializable {
      */
     @FXML
     private void handleInvite() {
+        // 分离已入群和未入群的好友
+        final List<Long> alreadyInGroup = selectedMap.entrySet().stream()
+                .filter(java.util.Map.Entry::getValue)
+                .map(java.util.Map.Entry::getKey)
+                .filter(userId -> existingMemberIds.contains(userId))
+                .collect(Collectors.toList());
+
         final List<Long> memberIds = selectedMap.entrySet().stream()
                 .filter(java.util.Map.Entry::getValue)
                 .map(java.util.Map.Entry::getKey)
+                .filter(userId -> !existingMemberIds.contains(userId))
                 .collect(Collectors.toList());
 
+        // 提示已入群的用户
+        if (!alreadyInGroup.isEmpty()) {
+            final String names = alreadyInGroup.stream()
+                    .map(id -> allFriends.stream()
+                            .filter(f -> f.getUserId().equals(id))
+                            .map(f -> f.getUsername() != null ? f.getUsername() : String.valueOf(id))
+                            .findFirst()
+                            .orElse(String.valueOf(id)))
+                    .collect(Collectors.joining("、"));
+            errorLabel.setText(names + " 已在群聊中，已自动过滤");
+        }
+
         if (memberIds.isEmpty()) {
-            errorLabel.setText("请至少选择一位好友");
+            if (alreadyInGroup.isEmpty()) {
+                errorLabel.setText("请至少选择一位好友");
+            }
             return;
         }
 
@@ -245,8 +304,21 @@ public final class GroupInviteController implements Initializable {
             nameLabel.setText(item.getUsername() != null ? item.getUsername() : "未知");
             remarkLabel.setText(item.getRemark() != null ? "备注: " + item.getRemark() : "");
 
-            final Boolean selected = selectedMap.get(item.getUserId());
-            checkBox.setSelected(selected != null && selected);
+            // 判断是否已在群中
+            final boolean inGroup = existingMemberIds.contains(item.getUserId());
+            if (inGroup) {
+                remarkLabel.setText("已在群聊中");
+                remarkLabel.setTextFill(Color.GRAY);
+                checkBox.setDisable(true);
+                checkBox.setSelected(false);
+                selectedMap.put(item.getUserId(), false);
+            } else {
+                // 恢复选中状态
+                final Boolean selected = selectedMap.get(item.getUserId());
+                checkBox.setSelected(selected != null && selected);
+                checkBox.setDisable(false);
+                remarkLabel.setTextFill(Color.BLACK);
+            }
 
             setGraphic(cell);
             setText(null);

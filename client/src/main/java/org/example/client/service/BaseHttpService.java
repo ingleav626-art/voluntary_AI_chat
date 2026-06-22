@@ -50,6 +50,15 @@ public abstract class BaseHttpService {
     /** 共享 HttpClient 实例 */
     private final HttpClient httpClient;
 
+    /**
+     * 获取共享 HttpClient 实例（供子类使用）
+     *
+     * @return HttpClient 实例
+     */
+    protected HttpClient getHttpClient() {
+        return httpClient;
+    }
+
     protected BaseHttpService() {
         final ClientConfig config = ClientConfig.getInstance();
         httpClient = HttpClient.newBuilder()

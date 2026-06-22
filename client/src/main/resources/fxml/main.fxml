@@ -85,12 +85,10 @@
 
             <!-- 输入区域 -->
             <VBox styleClass="input-area">
-                <!-- 工具栏：+ 按钮、图片按钮 -->
+                <!-- 工具栏：+ 按钮（发送图片 / 发送文件） -->
                 <HBox alignment="CENTER_LEFT" spacing="8.0" styleClass="input-toolbar">
                     <Button fx:id="plusButton" mnemonicParsing="false"
-                            onAction="#handlePlusButton" styleClass="btn-tool" text="+"/>
-                    <Button fx:id="imageButton" mnemonicParsing="false"
-                            onAction="#handleSendImage" styleClass="btn-tool" text="图片"/>
+                            onAction="#handlePlusButton" style="-fx-background-color: #FFE8D6; -fx-text-fill: #E76F51; -fx-font-size: 20px; -fx-font-weight: bold; -fx-background-radius: 18; -fx-min-width: 36px; -fx-min-height: 36px; -fx-alignment: center; -fx-cursor: hand; -fx-border-color: transparent;" text="+"/>
                 </HBox>
                 <!-- 输入框 -->
                 <TextArea fx:id="inputArea" promptText="输入消息... (Enter 发送, Shift+Enter 换行)"

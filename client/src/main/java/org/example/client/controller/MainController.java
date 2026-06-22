@@ -107,9 +107,6 @@ public final class MainController implements Initializable {
     private Button sendButton;
 
     @FXML
-    private Button imageButton;
-
-    @FXML
     private Button plusButton;
 
     private MainViewModel viewModel;
@@ -219,6 +216,15 @@ public final class MainController implements Initializable {
             });
         });
 
+        // 调试：输出加号按钮状态
+        if (plusButton != null) {
+            LOG.info("加号按钮初始化: text='{}', visible={}, styleClass={}, width={}, height={}",
+                    plusButton.getText(), plusButton.isVisible(),
+                    plusButton.getStyleClass(), plusButton.getWidth(), plusButton.getHeight());
+        } else {
+            LOG.warn("加号按钮为 null！FXML 注入可能失败");
+        }
+
         LOG.info("主界面控制器初始化完成");
     }
 
@@ -307,7 +313,7 @@ public final class MainController implements Initializable {
                 new javafx.stage.FileChooser.ExtensionFilter("所有文件", "*.*")
         );
 
-        final java.io.File selectedFile = fileChooser.showOpenDialog(imageButton.getScene().getWindow());
+        final java.io.File selectedFile = fileChooser.showOpenDialog(plusButton.getScene().getWindow());
         if (selectedFile != null) {
             // 校验文件大小（10MB）
             if (selectedFile.length() > 10 * 1024 * 1024) {
@@ -344,7 +350,7 @@ public final class MainController implements Initializable {
 
     /**
      * 处理 + 按钮点击
-     * 弹出快捷菜单，提供图片发送等更多功能入口
+     * 弹出快捷菜单：发送图片、发送文件
      */
     @FXML
     private void handlePlusButton() {
@@ -352,11 +358,38 @@ public final class MainController implements Initializable {
         final javafx.scene.control.MenuItem imageItem = new javafx.scene.control.MenuItem("发送图片");
         imageItem.setOnAction(e -> handleSendImage());
         final javafx.scene.control.MenuItem fileItem = new javafx.scene.control.MenuItem("发送文件");
-        fileItem.setDisable(true);
-        final javafx.scene.control.MenuItem locationItem = new javafx.scene.control.MenuItem("发送位置");
-        locationItem.setDisable(true);
-        menu.getItems().addAll(imageItem, fileItem, locationItem);
+        fileItem.setOnAction(e -> handleSendFile());
+        menu.getItems().addAll(imageItem, fileItem);
         menu.show(plusButton, javafx.geometry.Side.BOTTOM, 0, 0);
+    }
+
+    /**
+     * 处理发送文件
+     * 打开文件选择器，选择文件后发送
+     */
+    @FXML
+    private void handleSendFile() {
+        final ChatViewModel chatVm = viewModel.chatViewModelProperty().get();
+        if (chatVm == null) {
+            return;
+        }
+
+        final javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
+        fileChooser.setTitle("选择文件");
+        fileChooser.getExtensionFilters().addAll(
+                new javafx.stage.FileChooser.ExtensionFilter("所有文件", "*.*")
+        );
+
+        final java.io.File selectedFile = fileChooser.showOpenDialog(plusButton.getScene().getWindow());
+        if (selectedFile != null) {
+            // 校验文件大小（50MB）
+            if (selectedFile.length() > 50 * 1024 * 1024) {
+                errorLabel.setText("文件大小不能超过50MB");
+                return;
+            }
+            chatVm.sendFile(selectedFile.toPath());
+            LOG.info("用户选择发送文件: {}", selectedFile.getName());
+        }
     }
 
     /**
@@ -500,6 +533,20 @@ public final class MainController implements Initializable {
                 return;
             }
 
+            // 系统消息（群成员加入等）居中灰色文字显示
+            if ("SYSTEM".equals(item.getType())) {
+                final Label systemLabel = new Label(item.getContent());
+                systemLabel.getStyleClass().add("message-system");
+                systemLabel.setWrapText(true);
+                final HBox systemBox = new HBox(systemLabel);
+                systemBox.setAlignment(javafx.geometry.Pos.CENTER);
+                systemBox.setMaxWidth(Double.MAX_VALUE);
+                setGraphic(systemBox);
+                setText(null);
+                setContextMenu(null);
+                return;
+            }
+
             final VBox bubble = new VBox(4);
 
             final boolean sentByMe = item.isSentByMe();
@@ -513,49 +560,118 @@ public final class MainController implements Initializable {
 
             // 根据消息类型渲染内容
             if ("IMAGE".equals(item.getType())) {
-                // 图片消息：渲染 ImageView（优先使用缩略图）
+                // 图片消息：不带气泡框，直接显示图片 + 底部时间
+                final String thumbnailUrl = item.getThumbnailUrl();
+                final String originalUrl = item.getContent();
+                final String imageUrl = thumbnailUrl != null && !thumbnailUrl.isEmpty() ? thumbnailUrl : originalUrl;
+
                 final javafx.scene.image.ImageView imageView = new javafx.scene.image.ImageView();
-                try {
-                    // 优先使用缩略图URL，如果不存在则使用原图URL
-                    final String thumbnailUrl = item.getThumbnailUrl();
-                    final String originalUrl = item.getContent();
-                    final String imageUrl = thumbnailUrl != null && !thumbnailUrl.isEmpty() ? thumbnailUrl : originalUrl;
+                final double thumbWidth = 200;
+                final double thumbHeight = 150;
+                imageView.setPreserveRatio(true);
+                imageView.setFitWidth(thumbWidth);
+                imageView.setFitHeight(thumbHeight);
+                imageView.getStyleClass().add("message-image");
+                imageView.setCursor(javafx.scene.Cursor.HAND);
 
-                    if (imageUrl != null && !imageUrl.isEmpty()) {
-                        final javafx.scene.image.Image image = new javafx.scene.image.Image(imageUrl, true);
-                        imageView.setImage(image);
+                // 添加点击事件（点击显示原图）
+                imageView.setOnMouseClicked(e -> {
+                    LOG.info("点击图片: originalUrl={}", originalUrl);
+                    final ImageViewerDialog dialog = new ImageViewerDialog(originalUrl);
+                    dialog.show();
+                });
 
-                        // 缩略图显示尺寸（固定200x150，提升性能）
-                        final double thumbWidth = 200;
-                        final double thumbHeight = 150;
-                        imageView.setPreserveRatio(true);
-                        imageView.setFitWidth(thumbWidth);
-                        imageView.setFitHeight(thumbHeight);
-                        imageView.getStyleClass().add("message-image");
+                // 时间标签
+                final Label time = new Label(formatTime(item.getCreateTime()));
+                time.getStyleClass().add("message-time");
+                // 图片消息的时间颜色
+                time.setStyle("-fx-text-fill: #999;");
 
-                        // 添加点击事件（点击显示原图）
-                        imageView.setOnMouseClicked(e -> {
-                            LOG.info("点击图片: originalUrl={}", originalUrl);
-                            // 显示图片查看对话框
-                            final ImageViewerDialog dialog = new ImageViewerDialog(originalUrl);
-                            dialog.show();
-                        });
+                // 图片 + 时间垂直排列
+                final VBox imageCell = new VBox(4, imageView, time);
+                imageCell.setAlignment(sentByMe
+                        ? javafx.geometry.Pos.CENTER_RIGHT
+                        : javafx.geometry.Pos.CENTER_LEFT);
 
-                        // 设置鼠标样式为手型，提示可点击
-                        imageView.setCursor(javafx.scene.Cursor.HAND);
+                // 左右对齐
+                final HBox alignBox = new HBox(imageCell);
+                if (sentByMe) {
+                    alignBox.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
+                } else {
+                    alignBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+                }
+                alignBox.setMaxWidth(Double.MAX_VALUE);
+                setGraphic(alignBox);
+                setText(null);
+
+                // 异步加载图片（携带认证 Token）
+                if (imageUrl != null && !imageUrl.isEmpty()) {
+                    final MessageInfo currentItem = item;
+                    org.example.client.service.ChatService.getInstance()
+                            .loadImageBytes(imageUrl)
+                            .thenAccept(bytes -> Platform.runLater(() -> {
+                                if (getItem() == currentItem && bytes != null && bytes.length > 0) {
+                                    try {
+                                        final javafx.scene.image.Image image =
+                                                new javafx.scene.image.Image(
+                                                        new java.io.ByteArrayInputStream(bytes));
+                                        imageView.setImage(image);
+                                    } catch (final Exception e) {
+                                        LOG.warn("图片解码失败: {}", imageUrl, e);
+                                    }
+                                }
+                            }))
+                            .exceptionally(ex -> {
+                                LOG.warn("图片加载失败: {} - {}", imageUrl, ex.getMessage());
+                                return null;
+                            });
+                }
+
+                // 图片消息不走后续通用逻辑，直接返回
+                return;
+            } else if ("FILE".equals(item.getType())) {
+                // 文件消息：显示文件名和大小
+                final String fileName = item.getContent();
+                final HBox fileBox = new HBox(10);
+                fileBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+                final Label fileIcon = new Label("\uD83D\uDCC4");
+                fileIcon.setStyle("-fx-font-size: 24px;");
+
+                final VBox fileInfo = new VBox(2);
+                final Label nameLabel = new Label(fileName != null ? fileName : "未知文件");
+                nameLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold;");
+                nameLabel.setWrapText(true);
+                nameLabel.setMaxWidth(250);
+
+                // 解析文件大小
+                String sizeText = "";
+                if (item.getExtra() != null) {
+                    try {
+                        final com.fasterxml.jackson.databind.ObjectMapper mapper =
+                                new com.fasterxml.jackson.databind.ObjectMapper();
+                        final com.fasterxml.jackson.databind.JsonNode extra =
+                                mapper.readTree(item.getExtra());
+                        if (extra.has("fileSize")) {
+                            final long fileSize = extra.get("fileSize").asLong();
+                            if (fileSize >= 1024 * 1024) {
+                                sizeText = String.format("%.1f MB", fileSize / (1024.0 * 1024.0));
+                            } else if (fileSize >= 1024) {
+                                sizeText = String.format("%.1f KB", fileSize / 1024.0);
+                            } else {
+                                sizeText = fileSize + " B";
+                            }
+                        }
+                    } catch (final Exception ignored) {
+                        // 忽略解析错误
                     }
-                } catch (final Exception e) {
-                    // 图片加载失败时显示链接
-                    final Label fallback = new Label("[图片] " + item.getContent());
-                    fallback.getStyleClass().add("message-content");
-                    fallback.setWrapText(true);
-                    fallback.setMaxWidth(400);
-                    bubble.getChildren().add(fallback);
-                    LOG.warn("图片加载失败: {}", item.getContent(), e);
                 }
-                if (imageView.getImage() != null) {
-                    bubble.getChildren().add(imageView);
-                }
+                final Label sizeLabel = new Label(sizeText);
+                sizeLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #888;");
+
+                fileInfo.getChildren().addAll(nameLabel, sizeLabel);
+                fileBox.getChildren().addAll(fileIcon, fileInfo);
+                bubble.getChildren().add(fileBox);
             } else {
                 // 文本消息：渲染 Label
                 final Label content = new Label(item.getContent() != null ? item.getContent() : "");

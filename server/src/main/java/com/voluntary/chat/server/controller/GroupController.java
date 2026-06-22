@@ -11,8 +11,11 @@ import com.voluntary.chat.server.dto.request.UpdateGroupRequest;
 import com.voluntary.chat.server.dto.response.CreateGroupResponse;
 import com.voluntary.chat.server.dto.response.GroupMemberResponse;
 import com.voluntary.chat.server.dto.response.GroupResponse;
+import com.voluntary.chat.server.entity.User;
 import com.voluntary.chat.server.security.SecurityUtils;
 import com.voluntary.chat.server.service.GroupService;
+import com.voluntary.chat.server.service.UserService;
+import com.voluntary.chat.server.websocket.ChatWebSocketHandler;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -37,14 +40,37 @@ import org.springframework.web.bind.annotation.RestController;
 public class GroupController {
 
     private final GroupService groupService;
+    private final ChatWebSocketHandler webSocketHandler;
+    private final UserService userService;
 
     /**
      * 创建群组
+     * 创建成功后广播群成员加入通知（含创建者），客户端据此显示系统消息
      */
     @PostMapping("/create")
     public ApiResult<CreateGroupResponse> createGroup(@Valid @RequestBody CreateGroupRequest request) {
         Long userId = SecurityUtils.getCurrentUserId();
         CreateGroupResponse result = groupService.createGroup(userId, request);
+        Long groupId = result.getGroupId();
+
+        // 广播创建者加入
+        User creator = userService.findById(userId);
+        if (creator != null) {
+            webSocketHandler.broadcastMemberJoin(groupId, userId,
+                    creator.getUsername(), creator.getAvatar());
+        }
+
+        // 广播其他初始成员加入
+        for (Long memberId : request.getMemberIds()) {
+            if (!memberId.equals(userId)) {
+                User member = userService.findById(memberId);
+                if (member != null) {
+                    webSocketHandler.broadcastMemberJoin(groupId, memberId,
+                            member.getUsername(), member.getAvatar());
+                }
+            }
+        }
+
         return ApiResult.ok("创建成功", result);
     }
 
@@ -86,6 +112,7 @@ public class GroupController {
 
     /**
      * 邀请成员
+     * 邀请成功后广播被邀请成员加入通知
      */
     @PostMapping("/{groupId}/invite")
     public ApiResult<Void> inviteMembers(
@@ -93,6 +120,18 @@ public class GroupController {
             @Valid @RequestBody InviteMemberRequest request) {
         Long userId = SecurityUtils.getCurrentUserId();
         groupService.inviteMembers(userId, groupId, request);
+
+        // 广播被邀请成员加入通知
+        for (Long inviteUserId : request.getUserIds()) {
+            if (!inviteUserId.equals(userId)) {
+                User member = userService.findById(inviteUserId);
+                if (member != null) {
+                    webSocketHandler.broadcastMemberJoin(groupId, inviteUserId,
+                            member.getUsername(), member.getAvatar());
+                }
+            }
+        }
+
         return ApiResult.ok("邀请成功", null);
     }
 

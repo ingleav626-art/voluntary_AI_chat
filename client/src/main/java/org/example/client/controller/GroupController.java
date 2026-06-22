@@ -119,6 +119,16 @@ public final class GroupController implements Initializable {
         memberList.itemsProperty().bind(viewModel.membersProperty());
         memberList.setCellFactory(param -> new MemberCell());
 
+        // 成员列表变化时重新更新操作按钮状态（群主转让后角色变化需要刷新按钮）
+        viewModel.membersProperty().addListener((obs, oldVal, newVal) -> {
+            final GroupInfo selected = viewModel.getSelectedGroup();
+            if (selected != null) {
+                updateActionButtons(selected);
+            }
+            // 强制刷新成员列表Cell，确保行内按钮（移除、转让等）也同步更新
+            memberList.refresh();
+        });
+
         // 绑定状态消息
         errorLabel.textProperty().bind(viewModel.errorMessageProperty());
         successLabel.textProperty().bind(viewModel.successMessageProperty());
@@ -142,6 +152,15 @@ public final class GroupController implements Initializable {
 
         // 初始隐藏操作按钮
         setActionButtonsVisible(false);
+
+        // 注册群组事件监听器，收到 WebSocket 群成员变更通知时刷新成员列表
+        GroupListViewModel.setGroupEventListener(changedGroupId -> {
+            final GroupInfo selected = viewModel.getSelectedGroup();
+            if (selected != null && selected.getGroupId().equals(changedGroupId)) {
+                LOG.info("收到群成员变更通知，刷新成员列表: groupId={}", changedGroupId);
+                viewModel.loadMembers(changedGroupId);
+            }
+        });
 
         // 加载初始数据
         viewModel.loadGroups();

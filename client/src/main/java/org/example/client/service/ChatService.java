@@ -245,4 +245,50 @@ public final class ChatService extends BaseHttpService {
                         return failed;
                 }
         }
+
+        /**
+         * 下载图片字节（带认证）
+         * 使用 Bearer Token 下载图片文件，解决 JavaFX Image 直接加载不携带认证头的问题
+         *
+         * @param imageUrl 图片URL
+         * @return 异步结果，包含图片字节数据
+         */
+        public CompletableFuture<byte[]> loadImageBytes(final String imageUrl) {
+                final CompletableFuture<byte[]> future = new CompletableFuture<>();
+                try {
+                        final org.example.client.model.LoginResponse token =
+                                org.example.client.util.TokenStorage.load();
+                        final HttpRequest.Builder builder = HttpRequest.newBuilder()
+                                .uri(java.net.URI.create(imageUrl))
+                                .timeout(java.time.Duration.ofSeconds(
+                                        ClientConfig.getInstance().getReadTimeout()))
+                                .GET();
+                        if (token != null && token.getAccessToken() != null) {
+                                builder.header("Authorization", "Bearer " + token.getAccessToken());
+                        }
+                        final HttpRequest request = builder.build();
+
+                        getHttpClient().sendAsync(request, java.net.http.HttpResponse.BodyHandlers.ofByteArray())
+                                .thenAccept(response -> {
+                                        if (response.statusCode() == 200) {
+                                                future.complete(response.body());
+                                        } else {
+                                                LOG.warn("下载图片失败: url={}, status={}",
+                                                        imageUrl, response.statusCode());
+                                                future.completeExceptionally(
+                                                        new java.io.IOException(
+                                                                "HTTP " + response.statusCode()));
+                                        }
+                                })
+                                .exceptionally(ex -> {
+                                        LOG.warn("下载图片异常: url={}", imageUrl, ex);
+                                        future.completeExceptionally(ex);
+                                        return null;
+                                });
+                } catch (final Exception e) {
+                        LOG.warn("创建图片下载请求失败: url={}", imageUrl, e);
+                        future.completeExceptionally(e);
+                }
+                return future;
+        }
 }
