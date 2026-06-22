@@ -12,6 +12,7 @@ import org.example.client.model.ImageUploadResponse;
 import org.example.client.model.MarkReadRequest;
 import org.example.client.model.MessageInfo;
 import org.example.client.model.PageResult;
+import org.example.client.model.RecallMessageResponse;
 import org.example.client.model.SendMessageRequest;
 import org.example.client.model.SendMessageResponse;
 import org.slf4j.Logger;
@@ -171,12 +172,12 @@ public final class ChatService extends BaseHttpService {
          * @param messageId 消息ID
          * @return 异步结果
          */
-        public CompletableFuture<ApiResponse<Void>> recallMessage(final Long messageId) {
+        public CompletableFuture<ApiResponse<RecallMessageResponse>> recallMessage(final Long messageId) {
                 final HttpRequest httpRequest = buildPostRequest(
                                 MESSAGE_RECALL_PATH, java.util.Map.of("messageId", String.valueOf(messageId))).build();
 
                 return sendRequest(httpRequest, getTypeFactory().constructParametricType(
-                                ApiResponse.class, Void.class));
+                                ApiResponse.class, RecallMessageResponse.class));
         }
 
         /**

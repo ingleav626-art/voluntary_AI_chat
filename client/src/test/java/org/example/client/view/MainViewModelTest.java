@@ -548,4 +548,165 @@ class MainViewModelTest {
         }
         return null;
     }
+
+    // ==================== GROUP_MESSAGE 处理测试 ====================
+
+    /**
+     * 通过反射调用私有方法 handleGroupMessage
+     */
+    private void invokeHandleGroupMessage(final WebSocketMessage wsMessage) throws Exception {
+        final Method method = MainViewModel.class.getDeclaredMethod(
+                "handleGroupMessage", WebSocketMessage.class);
+        method.setAccessible(true);
+        method.invoke(viewModel, wsMessage);
+    }
+
+    @Test
+    @DisplayName("handleGroupMessage 应正确解析并追加群消息")
+    void handleGroupMessage_shouldParseAndAppendMessage() throws Exception {
+        // 准备群聊会话
+        final ConversationInfo groupConv = new ConversationInfo();
+        groupConv.setSessionId("g_2001");
+        groupConv.setTargetId(2001L);
+        groupConv.setTargetName("技术交流群");
+        groupConv.setUnreadCount(0);
+        viewModel.getConversations().add(groupConv);
+        setAllConversations(viewModel.getConversations());
+
+        // 选择该群会话
+        viewModel.selectConversation(groupConv);
+        final ChatViewModel chatVm = viewModel.getChatViewModel();
+        assertNotNull(chatVm);
+
+        final WebSocketMessage wsMessage = WebSocketMessage.builder()
+                .id("msg_001")
+                .type(MessageTypes.GROUP_MESSAGE)
+                .data(Map.of(
+                        "messageId", 100L,
+                        "sessionId", "g_2001",
+                        "senderId", 1002L,
+                        "senderName", "李四",
+                        "senderAvatar", "",
+                        "senderType", "USER",
+                        "msgType", "TEXT",
+                        "content", "大家好",
+                        "createTime", "2024-01-01T10:00:00"))
+                .build();
+
+        invokeHandleGroupMessage(wsMessage);
+
+        // 验证消息已追加
+        assertEquals(1, chatVm.getMessages().size());
+        assertEquals("大家好", chatVm.getMessages().get(0).getContent());
+        assertEquals("TEXT", chatVm.getMessages().get(0).getType());
+        assertFalse(chatVm.getMessages().get(0).isSentByMe());
+    }
+
+    @Test
+    @DisplayName("handleGroupMessage 应正确处理 IMAGE 类型群消息")
+    void handleGroupMessage_shouldHandleImageMessage() throws Exception {
+        final ConversationInfo groupConv = new ConversationInfo();
+        groupConv.setSessionId("g_2002");
+        groupConv.setTargetId(2002L);
+        groupConv.setTargetName("图片群");
+        groupConv.setUnreadCount(0);
+        viewModel.getConversations().add(groupConv);
+        setAllConversations(viewModel.getConversations());
+
+        viewModel.selectConversation(groupConv);
+        final ChatViewModel chatVm = viewModel.getChatViewModel();
+        assertNotNull(chatVm);
+
+        final WebSocketMessage wsMessage = WebSocketMessage.builder()
+                .id("msg_002")
+                .type(MessageTypes.GROUP_MESSAGE)
+                .data(Map.of(
+                        "messageId", 101L,
+                        "sessionId", "g_2002",
+                        "senderId", 1002L,
+                        "senderName", "李四",
+                        "senderAvatar", "",
+                        "senderType", "USER",
+                        "msgType", "IMAGE",
+                        "content", "http://example.com/image.png",
+                        "createTime", "2024-01-01T10:00:00"))
+                .build();
+
+        invokeHandleGroupMessage(wsMessage);
+
+        assertEquals(1, chatVm.getMessages().size());
+        assertEquals("IMAGE", chatVm.getMessages().get(0).getType());
+        assertEquals("http://example.com/image.png", chatVm.getMessages().get(0).getContent());
+    }
+
+    @Test
+    @DisplayName("handleGroupMessage 非当前会话时应增加未读数")
+    void handleGroupMessage_shouldIncrementUnreadWhenNotCurrentSession() throws Exception {
+        final ConversationInfo groupConv = new ConversationInfo();
+        groupConv.setSessionId("g_2003");
+        groupConv.setTargetId(2003L);
+        groupConv.setTargetName("未读群");
+        groupConv.setUnreadCount(0);
+        viewModel.getConversations().add(groupConv);
+        setAllConversations(viewModel.getConversations());
+
+        // 不选择该群，保持当前会话为 conversation1
+        viewModel.selectConversation(conversation1);
+
+        final WebSocketMessage wsMessage = WebSocketMessage.builder()
+                .id("msg_003")
+                .type(MessageTypes.GROUP_MESSAGE)
+                .data(Map.of(
+                        "messageId", 102L,
+                        "sessionId", "g_2003",
+                        "senderId", 1002L,
+                        "senderName", "李四",
+                        "senderAvatar", "",
+                        "senderType", "USER",
+                        "msgType", "TEXT",
+                        "content", "新消息",
+                        "createTime", "2024-01-01T10:00:00"))
+                .build();
+
+        invokeHandleGroupMessage(wsMessage);
+
+        // 验证未读数增加
+        assertEquals(1, groupConv.getUnreadCount());
+    }
+
+    @Test
+    @DisplayName("handleGroupMessage 自己发送的消息应标记为 sentByMe")
+    void handleGroupMessage_shouldMarkSentByMeForOwnMessage() throws Exception {
+        final ConversationInfo groupConv = new ConversationInfo();
+        groupConv.setSessionId("g_2004");
+        groupConv.setTargetId(2004L);
+        groupConv.setTargetName("我的群");
+        groupConv.setUnreadCount(0);
+        viewModel.getConversations().add(groupConv);
+        setAllConversations(viewModel.getConversations());
+
+        viewModel.selectConversation(groupConv);
+        final ChatViewModel chatVm = viewModel.getChatViewModel();
+        assertNotNull(chatVm);
+
+        final WebSocketMessage wsMessage = WebSocketMessage.builder()
+                .id("msg_004")
+                .type(MessageTypes.GROUP_MESSAGE)
+                .data(Map.of(
+                        "messageId", 103L,
+                        "sessionId", "g_2004",
+                        "senderId", 1001L,  // 当前用户 ID
+                        "senderName", "张三",
+                        "senderAvatar", "",
+                        "senderType", "USER",
+                        "msgType", "TEXT",
+                        "content", "我发的消息",
+                        "createTime", "2024-01-01T10:00:00"))
+                .build();
+
+        invokeHandleGroupMessage(wsMessage);
+
+        assertEquals(1, chatVm.getMessages().size());
+        assertTrue(chatVm.getMessages().get(0).isSentByMe());
+    }
 }

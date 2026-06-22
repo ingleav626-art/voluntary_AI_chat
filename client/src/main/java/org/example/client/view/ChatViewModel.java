@@ -1,6 +1,7 @@
 package org.example.client.view;
 
 import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -72,6 +73,9 @@ public final class ChatViewModel {
     /** 待撤回消息的 clientId 集合（ACK 到达后自动执行 REST 撤回） */
     private final java.util.Set<String> pendingRecallClientIds = new java.util.HashSet<>();
 
+    /** 待撤回消息的内容集合（用于刷新后匹配执行延迟撤回） */
+    private final java.util.Set<String> pendingRecallContents = new java.util.HashSet<>();
+
     /** 当前页码 */
     private int currentPage = 1;
 
@@ -90,6 +94,7 @@ public final class ChatViewModel {
 
         loading.set(true);
         currentPage = 1;
+        hasMoreHistory = true;
 
         ChatService.getInstance().getHistory(conversation.getSessionId(), currentPage, DEFAULT_PAGE_SIZE)
                 .thenAccept(response -> {
@@ -112,6 +117,9 @@ public final class ChatViewModel {
                                         java.util.Comparator.nullsFirst(java.time.LocalDateTime::compareTo)));
                                 messages.setAll(list);
                                 LOG.info("历史消息加载成功: count={}", list.size());
+
+                                // 检查是否有待撤回的乐观消息（刷新后需要补执行撤回）
+                                checkAndExecutePendingRecalls(list);
 
                                 // 加载成功后上报已读
                                 reportRead();
@@ -212,28 +220,58 @@ public final class ChatViewModel {
                 messages.set(index, pending);
             }
 
-            // 如果该消息注册了延迟撤回，ACK 到达后用真实 messageId 执行 REST 撤回
-            // 使用 .join() 同步等待，确保服务端更新完成后再允许刷新
+            // 如果该消息注册了延迟撤回，ACK 到达后异步执行 REST 撤回，不阻塞 JavaFX 线程
             if (pendingRecallClientIds.remove(clientId)) {
-                LOG.info("ACK 到达，执行延迟 REST 撤回: clientId={}, messageId={}", clientId, messageId);
-                try {
-                    final var recallResponse = ChatService.getInstance().recallMessage(messageId).join();
-                    LOG.info("延迟 REST 撤回完成: messageId={}, success={}",
-                            messageId, recallResponse != null && recallResponse.isSuccess());
-                } catch (final Exception e) {
-                    LOG.error("延迟 REST 撤回失败: messageId={}", messageId, e);
+                // 同时清理待撤回内容列表
+                if (pending.getContent() != null) {
+                    pendingRecallContents.remove(pending.getContent());
                 }
+                LOG.info("ACK 到达，执行延迟 REST 撤回: clientId={}, messageId={}", clientId, messageId);
+                ChatService.getInstance().recallMessage(messageId)
+                        .thenAccept(response -> {
+                            Platform.runLater(() -> {
+                                if (response != null && response.isSuccess()) {
+                                    LOG.info("延迟 REST 撤回成功: messageId={}", messageId);
+                                } else {
+                                    // 撤回失败，回滚 UI 状态
+                                    pending.setRecalled(false);
+                                    final int idx = messages.indexOf(pending);
+                                    if (idx >= 0) {
+                                        messages.set(idx, pending);
+                                    }
+                                    final String msg = response != null ? response.getMessage() : "撤回失败";
+                                    errorMessage.set(msg);
+                                    LOG.warn("延迟 REST 撤回失败，已回滚 UI: messageId={}, error={}",
+                                            messageId, msg);
+                                }
+                            });
+                        })
+                        .exceptionally(ex -> {
+                            LOG.error("延迟 REST 撤回异常: messageId={}", messageId, ex);
+                            Platform.runLater(() -> {
+                                pending.setRecalled(false);
+                                final int idx = messages.indexOf(pending);
+                                if (idx >= 0) {
+                                    messages.set(idx, pending);
+                                }
+                                errorMessage.set("撤回失败，请重试");
+                            });
+                            return null;
+                        });
             }
 
             LOG.debug("消息确认更新: clientId={}, messageId={}", clientId, messageId);
         }
     }
 
+    /** 是否还有更多历史消息可加载 */
+    private boolean hasMoreHistory = true;
+
     /**
      * 加载更多历史消息
      */
     public void loadMoreHistory() {
-        if (conversation == null || loading.get()) {
+        if (conversation == null || loading.get() || !hasMoreHistory) {
             return;
         }
 
@@ -259,9 +297,18 @@ public final class ChatViewModel {
                                         java.util.Comparator.nullsFirst(java.time.LocalDateTime::compareTo)));
                                 messages.addAll(0, list);
                                 LOG.info("加载更多消息: count={}", list.size());
+                            } else {
+                                // 返回空列表说明没有更多历史消息
+                                hasMoreHistory = false;
+                                LOG.debug("没有更多历史消息");
+                            }
+                            // 返回数量小于页数也说明没有更多了
+                            if (list != null && list.size() < DEFAULT_PAGE_SIZE) {
+                                hasMoreHistory = false;
                             }
                         } else {
                             currentPage--;
+                            hasMoreHistory = false;
                             LOG.debug("没有更多历史消息");
                         }
                     });
@@ -294,12 +341,17 @@ public final class ChatViewModel {
             }
             if (clientId != null) {
                 pendingRecallClientIds.add(clientId);
+                // 保存消息内容，用于刷新后匹配执行延迟撤回
+                if (message.getContent() != null) {
+                    pendingRecallContents.add(message.getContent());
+                }
                 message.setRecalled(true);
                 final int index = messages.indexOf(message);
                 if (index >= 0) {
                     messages.set(index, message);
                 }
-                LOG.info("乐观消息已标记撤回，等待 ACK 后执行 REST 撤回: clientId={}", clientId);
+                LOG.info("乐观消息已标记撤回，等待 ACK 后执行 REST 撤回: clientId={}, content={}",
+                        clientId, message.getContent());
                 return;
             }
             LOG.warn("乐观消息未找到对应 clientId，忽略: messageId={}", messageId);
@@ -323,7 +375,57 @@ public final class ChatViewModel {
                             LOG.warn("消息撤回失败: {}", msg);
                         }
                     });
+                })
+                .exceptionally(ex -> {
+                    LOG.error("消息撤回异常: messageId={}", messageId, ex);
+                    Platform.runLater(() -> errorMessage.set("网络异常，撤回失败"));
+                    return null;
                 });
+    }
+
+    /**
+     * 检查并执行待撤回的乐观消息
+     * 刷新历史消息后，如果发现有待撤回的消息（内容匹配），立即执行 REST 撤回
+     *
+     * @param loadedMessages 加载的消息列表
+     */
+    private void checkAndExecutePendingRecalls(final List<MessageInfo> loadedMessages) {
+        if (pendingRecallContents.isEmpty() || loadedMessages == null) {
+            return;
+        }
+
+        for (final MessageInfo msg : loadedMessages) {
+            // 只检查自己发送的消息，且内容匹配待撤回列表
+            if (msg.isSentByMe() && msg.getContent() != null
+                    && pendingRecallContents.contains(msg.getContent())
+                    && msg.getMessageId() != null && msg.getMessageId() > 0) {
+                LOG.info("发现待撤回消息，立即执行 REST 撤回: messageId={}, content={}",
+                        msg.getMessageId(), msg.getContent());
+                // 从待撤回列表中移除
+                pendingRecallContents.remove(msg.getContent());
+                // 执行 REST 撤回
+                ChatService.getInstance().recallMessage(msg.getMessageId())
+                        .thenAccept(response -> {
+                            Platform.runLater(() -> {
+                                if (response != null && response.isSuccess()) {
+                                    msg.setRecalled(true);
+                                    final int index = messages.indexOf(msg);
+                                    if (index >= 0) {
+                                        messages.set(index, msg);
+                                    }
+                                    LOG.info("延迟 REST 撤回成功（刷新后补执行）: messageId={}", msg.getMessageId());
+                                } else {
+                                    final String errorMsg = response != null ? response.getMessage() : "撤回失败";
+                                    LOG.warn("延迟 REST 撤回失败: messageId={}, error={}", msg.getMessageId(), errorMsg);
+                                }
+                            });
+                        })
+                        .exceptionally(ex -> {
+                            LOG.error("延迟 REST 撤回异常: messageId={}", msg.getMessageId(), ex);
+                            return null;
+                        });
+            }
+        }
     }
 
     /**
@@ -377,23 +479,51 @@ public final class ChatViewModel {
         loading.set(true);
         ChatService.getInstance().uploadImage(filePath)
                 .thenAccept(response -> {
-                    loading.set(false);
-                    if (response != null && response.isSuccess() && response.getData() != null) {
-                        final ImageUploadResponse uploadResult = response.getData();
-                        // 通过 WebSocket 发送 IMAGE 类型消息
-                        final String clientId = UUID.randomUUID().toString();
-                        final Map<String, Object> data = new HashMap<>();
-                        data.put("sessionId", conversation.getSessionId());
-                        data.put("msgType", MSG_TYPE_IMAGE);
-                        data.put("content", uploadResult.getUrl());
+                    Platform.runLater(() -> {
+                        loading.set(false);
+                        if (response != null && response.isSuccess() && response.getData() != null) {
+                            final ImageUploadResponse uploadResult = response.getData();
+                            final String clientId = UUID.randomUUID().toString();
 
-                        WebSocketClient.getInstance().send(MessageTypes.SEND_MESSAGE, data);
-                        LOG.info("图片消息发送: url={}", uploadResult.getUrl());
-                    } else {
-                        final String msg = response != null ? response.getMessage() : "图片上传失败";
-                        errorMessage.set(msg);
-                        LOG.warn("图片上传失败: {}", msg);
-                    }
+                            // 创建乐观消息
+                            final MessageInfo optimisticMsg = new MessageInfo();
+                            optimisticMsg.setMessageId(-1L);
+                            optimisticMsg.setSessionId(conversation.getSessionId());
+                            optimisticMsg.setSenderId(currentUser != null ? currentUser.getUserId() : null);
+                            optimisticMsg.setSenderName(currentUser != null ? currentUser.getUsername() : "");
+                            optimisticMsg.setSenderType("USER");
+                            optimisticMsg.setType(MSG_TYPE_IMAGE);
+                            optimisticMsg.setContent(uploadResult.getUrl());
+                            // 设置缩略图URL和尺寸信息
+                            optimisticMsg.setThumbnailUrl(uploadResult.getThumbnailUrl());
+                            optimisticMsg.setWidth(uploadResult.getWidth());
+                            optimisticMsg.setHeight(uploadResult.getHeight());
+                            optimisticMsg.setCreateTime(LocalDateTime.now());
+                            optimisticMsg.setSentByMe(true);
+
+                            // 添加到消息列表并注册待确认
+                            messages.add(optimisticMsg);
+                            pendingMessages.put(clientId, optimisticMsg);
+
+                            // 通过 WebSocket 发送 IMAGE 类型消息
+                            final Map<String, Object> data = new HashMap<>();
+                            data.put("sessionId", conversation.getSessionId());
+                            data.put("msgType", MSG_TYPE_IMAGE);
+                            data.put("content", uploadResult.getUrl());
+                            // 添加缩略图和尺寸信息到WebSocket消息
+                            data.put("thumbnailUrl", uploadResult.getThumbnailUrl());
+                            data.put("width", uploadResult.getWidth());
+                            data.put("height", uploadResult.getHeight());
+
+                            WebSocketClient.getInstance().send(MessageTypes.SEND_MESSAGE, data);
+                            LOG.info("图片消息发送: url={}, thumbnailUrl={}, clientId={}",
+                                    uploadResult.getUrl(), uploadResult.getThumbnailUrl(), clientId);
+                        } else {
+                            final String msg = response != null ? response.getMessage() : "图片上传失败";
+                            errorMessage.set(msg);
+                            LOG.warn("图片上传失败: {}", msg);
+                        }
+                    });
                 });
     }
 

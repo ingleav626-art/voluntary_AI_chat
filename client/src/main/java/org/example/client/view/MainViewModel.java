@@ -195,11 +195,18 @@ public final class MainViewModel {
 
         switch (wsMessage.getType()) {
             case MessageTypes.RECEIVE_MESSAGE -> handleReceiveMessage(wsMessage);
+            case MessageTypes.GROUP_MESSAGE -> handleGroupMessage(wsMessage);
             case MessageTypes.MESSAGE_ACK -> handleAck(wsMessage);
             case MessageTypes.STATUS_CHANGE -> handleStatusChange(wsMessage);
             case MessageTypes.RECONNECT_ACK -> handleReconnectAck(wsMessage);
             case MessageTypes.READ_RECEIPT -> handleReadReceipt(wsMessage);
             case MessageTypes.MESSAGE_RECALL -> handleMessageRecall(wsMessage);
+            // 群组事件通知
+            case MessageTypes.GROUP_MEMBER_JOIN -> handleGroupMemberJoin(wsMessage);
+            case MessageTypes.GROUP_MEMBER_LEAVE -> handleGroupMemberLeave(wsMessage);
+            case MessageTypes.GROUP_MEMBER_ROLE_CHANGE -> handleGroupMemberRoleChange(wsMessage);
+            case MessageTypes.GROUP_INFO_CHANGE -> handleGroupInfoChange(wsMessage);
+            case MessageTypes.GROUP_DISMISSED -> handleGroupDismissed(wsMessage);
             default -> LOG.debug("未处理的消息类型: {}", wsMessage.getType());
         }
     }
@@ -338,6 +345,88 @@ public final class MainViewModel {
     }
 
     /**
+     * 处理群成员加入通知
+     * 在会话列表中刷新未读数提示，如果当前在群成员页面则需刷新
+     */
+    @SuppressWarnings("unchecked")
+    private void handleGroupMemberJoin(final WebSocketMessage wsMessage) {
+        final java.util.Map<String, Object> data = (java.util.Map<String, Object>) wsMessage.getData();
+        if (data == null) {
+            return;
+        }
+        final Long groupId = toLong(data.get("groupId"));
+        final Long userId = toLong(data.get("userId"));
+        final String username = (String) data.get("username");
+        LOG.info("群成员加入: groupId={}, userId={}, username={}", groupId, userId, username);
+    }
+
+    /**
+     * 处理群成员离开通知
+     */
+    @SuppressWarnings("unchecked")
+    private void handleGroupMemberLeave(final WebSocketMessage wsMessage) {
+        final java.util.Map<String, Object> data = (java.util.Map<String, Object>) wsMessage.getData();
+        if (data == null) {
+            return;
+        }
+        final Long groupId = toLong(data.get("groupId"));
+        final Long userId = toLong(data.get("userId"));
+        LOG.info("群成员离开: groupId={}, userId={}", groupId, userId);
+    }
+
+    /**
+     * 处理群成员角色变更通知（管理员设置/取消、群主转让）
+     */
+    @SuppressWarnings("unchecked")
+    private void handleGroupMemberRoleChange(final WebSocketMessage wsMessage) {
+        final java.util.Map<String, Object> data = (java.util.Map<String, Object>) wsMessage.getData();
+        if (data == null) {
+            return;
+        }
+        final Long groupId = toLong(data.get("groupId"));
+        final Long userId = toLong(data.get("userId"));
+        final String newRole = (String) data.get("newRole");
+        LOG.info("群成员角色变更: groupId={}, userId={}, newRole={}", groupId, userId, newRole);
+    }
+
+    /**
+     * 处理群信息变更通知（群名、公告等修改）
+     */
+    @SuppressWarnings("unchecked")
+    private void handleGroupInfoChange(final WebSocketMessage wsMessage) {
+        final java.util.Map<String, Object> data = (java.util.Map<String, Object>) wsMessage.getData();
+        if (data == null) {
+            return;
+        }
+        final Long groupId = toLong(data.get("groupId"));
+        LOG.info("群信息变更: groupId={}，刷新会话列表", groupId);
+        // 刷新会话列表以获取最新群信息
+        loadConversations();
+    }
+
+    /**
+     * 处理群解散通知
+     */
+    @SuppressWarnings("unchecked")
+    private void handleGroupDismissed(final WebSocketMessage wsMessage) {
+        final java.util.Map<String, Object> data = (java.util.Map<String, Object>) wsMessage.getData();
+        if (data == null) {
+            return;
+        }
+        final Long groupId = toLong(data.get("groupId"));
+        LOG.info("群组已解散: groupId={}", groupId);
+        // 从会话列表中移除被解散的群
+        final String sessionId = "g_" + groupId;
+        allConversations.removeIf(conv -> sessionId.equals(conv.getSessionId()));
+        conversations.removeIf(conv -> sessionId.equals(conv.getSessionId()));
+        // 如果当前正在查看该群，清空聊天区
+        final ChatViewModel chatVm = chatViewModel.get();
+        if (chatVm != null && sessionId.equals(chatVm.getSessionId())) {
+            chatViewModel.set(null);
+        }
+    }
+
+    /**
      * 处理接收消息
      *
      * @param wsMessage WebSocket 消息
@@ -402,6 +491,74 @@ public final class MainViewModel {
         }
 
         LOG.info("收到消息: sessionId={}, messageId={}", sessionId, messageId);
+    }
+
+    /**
+     * 处理群聊消息
+     * 群消息通过 GROUP_MESSAGE 类型推送，需解析并追加到对应会话
+     *
+     * @param wsMessage WebSocket 消息
+     */
+    @SuppressWarnings("unchecked")
+    private void handleGroupMessage(final WebSocketMessage wsMessage) {
+        final java.util.Map<String, Object> data = (java.util.Map<String, Object>) wsMessage.getData();
+        if (data == null) {
+            return;
+        }
+
+        final String sessionId = (String) data.get("sessionId");
+        final Long messageId = toLong(data.get("messageId"));
+        final Long senderId = toLong(data.get("senderId"));
+        final String senderName = (String) data.get("senderName");
+        final String senderAvatar = (String) data.get("senderAvatar");
+        final String senderType = (String) data.get("senderType");
+        final String msgType = (String) data.get("msgType");
+        final String content = (String) data.get("content");
+        final String createTimeStr = (String) data.get("createTime");
+
+        final MessageInfo message = new MessageInfo();
+        message.setMessageId(messageId);
+        message.setSessionId(sessionId);
+        message.setSenderId(senderId);
+        message.setSenderName(senderName);
+        message.setSenderAvatar(senderAvatar);
+        message.setSenderType(senderType);
+        message.setType(msgType);
+        message.setContent(content);
+        message.setCreateTime(parseDateTime(createTimeStr));
+        message.setSentByMe(currentUser.get() != null
+                && currentUser.get().getUserId() != null
+                && currentUser.get().getUserId().equals(senderId));
+
+        // 更新会话最后消息
+        updateConversationLastMessage(sessionId, content);
+
+        // 如果当前正在查看该群，追加消息到聊天区
+        final ChatViewModel chatVm = chatViewModel.get();
+        if (chatVm != null && sessionId.equals(chatVm.getSessionId())) {
+            chatVm.appendMessage(message);
+            // 当前会话收到消息时自动上报已读
+            chatVm.reportRead();
+        } else {
+            // 非当前会话，增加未读数
+            for (final ConversationInfo conv : conversations) {
+                if (sessionId.equals(conv.getSessionId())) {
+                    conv.setUnreadCount(conv.getUnreadCount() + 1);
+                    final int index = conversations.indexOf(conv);
+                    if (index >= 0) {
+                        conversations.set(index, conv);
+                    }
+                    // 同步更新 allConversations
+                    final int allIndex = allConversations.indexOf(conv);
+                    if (allIndex >= 0) {
+                        allConversations.set(allIndex, conv);
+                    }
+                    break;
+                }
+            }
+        }
+
+        LOG.info("收到群消息: sessionId={}, messageId={}, msgType={}", sessionId, messageId, msgType);
     }
 
     /**

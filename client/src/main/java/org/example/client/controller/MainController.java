@@ -243,43 +243,36 @@ public final class MainController implements Initializable {
         }
     }
 
-    /**
-     * 设置消息列表滚动监听
-     * 滚动到顶部时触发加载更多历史消息
-     */
-    private void setupScrollListener() {
-        final javafx.scene.Node virtualFlow = messageList.lookup(".virtual-flow");
-        if (virtualFlow instanceof javafx.scene.layout.Region region) {
-            region.heightProperty().addListener((obs, oldVal, newVal) -> {
-                // 检查是否滚动到顶部
-                final double scrollValue = region.getTranslateY();
-                if (scrollValue >= 0) {
-                    final ChatViewModel chatVm = viewModel.chatViewModelProperty().get();
-                    if (chatVm != null && !chatVm.loadingProperty().get()) {
-                        final int currentSize = chatVm.getMessages().size();
-                        chatVm.loadMoreHistory();
-                        // 加载后保持滚动位置
-                        maintainScrollPosition(currentSize);
-                    }
-                }
-            });
-        }
-    }
+    /** 标记正在加载更多历史消息，防止重复触发 */
+    private volatile boolean isLoadingMoreHistory;
 
     /**
-     * 加载更多后保持滚动位置
-     *
-     * @param previousSize 加载前的消息数量
+     * 设置消息列表滚动监听
+     * 使用垂直滚动条监听滚动位置，滚动到顶部时加载更多历史消息
      */
-    private void maintainScrollPosition(final int previousSize) {
+    private void setupScrollListener() {
+        // 延迟到 VirtualFlow 渲染完成后查找 ScrollBar
         Platform.runLater(() -> {
-            final ChatViewModel chatVm = viewModel.chatViewModelProperty().get();
-            if (chatVm != null) {
-                final int newSize = chatVm.getMessages().size();
-                final int addedCount = newSize - previousSize;
-                if (addedCount > 0) {
-                    // 跳转到加载前的位置
-                    messageList.scrollTo(addedCount);
+            for (final javafx.scene.Node node : messageList.lookupAll(".scroll-bar")) {
+                if (node instanceof javafx.scene.control.ScrollBar scrollBar
+                        && scrollBar.getOrientation() == javafx.geometry.Orientation.VERTICAL) {
+                    scrollBar.valueProperty().addListener((obs, oldVal, newVal) -> {
+                        // 滚动到顶部（value <= 0.01）且没有正在加载
+                        if (newVal.doubleValue() <= 0.01 && !isLoadingMoreHistory) {
+                            final ChatViewModel chatVm = viewModel.chatViewModelProperty().get();
+                            if (chatVm != null && !chatVm.loadingProperty().get()) {
+                                isLoadingMoreHistory = true;
+                                final int currentSize = chatVm.getMessages().size();
+                                chatVm.loadMoreHistory();
+                                // 加载完成后恢复状态
+                                Platform.runLater(() -> {
+                                    isLoadingMoreHistory = false;
+                                });
+                            }
+                        }
+                    });
+                    LOG.debug("消息列表滚动监听已注册");
+                    break;
                 }
             }
         });
@@ -321,7 +314,18 @@ public final class MainController implements Initializable {
                 errorLabel.setText("图片大小不能超过10MB");
                 return;
             }
-            chatVm.sendImage(selectedFile.toPath());
+
+            // 显示图片预览对话框
+            final ImagePreviewDialog previewDialog = new ImagePreviewDialog(selectedFile);
+            final boolean confirmed = previewDialog.showAndWait();
+
+            // 用户确认后上传
+            if (confirmed) {
+                chatVm.sendImage(selectedFile.toPath());
+                LOG.info("用户确认上传图片: {}", selectedFile.getName());
+            } else {
+                LOG.info("用户取消上传图片: {}", selectedFile.getName());
+            }
         }
     }
 
@@ -509,19 +513,36 @@ public final class MainController implements Initializable {
 
             // 根据消息类型渲染内容
             if ("IMAGE".equals(item.getType())) {
-                // 图片消息：渲染 ImageView
+                // 图片消息：渲染 ImageView（优先使用缩略图）
                 final javafx.scene.image.ImageView imageView = new javafx.scene.image.ImageView();
                 try {
-                    if (item.getContent() != null && !item.getContent().isEmpty()) {
-                        final javafx.scene.image.Image image = new javafx.scene.image.Image(item.getContent(), true);
+                    // 优先使用缩略图URL，如果不存在则使用原图URL
+                    final String thumbnailUrl = item.getThumbnailUrl();
+                    final String originalUrl = item.getContent();
+                    final String imageUrl = thumbnailUrl != null && !thumbnailUrl.isEmpty() ? thumbnailUrl : originalUrl;
+
+                    if (imageUrl != null && !imageUrl.isEmpty()) {
+                        final javafx.scene.image.Image image = new javafx.scene.image.Image(imageUrl, true);
                         imageView.setImage(image);
-                        // 限制图片最大尺寸
-                        final double maxWidth = 300;
-                        final double maxHeight = 200;
+
+                        // 缩略图显示尺寸（固定200x150，提升性能）
+                        final double thumbWidth = 200;
+                        final double thumbHeight = 150;
                         imageView.setPreserveRatio(true);
-                        imageView.setFitWidth(Math.min(image.getWidth(), maxWidth));
-                        imageView.setFitHeight(Math.min(image.getHeight(), maxHeight));
+                        imageView.setFitWidth(thumbWidth);
+                        imageView.setFitHeight(thumbHeight);
                         imageView.getStyleClass().add("message-image");
+
+                        // 添加点击事件（点击显示原图）
+                        imageView.setOnMouseClicked(e -> {
+                            LOG.info("点击图片: originalUrl={}", originalUrl);
+                            // 显示图片查看对话框
+                            final ImageViewerDialog dialog = new ImageViewerDialog(originalUrl);
+                            dialog.show();
+                        });
+
+                        // 设置鼠标样式为手型，提示可点击
+                        imageView.setCursor(javafx.scene.Cursor.HAND);
                     }
                 } catch (final Exception e) {
                     // 图片加载失败时显示链接
@@ -530,6 +551,7 @@ public final class MainController implements Initializable {
                     fallback.setWrapText(true);
                     fallback.setMaxWidth(400);
                     bubble.getChildren().add(fallback);
+                    LOG.warn("图片加载失败: {}", item.getContent(), e);
                 }
                 if (imageView.getImage() != null) {
                     bubble.getChildren().add(imageView);
