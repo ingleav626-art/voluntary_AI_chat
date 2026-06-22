@@ -4,6 +4,7 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 .kotlin
+AGENTS.md
 
 # Java
 *.class
