@@ -128,3 +128,64 @@ CREATE TABLE IF NOT EXISTS `group_member` (
     UNIQUE KEY `uk_group_user` (`group_id`, `user_id`),
     KEY `idx_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='群成员表';
+
+-- AI 角色表
+CREATE TABLE IF NOT EXISTS `ai_profile` (
+    `id` BIGINT NOT NULL COMMENT 'AI ID（雪花算法）',
+    `user_id` BIGINT NOT NULL COMMENT '用户ID（所有者）',
+    `name` VARCHAR(50) NOT NULL COMMENT 'AI 名称',
+    `avatar` VARCHAR(500) DEFAULT NULL COMMENT 'AI 头像',
+    `persona` VARCHAR(2000) DEFAULT NULL COMMENT 'AI 人设/性格描述',
+    `system_prompt` TEXT DEFAULT NULL COMMENT '系统提示词',
+    `model_provider` VARCHAR(20) NOT NULL COMMENT '模型提供商：openai, deepseek, qwen, zhipu, custom',
+    `model` VARCHAR(50) NOT NULL COMMENT '模型名称',
+    `api_key_enc` VARCHAR(500) NOT NULL COMMENT 'API Key（AES-256-GCM 加密）',
+    `is_group` TINYINT DEFAULT 0 COMMENT '是否可用于群聊：0-否，1-是',
+    `temperature` DECIMAL(3,2) DEFAULT 0.70 COMMENT 'AI 回复创造性参数（0.0-2.0）',
+    `max_tokens` INT DEFAULT 2048 COMMENT 'AI 回复最大长度',
+    `status` TINYINT DEFAULT 0 COMMENT '状态：0-正常，1-禁用',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_deleted` TINYINT DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+    PRIMARY KEY (`id`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_model_provider` (`model_provider`),
+    KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 角色表';
+
+-- AI 群配置表
+CREATE TABLE IF NOT EXISTS `ai_group_config` (
+    `id` BIGINT NOT NULL COMMENT '配置ID（雪花算法）',
+    `group_id` BIGINT NOT NULL COMMENT '群组ID',
+    `ai_id` BIGINT NOT NULL COMMENT 'AI 角色ID',
+    `trigger_keywords` VARCHAR(200) DEFAULT NULL COMMENT '触发关键词（逗号分隔）',
+    `trigger_probability` DECIMAL(3,2) DEFAULT 0.00 COMMENT '触发概率（0.0-1.0）',
+    `is_enabled` TINYINT DEFAULT 1 COMMENT '是否启用：0-否，1-是',
+    `cooldown_seconds` INT DEFAULT 30 COMMENT 'AI 回复冷却时间（秒）',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_deleted` TINYINT DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_group_ai` (`group_id`, `ai_id`),
+    KEY `idx_ai_id` (`ai_id`),
+    KEY `idx_is_enabled` (`is_enabled`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 群配置表';
+
+-- AI 记忆表
+CREATE TABLE IF NOT EXISTS `ai_memory` (
+    `id` BIGINT NOT NULL COMMENT '记忆ID（雪花算法）',
+    `ai_id` BIGINT NOT NULL COMMENT 'AI 角色ID',
+    `user_id` BIGINT NOT NULL COMMENT '用户ID',
+    `session_id` VARCHAR(100) DEFAULT NULL COMMENT '会话ID',
+    `summary` VARCHAR(500) NOT NULL COMMENT '记忆摘要',
+    `keywords` VARCHAR(200) DEFAULT NULL COMMENT '关键词（逗号分隔）',
+    `importance` DECIMAL(3,2) DEFAULT 0.50 COMMENT '记忆重要度评分（0.0-1.0）',
+    `vector_id` VARCHAR(100) DEFAULT NULL COMMENT '向量ID（Milvus/Qdrant）',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_deleted` TINYINT DEFAULT 0 COMMENT '是否删除：0-否，1-是',
+    PRIMARY KEY (`id`),
+    KEY `idx_ai_user` (`ai_id`, `user_id`),
+    KEY `idx_session_id` (`session_id`),
+    KEY `idx_vector_id` (`vector_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 记忆表';

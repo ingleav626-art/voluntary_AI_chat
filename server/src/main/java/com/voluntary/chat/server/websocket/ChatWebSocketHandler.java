@@ -1,5 +1,6 @@
 package com.voluntary.chat.server.websocket;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.voluntary.chat.common.constant.MessageTypes;
 import com.voluntary.chat.common.enums.SenderType;
@@ -9,6 +10,7 @@ import com.voluntary.chat.server.dto.response.MessageResponse;
 import com.voluntary.chat.server.dto.response.SendMessageResponse;
 import com.voluntary.chat.server.entity.User;
 import com.voluntary.chat.server.mapper.GroupMemberMapper;
+import com.voluntary.chat.server.service.AiChatService;
 import com.voluntary.chat.server.service.MessageService;
 import com.voluntary.chat.server.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +39,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
   private final MessageService messageService;
   private final UserService userService;
   private final GroupMemberMapper groupMemberMapper;
+  private final AiChatService aiChatService;
   private final ObjectMapper objectMapper;
 
   /** userId -> WebSocketSession，用于在线状态管理和消息推送 */
@@ -61,7 +64,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             .build();
         String payload = objectMapper.writeValueAsString(kickMsg);
         oldSession.sendMessage(new TextMessage(payload));
-      } catch (Exception e) {
+      } catch (IOException e) {
         log.warn("通知旧连接顶号失败: userId={}", userId, e);
       }
       oldSession.close(CloseStatus.NORMAL);
@@ -81,13 +84,14 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     WebSocketMessage wsMessage;
     try {
       wsMessage = objectMapper.readValue(textMessage.getPayload(), WebSocketMessage.class);
-    } catch (Exception e) {
+    } catch (JsonProcessingException e) {
       log.warn("WebSocket 消息解析失败: userId={}, error={}", userId, e.getMessage());
       return;
     }
 
     switch (wsMessage.getType()) {
       case MessageTypes.SEND_MESSAGE -> handleSendMessage(userId, wsMessage);
+      case MessageTypes.AI_CHAT -> handleAiChat(userId, wsMessage);
       case MessageTypes.PING -> handlePing(session, wsMessage);
       case MessageTypes.RECONNECT -> handleReconnect(userId, wsMessage);
       default -> log.warn("未知的消息类型: type={}, userId={}", wsMessage.getType(), userId);
@@ -222,6 +226,50 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     log.info("私聊消息转发: senderId={}, targetUserId={}, sessionId={}",
         senderId, targetUserId, request.getSessionId());
+  }
+
+  /**
+   * 处理 AI 对话请求
+   */
+  private void handleAiChat(Long userId, WebSocketMessage wsMessage) {
+    @SuppressWarnings("unchecked")
+    Map<String, Object> data = (Map<String, Object>) wsMessage.getData();
+
+    Long aiId = Long.parseLong(String.valueOf(data.get("aiId")));
+    String sessionId = (String) data.get("sessionId");
+    String content = (String) data.get("content");
+
+    log.info("AI 对话请求: userId={}, aiId={}, sessionId={}", userId, aiId, sessionId);
+
+    // 异步处理 AI 对话（流式输出）
+    aiChatService.handleAiChat(userId, aiId, sessionId, content, wsMessage.getId());
+  }
+
+  /**
+   * 推送 AI 流式输出
+   */
+  public void sendAiStream(Long userId, String messageId, String content, boolean done) {
+    sendAiStream(userId, messageId, content, done, null);
+  }
+
+  /**
+   * 推送 AI 流式输出（带完整消息ID）
+   */
+  public void sendAiStream(Long userId, String messageId, String content, boolean done, Long aiMessageId) {
+    Map<String, Object> data = new java.util.LinkedHashMap<>();
+    data.put("messageId", messageId);
+    data.put("content", content);
+    data.put("done", done);
+    if (aiMessageId != null) {
+      data.put("aiMessageId", aiMessageId);
+    }
+
+    WebSocketMessage streamMsg = WebSocketMessage.builder()
+        .id(messageId)
+        .type(MessageTypes.AI_STREAM)
+        .data(data)
+        .build();
+    sendToUser(userId, streamMsg);
   }
 
   /**
@@ -381,8 +429,8 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
   /**
    * 广播群成员加入通知
    *
-   * @param groupId 群组ID
-   * @param userId  加入的用户ID
+   * @param groupId  群组ID
+   * @param userId   加入的用户ID
    * @param username 用户名
    * @param avatar   用户头像
    */
@@ -449,8 +497,10 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
   public void broadcastGroupInfoChange(Long groupId, String name, String announcement) {
     Map<String, Object> data = new java.util.LinkedHashMap<>();
     data.put("groupId", groupId);
-    if (name != null) data.put("name", name);
-    if (announcement != null) data.put("announcement", announcement);
+    if (name != null)
+      data.put("name", name);
+    if (announcement != null)
+      data.put("announcement", announcement);
 
     WebSocketMessage message = WebSocketMessage.builder()
         .id(String.valueOf(System.currentTimeMillis()))
