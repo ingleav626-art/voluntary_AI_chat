@@ -15,6 +15,7 @@ import org.example.client.model.LoginResponse;
 import org.example.client.model.RegisterRequest;
 import org.example.client.model.RegisterResponse;
 import org.example.client.model.SmsSendRequest;
+import org.example.client.util.ErrorCodeRegistry;
 import org.example.client.util.JsonUtils;
 import org.example.client.util.TokenStorage;
 import org.slf4j.Logger;
@@ -23,10 +24,15 @@ import org.slf4j.LoggerFactory;
 /**
  * 认证服务
  *
+ * <p>
+ * 错误码映射统一由 {@link org.example.client.util.ErrorCodeRegistry} 管理，
+ * 本类仅负责请求发送和响应解析。
+ * </p>
+ *
  * @author voluntary-ai-chat
  * @since 1.0.0
  */
-public final class AuthService {
+public final class AuthService extends BaseHttpService {
 
     private static final Logger LOG = LoggerFactory.getLogger(AuthService.class);
 
@@ -45,24 +51,6 @@ public final class AuthService {
 
     /** HTTP 状态码 - 成功 */
     private static final int HTTP_OK = 200;
-
-    /** 业务错误码 - 账号或密码错误 */
-    private static final int CODE_WRONG_CREDENTIALS = 1004;
-
-    /** 业务错误码 - 账号锁定 */
-    private static final int CODE_ACCOUNT_LOCKED = 1005;
-
-    /** 业务错误码 - 手机号已注册 */
-    private static final int CODE_PHONE_REGISTERED = 1001;
-
-    /** 业务错误码 - 验证码错误或已过期 */
-    private static final int CODE_SMS_INVALID = 1002;
-
-    /** 业务错误码 - 用户名已存在 */
-    private static final int CODE_USERNAME_EXISTS = 1003;
-
-    /** HTTP 状态码 - 请求参数错误 */
-    private static final int HTTP_BAD_REQUEST = 400;
 
     /** HTTP 状态码 - 服务器错误 */
     private static final int HTTP_SERVER_ERROR = 500;
@@ -121,8 +109,8 @@ public final class AuthService {
                 .build();
 
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
-                .thenApply(this::handleResponse)
-                .exceptionally(this::handleError);
+                .thenApply(this::handleLoginResponse)
+                .exceptionally(this::handleLoginError);
     }
 
     /**
@@ -186,17 +174,20 @@ public final class AuthService {
                         apiResponse.getData().getUser() != null
                                 ? apiResponse.getData().getUser().getUserId()
                                 : null);
-            } else {
-                LOG.warn("注册失败: code={}, message={}",
-                        apiResponse != null ? apiResponse.getCode() : null,
-                        apiResponse != null ? apiResponse.getMessage() : null);
+            } else if (apiResponse != null) {
+                // 通过 ErrorCodeRegistry 映射用户友好提示
+                final String friendlyMessage = ErrorCodeRegistry.getMessage(
+                        apiResponse.getCode(), apiResponse.getMessage());
+                LOG.warn("注册失败: code={}, backendMsg={}, displayMsg={}",
+                        apiResponse.getCode(), apiResponse.getMessage(), friendlyMessage);
+                apiResponse.setMessage(friendlyMessage);
             }
 
             return apiResponse;
         }
 
         LOG.error("注册请求失败: statusCode={}", statusCode);
-        return createRegisterErrorResponse(statusCode, "网络请求失败");
+        return createRegisterErrorResponse(statusCode, ErrorCodeRegistry.getMessage(statusCode));
     }
 
     private ApiResponse<RegisterResponse> handleRegisterError(final Throwable ex) {
@@ -207,25 +198,8 @@ public final class AuthService {
     private ApiResponse<RegisterResponse> createRegisterErrorResponse(final int code, final String message) {
         final ApiResponse<RegisterResponse> response = new ApiResponse<>();
         response.setCode(code);
-        response.setMessage(mapRegisterErrorMessage(code, message));
+        response.setMessage(message);
         return response;
-    }
-
-    private String mapRegisterErrorMessage(final int code, final String defaultMessage) {
-        switch (code) {
-            case CODE_PHONE_REGISTERED:
-                return "手机号已注册";
-            case CODE_SMS_INVALID:
-                return "验证码错误或已过期";
-            case CODE_USERNAME_EXISTS:
-                return "用户名已存在";
-            case HTTP_BAD_REQUEST:
-                return "请求参数错误，请检查输入";
-            case HTTP_SERVER_ERROR:
-                return "服务器异常，请稍后重试";
-            default:
-                return defaultMessage;
-        }
     }
 
     @SuppressWarnings("unchecked")
@@ -239,17 +213,19 @@ public final class AuthService {
 
             if (apiResponse != null && apiResponse.isSuccess()) {
                 LOG.info("验证码发送成功");
-            } else {
-                LOG.warn("验证码发送失败: code={}, message={}",
-                        apiResponse != null ? apiResponse.getCode() : null,
-                        apiResponse != null ? apiResponse.getMessage() : null);
+            } else if (apiResponse != null) {
+                final String friendlyMessage = ErrorCodeRegistry.getMessage(
+                        apiResponse.getCode(), apiResponse.getMessage());
+                LOG.warn("验证码发送失败: code={}, backendMsg={}, displayMsg={}",
+                        apiResponse.getCode(), apiResponse.getMessage(), friendlyMessage);
+                apiResponse.setMessage(friendlyMessage);
             }
 
             return apiResponse;
         }
 
         LOG.error("验证码请求失败: statusCode={}", statusCode);
-        return createSmsErrorResponse(statusCode, "网络请求失败");
+        return createSmsErrorResponse(statusCode, ErrorCodeRegistry.getMessage(statusCode));
     }
 
     private ApiResponse<Void> handleSmsError(final Throwable ex) {
@@ -264,7 +240,7 @@ public final class AuthService {
         return response;
     }
 
-    private ApiResponse<LoginResponse> handleResponse(final HttpResponse<String> response) {
+    private ApiResponse<LoginResponse> handleLoginResponse(final HttpResponse<String> response) {
         final int statusCode = response.statusCode();
 
         if (statusCode == HTTP_OK) {
@@ -274,44 +250,31 @@ public final class AuthService {
 
             if (apiResponse != null && apiResponse.isSuccess()) {
                 LOG.info("登录成功: userId={}", apiResponse.getData().getUser().getUserId());
-            } else {
-                LOG.warn("登录失败: code={}, message={}",
-                        apiResponse != null ? apiResponse.getCode() : null,
-                        apiResponse != null ? apiResponse.getMessage() : null);
+            } else if (apiResponse != null) {
+                final String friendlyMessage = ErrorCodeRegistry.getMessage(
+                        apiResponse.getCode(), apiResponse.getMessage());
+                LOG.warn("登录失败: code={}, backendMsg={}, displayMsg={}",
+                        apiResponse.getCode(), apiResponse.getMessage(), friendlyMessage);
+                apiResponse.setMessage(friendlyMessage);
             }
 
             return apiResponse;
         }
 
         LOG.error("登录请求失败: statusCode={}", statusCode);
-        return createErrorResponse(statusCode, "网络请求失败");
+        return createErrorResponse(statusCode, ErrorCodeRegistry.getMessage(statusCode));
     }
 
-    private ApiResponse<LoginResponse> handleError(final Throwable ex) {
+    private ApiResponse<LoginResponse> handleLoginError(final Throwable ex) {
         LOG.error("登录请求异常", ex);
         return createErrorResponse(HTTP_SERVER_ERROR, "网络连接失败，请检查网络");
     }
 
-    private ApiResponse<LoginResponse> createErrorResponse(final int code, final String message) {
+    protected ApiResponse<LoginResponse> createErrorResponse(final int code, final String message) {
         final ApiResponse<LoginResponse> response = new ApiResponse<>();
         response.setCode(code);
-        response.setMessage(mapErrorMessage(code, message));
+        response.setMessage(message);
         return response;
-    }
-
-    private String mapErrorMessage(final int code, final String defaultMessage) {
-        switch (code) {
-            case CODE_WRONG_CREDENTIALS:
-                return "账号或密码错误";
-            case CODE_ACCOUNT_LOCKED:
-                return "登录次数过多，账号已锁定";
-            case HTTP_BAD_REQUEST:
-                return "请求参数错误，请检查输入";
-            case HTTP_SERVER_ERROR:
-                return "服务器异常，请稍后重试";
-            default:
-                return defaultMessage;
-        }
     }
 
     private String maskPhone(final String phone) {
@@ -356,17 +319,19 @@ public final class AuthService {
 
             if (apiResponse != null && apiResponse.isSuccess()) {
                 LOG.info("密码重置成功");
-            } else {
-                LOG.warn("密码重置失败: code={}, message={}",
-                        apiResponse != null ? apiResponse.getCode() : null,
-                        apiResponse != null ? apiResponse.getMessage() : null);
+            } else if (apiResponse != null) {
+                final String friendlyMessage = ErrorCodeRegistry.getMessage(
+                        apiResponse.getCode(), apiResponse.getMessage());
+                LOG.warn("密码重置失败: code={}, backendMsg={}, displayMsg={}",
+                        apiResponse.getCode(), apiResponse.getMessage(), friendlyMessage);
+                apiResponse.setMessage(friendlyMessage);
             }
 
             return apiResponse;
         }
 
         LOG.error("忘记密码请求失败: statusCode={}", statusCode);
-        return createForgotPasswordErrorResponse(statusCode, "网络请求失败");
+        return createForgotPasswordErrorResponse(statusCode, ErrorCodeRegistry.getMessage(statusCode));
     }
 
     private ApiResponse<Void> handleForgotPasswordError(final Throwable ex) {
@@ -377,20 +342,7 @@ public final class AuthService {
     private ApiResponse<Void> createForgotPasswordErrorResponse(final int code, final String message) {
         final ApiResponse<Void> response = new ApiResponse<>();
         response.setCode(code);
-        response.setMessage(mapForgotPasswordErrorMessage(code, message));
+        response.setMessage(message);
         return response;
-    }
-
-    private String mapForgotPasswordErrorMessage(final int code, final String defaultMessage) {
-        switch (code) {
-            case CODE_SMS_INVALID:
-                return "验证码错误或已过期";
-            case HTTP_BAD_REQUEST:
-                return "请求参数错误，请检查输入";
-            case HTTP_SERVER_ERROR:
-                return "服务器异常，请稍后重试";
-            default:
-                return defaultMessage;
-        }
     }
 }

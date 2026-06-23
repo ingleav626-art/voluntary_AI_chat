@@ -9,6 +9,7 @@ import java.util.concurrent.CompletableFuture;
 
 import org.example.client.config.ClientConfig;
 import org.example.client.model.ApiResponse;
+import org.example.client.util.ErrorCodeRegistry;
 import org.example.client.util.JsonUtils;
 import org.example.client.util.TokenStorage;
 import org.slf4j.Logger;
@@ -17,7 +18,9 @@ import org.slf4j.LoggerFactory;
 /**
  * HTTP 基础服务
  *
- * <p>封装通用 HTTP 请求逻辑，自动注入 JWT Token。</p>
+ * <p>
+ * 封装通用 HTTP 请求逻辑，自动注入 JWT Token。
+ * </p>
  *
  * @author voluntary-ai-chat
  * @since 1.0.0
@@ -176,9 +179,9 @@ public abstract class BaseHttpService {
     /**
      * 发送请求并解析响应
      *
-     * @param request HTTP 请求
+     * @param request      HTTP 请求
      * @param responseType 响应数据类型
-     * @param <T> 响应数据泛型
+     * @param <T>          响应数据泛型
      * @return 异步结果
      */
     protected <T> CompletableFuture<ApiResponse<T>> sendRequest(
@@ -199,9 +202,16 @@ public abstract class BaseHttpService {
     /**
      * 处理 HTTP 响应
      *
-     * @param response HTTP 响应
+     * <p>
+     * 统一错误码映射逻辑：
+     * 1. HTTP 200 时检查业务码，非200业务码通过 ErrorCodeRegistry 映射
+     * 2. 非 HTTP 200 时尝试解析后端错误体，再通过 ErrorCodeRegistry 映射
+     * 3. 401/403 特殊处理
+     * </p>
+     *
+     * @param response     HTTP 响应
      * @param responseType 响应数据类型
-     * @param <T> 响应数据泛型
+     * @param <T>          响应数据泛型
      * @return API 响应
      */
     private <T> ApiResponse<T> handleResponse(
@@ -215,36 +225,47 @@ public abstract class BaseHttpService {
                 LOG.error("响应解析失败: body={}", response.body());
                 return createErrorResponse(HTTP_OK, "响应解析失败");
             }
+            // 业务码非200时，通过 ErrorCodeRegistry 映射用户友好提示
+            if (!apiResponse.isSuccess()) {
+                final String friendlyMessage = ErrorCodeRegistry.getMessage(
+                        apiResponse.getCode(), apiResponse.getMessage());
+                LOG.warn("业务错误: code={}, backendMsg={}, displayMsg={}",
+                        apiResponse.getCode(), apiResponse.getMessage(), friendlyMessage);
+                apiResponse.setMessage(friendlyMessage);
+            }
             return apiResponse;
         }
 
         if (statusCode == HTTP_UNAUTHORIZED) {
             LOG.warn("Token 已失效，需要重新登录");
-            return createErrorResponse(HTTP_UNAUTHORIZED, "登录已失效，请重新登录");
+            return createErrorResponse(HTTP_UNAUTHORIZED, ErrorCodeRegistry.getMessage(HTTP_UNAUTHORIZED));
         }
 
         if (statusCode == HTTP_FORBIDDEN) {
             LOG.warn("请求被拒绝: 403 Forbidden，可能未登录或 Token 无效");
-            return createErrorResponse(HTTP_FORBIDDEN, "请先登录");
+            return createErrorResponse(HTTP_FORBIDDEN, ErrorCodeRegistry.getMessage(HTTP_FORBIDDEN));
         }
 
         // 尝试从响应体中解析后端返回的具体错误消息
         final ApiResponse<T> errorBody = JsonUtils.fromJson(
                 response.body(), getTypeFactory().constructParametricType(ApiResponse.class, Void.class));
         if (errorBody != null && errorBody.getMessage() != null && !errorBody.getMessage().isEmpty()) {
-            LOG.error("请求失败: statusCode={}, errorCode={}, message={}",
-                    statusCode, errorBody.getCode(), errorBody.getMessage());
+            final String friendlyMessage = ErrorCodeRegistry.getMessage(
+                    errorBody.getCode(), errorBody.getMessage());
+            LOG.error("请求失败: statusCode={}, errorCode={}, backendMsg={}, displayMsg={}",
+                    statusCode, errorBody.getCode(), errorBody.getMessage(), friendlyMessage);
+            errorBody.setMessage(friendlyMessage);
             return errorBody;
         }
 
         LOG.error("请求失败: statusCode={}", statusCode);
-        return createErrorResponse(statusCode, "网络请求失败");
+        return createErrorResponse(statusCode, ErrorCodeRegistry.getMessage(statusCode));
     }
 
     /**
      * 处理请求异常
      *
-     * @param ex 异常
+     * @param ex  异常
      * @param <T> 响应数据泛型
      * @return API 响应
      */
@@ -256,9 +277,9 @@ public abstract class BaseHttpService {
     /**
      * 创建错误响应
      *
-     * @param code 错误码
+     * @param code    错误码
      * @param message 错误消息
-     * @param <T> 响应数据泛型
+     * @param <T>     响应数据泛型
      * @return API 响应
      */
     protected <T> ApiResponse<T> createErrorResponse(final int code, final String message) {
