@@ -12,6 +12,7 @@ import org.example.client.model.ImageUploadResponse;
 import org.example.client.model.MarkReadRequest;
 import org.example.client.model.MessageInfo;
 import org.example.client.model.PageResult;
+import org.example.client.model.RecallMessageResponse;
 import org.example.client.model.SendMessageRequest;
 import org.example.client.model.SendMessageResponse;
 import org.slf4j.Logger;
@@ -171,12 +172,12 @@ public final class ChatService extends BaseHttpService {
          * @param messageId 消息ID
          * @return 异步结果
          */
-        public CompletableFuture<ApiResponse<Void>> recallMessage(final Long messageId) {
+        public CompletableFuture<ApiResponse<RecallMessageResponse>> recallMessage(final Long messageId) {
                 final HttpRequest httpRequest = buildPostRequest(
                                 MESSAGE_RECALL_PATH, java.util.Map.of("messageId", String.valueOf(messageId))).build();
 
                 return sendRequest(httpRequest, getTypeFactory().constructParametricType(
-                                ApiResponse.class, Void.class));
+                                ApiResponse.class, RecallMessageResponse.class));
         }
 
         /**
@@ -201,15 +202,35 @@ public final class ChatService extends BaseHttpService {
                         final String boundary = "----Boundary" + System.currentTimeMillis();
                         final String url = ClientConfig.getInstance().getBaseUrl() + MESSAGE_UPLOAD_IMAGE_PATH;
 
-                        // 构建 multipart/form-data 请求体
+                        // 探测文件 MIME 类型，无法探测时默认 image/png
+                        String contentType = Files.probeContentType(filePath);
+                        if (contentType == null || contentType.isEmpty()) {
+                                final String fileName = filePath.getFileName().toString().toLowerCase();
+                                if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")) {
+                                        contentType = "image/jpeg";
+                                } else if (fileName.endsWith(".gif")) {
+                                        contentType = "image/gif";
+                                } else if (fileName.endsWith(".webp")) {
+                                        contentType = "image/webp";
+                                } else {
+                                        contentType = "image/png";
+                                }
+                        }
+
+                        // 对文件名进行 URL 编码，避免中文文件名导致 multipart 解析失败
+                        final String encodedFileName = java.net.URLEncoder.encode(
+                                        filePath.getFileName().toString(), java.nio.charset.StandardCharsets.UTF_8);
+
+                        // 构建 multipart/form-data 请求体（使用 UTF-8 编码）
                         final StringBuilder sb = new StringBuilder();
                         sb.append("--").append(boundary).append("\r\n");
                         sb.append("Content-Disposition: form-data; name=\"file\"; filename=\"")
-                                        .append(filePath.getFileName().toString()).append("\"\r\n");
-                        sb.append("Content-Type: ").append(Files.probeContentType(filePath)).append("\r\n\r\n");
+                                        .append(encodedFileName).append("\"\r\n");
+                        sb.append("Content-Type: ").append(contentType).append("\r\n\r\n");
 
-                        final byte[] header = sb.toString().getBytes();
-                        final byte[] footer = ("\r\n--" + boundary + "--\r\n").getBytes();
+                        final byte[] header = sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                        final byte[] footer = ("\r\n--" + boundary + "--\r\n")
+                                        .getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
                         final java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
                         bos.write(header);
@@ -233,7 +254,8 @@ public final class ChatService extends BaseHttpService {
                         }
 
                         final HttpRequest request = builder.build();
-                        LOG.info("上传图片: fileName={}", filePath.getFileName());
+                        LOG.info("上传图片: fileName={}, contentType={}, size={}", filePath.getFileName(),
+                                        contentType, fileBytes.length);
 
                         return sendRequest(request, getTypeFactory().constructParametricType(
                                         ApiResponse.class, ImageUploadResponse.class));
@@ -243,5 +265,51 @@ public final class ChatService extends BaseHttpService {
                         failed.completeExceptionally(e);
                         return failed;
                 }
+        }
+
+        /**
+         * 下载图片字节（带认证）
+         * 使用 Bearer Token 下载图片文件，解决 JavaFX Image 直接加载不携带认证头的问题
+         *
+         * @param imageUrl 图片URL
+         * @return 异步结果，包含图片字节数据
+         */
+        public CompletableFuture<byte[]> loadImageBytes(final String imageUrl) {
+                final CompletableFuture<byte[]> future = new CompletableFuture<>();
+                try {
+                        final org.example.client.model.LoginResponse token =
+                                org.example.client.util.TokenStorage.load();
+                        final HttpRequest.Builder builder = HttpRequest.newBuilder()
+                                .uri(java.net.URI.create(imageUrl))
+                                .timeout(java.time.Duration.ofSeconds(
+                                        ClientConfig.getInstance().getReadTimeout()))
+                                .GET();
+                        if (token != null && token.getAccessToken() != null) {
+                                builder.header("Authorization", "Bearer " + token.getAccessToken());
+                        }
+                        final HttpRequest request = builder.build();
+
+                        getHttpClient().sendAsync(request, java.net.http.HttpResponse.BodyHandlers.ofByteArray())
+                                .thenAccept(response -> {
+                                        if (response.statusCode() == 200) {
+                                                future.complete(response.body());
+                                        } else {
+                                                LOG.warn("下载图片失败: url={}, status={}",
+                                                        imageUrl, response.statusCode());
+                                                future.completeExceptionally(
+                                                        new java.io.IOException(
+                                                                "HTTP " + response.statusCode()));
+                                        }
+                                })
+                                .exceptionally(ex -> {
+                                        LOG.warn("下载图片异常: url={}", imageUrl, ex);
+                                        future.completeExceptionally(ex);
+                                        return null;
+                                });
+                } catch (final Exception e) {
+                        LOG.warn("创建图片下载请求失败: url={}", imageUrl, e);
+                        future.completeExceptionally(e);
+                }
+                return future;
         }
 }

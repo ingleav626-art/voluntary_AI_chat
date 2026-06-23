@@ -187,3 +187,40 @@
     -fx-text-fill: #388e3c;
     -fx-font-size: 12px;
 }
+
+/* ===== 修改群信息对话框样式 ===== */
+
+.group-info-announcement {
+    -fx-pref-height: 120px;
+    -fx-padding: 8px 10px;
+    -fx-border-color: #d0d0d0;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-font-size: 13px;
+}
+
+.group-info-announcement:focused {
+    -fx-border-color: #42A5F5;
+}
+
+/* ===== 成员管理按钮样式 ===== */
+
+.member-actions {
+    -fx-spacing: 4px;
+    -fx-alignment: CENTER_RIGHT;
+}
+
+.btn-action-sm {
+    -fx-background-color: #f5f5f5;
+    -fx-border-color: #d0d0d0;
+    -fx-border-radius: 3px;
+    -fx-background-radius: 3px;
+    -fx-padding: 2px 8px;
+    -fx-font-size: 11px;
+    -fx-cursor: hand;
+}
+
+.btn-action-sm:hover {
+    -fx-background-color: #e3f2fd;
+    -fx-border-color: #42A5F5;
+}

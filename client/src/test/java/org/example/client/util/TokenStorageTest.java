@@ -88,4 +88,196 @@ class TokenStorageTest {
         assertNull(TokenStorage.load());
     }
 
+    @Test
+    @DisplayName("保存 Token 不持久化（内存模式）")
+    void testSaveMemoryOnly() {
+        LoginResponse response = new LoginResponse();
+        response.setAccessToken("mem-token");
+        response.setRefreshToken("mem-refresh");
+
+        TokenStorage.save(response, false);
+
+        // 验证文件未创建
+        final Path tokenFile = tempDir.resolve("token.dat");
+        assertFalse(Files.exists(tokenFile));
+
+        // 但内存加载有效
+        LoginResponse loaded = TokenStorage.load();
+        assertNotNull(loaded);
+        assertEquals("mem-token", loaded.getAccessToken());
+    }
+
+    @Test
+    @DisplayName("load 优先从内存缓存加载")
+    void testLoadPrefersMemoryCache() throws Exception {
+        // 先保存到内存
+        LoginResponse memResponse = new LoginResponse();
+        memResponse.setAccessToken("mem-token");
+        memResponse.setRefreshToken("mem-refresh");
+        TokenStorage.save(memResponse, false);
+
+        // 再写入不同的文件内容
+        String fileData = Base64.getEncoder().encodeToString("file-token|file-refresh".getBytes());
+        Path tokenFile = tempDir.resolve("token.dat");
+        Files.writeString(tokenFile, fileData);
+
+        // 应从内存加载（优先）
+        LoginResponse loaded = TokenStorage.load();
+        assertNotNull(loaded);
+        assertEquals("mem-token", loaded.getAccessToken());
+    }
+
+    @Test
+    @DisplayName("clear 清除内存缓存后从文件重新加载")
+    void testClearThenReloadFromFile() {
+        // 先持久化保存
+        LoginResponse response = new LoginResponse();
+        response.setAccessToken("persist-token");
+        response.setRefreshToken("persist-refresh");
+        TokenStorage.save(response, true);
+
+        // 清除（内存和文件）
+        TokenStorage.clear();
+
+        // 验证文件已清除
+        final Path tokenFile = tempDir.resolve("token.dat");
+        assertFalse(Files.exists(tokenFile));
+
+        // 加载应为 null
+        assertNull(TokenStorage.load());
+    }
+
+    @Test
+    @DisplayName("多次背靠背 save 覆盖内存缓存")
+    void testMultipleSaveOverwritesMemory() {
+        LoginResponse resp1 = new LoginResponse();
+        resp1.setAccessToken("token1");
+        resp1.setRefreshToken("refresh1");
+        TokenStorage.save(resp1);
+
+        LoginResponse resp2 = new LoginResponse();
+        resp2.setAccessToken("token2");
+        resp2.setRefreshToken("refresh2");
+        TokenStorage.save(resp2);
+
+        LoginResponse loaded = TokenStorage.load();
+        assertNotNull(loaded);
+        assertEquals("token2", loaded.getAccessToken());
+    }
+
+    @Test
+    @DisplayName("save 持久化后文件存在")
+    void testSavePersistCreatesFile() {
+        LoginResponse response = new LoginResponse();
+        response.setAccessToken("persist-token");
+        response.setRefreshToken("persist-refresh");
+        TokenStorage.save(response, true);
+
+        final Path tokenFile = tempDir.resolve("token.dat");
+        assertTrue(Files.exists(tokenFile));
+    }
+
+    @Test
+    @DisplayName("load 文件内容有三段分隔符返回 null")
+    void testLoadFileWithThreeParts() throws Exception {
+        String threeParts = Base64.getEncoder().encodeToString("part1|part2|part3".getBytes());
+        Path tokenFile = tempDir.resolve("token.dat");
+        Files.writeString(tokenFile, threeParts);
+
+        assertNull(TokenStorage.load());
+    }
+
+    @Test
+    @DisplayName("load 文件存在且无内存缓存时从文件加载")
+    void testLoadFromFileWithoutMemoryCache() throws Exception {
+        // 先清除所有缓存
+        TokenStorage.clear();
+
+        // 直接写入文件
+        String fileData = Base64.getEncoder().encodeToString("file-load-token|file-load-refresh".getBytes());
+        Path tokenFile = tempDir.resolve("token.dat");
+        Files.writeString(tokenFile, fileData);
+
+        // 无内存缓存时应从文件加载
+        LoginResponse loaded = TokenStorage.load();
+        assertNotNull(loaded);
+        assertEquals("file-load-token", loaded.getAccessToken());
+        assertEquals("file-load-refresh", loaded.getRefreshToken());
+    }
+
+    @Test
+    @DisplayName("clear 清除后内存和文件都为空")
+    void testClearRemovesBoth() throws Exception {
+        LoginResponse response = new LoginResponse();
+        response.setAccessToken("clear-test-token");
+        response.setRefreshToken("clear-test-refresh");
+        TokenStorage.save(response, true);
+
+        // 确认已保存
+        assertNotNull(TokenStorage.load());
+
+        TokenStorage.clear();
+
+        // 确认已清除
+        assertNull(TokenStorage.load());
+
+        Path tokenFile = tempDir.resolve("token.dat");
+        assertFalse(Files.exists(tokenFile));
+    }
+
+    @Test
+    @DisplayName("load 文件内容为带换行的 Base64 返回 null")
+    void testLoadFileWithNewlineInBase64() throws Exception {
+        Path tokenFile = tempDir.resolve("token.dat");
+        // "a\nb\n" split by | → 1 part (no |) → null
+        String data = Base64.getEncoder().encodeToString("a\nb\n".getBytes());
+        Files.writeString(tokenFile, data);
+
+        assertNull(TokenStorage.load());
+    }
+
+    @Test
+    @DisplayName("save(null, true) 抛出 NullPointerException")
+    void testSaveNullWithPersistThrowsNPE() {
+        assertThrows(NullPointerException.class, () -> TokenStorage.save(null, true));
+    }
+
+    @Test
+    @DisplayName("save 持久化时 tokenFile 路径被目录占用触发 IOException 不崩溃")
+    void testSavePersistWithDirectoryConflict() throws Exception {
+        // 创建一个目录占据 token.dat 的路径，触发 IOException
+        Path tokenDir = tempDir.resolve("token.dat");
+        Files.createDirectories(tokenDir); // token.dat 变成一个目录
+
+        LoginResponse response = new LoginResponse();
+        response.setAccessToken("test-token");
+        response.setRefreshToken("test-refresh");
+
+        // 不应该崩溃，IOException 会被捕获
+        TokenStorage.save(response, true);
+        // 验证不崩溃
+    }
+
+    @Test
+    @DisplayName("load 从文件加载后缓存到内存")
+    void testLoadCachesToMemory() throws Exception {
+        TokenStorage.clear();
+
+        // 写入一个文件
+        String fileData = Base64.getEncoder().encodeToString("cache-token|cache-refresh".getBytes());
+        Path tokenFile = tempDir.resolve("token.dat");
+        Files.writeString(tokenFile, fileData);
+
+        // 第一次 load 从文件
+        LoginResponse first = TokenStorage.load();
+        assertNotNull(first);
+
+        // 删除文件
+        Files.deleteIfExists(tokenFile);
+
+        // 第二次 load 应该从内存缓存（文件已删）
+        LoginResponse second = TokenStorage.load();
+        assertNotNull(second);
+        assertEquals("cache-token", second.getAccessToken());
+    }
 }

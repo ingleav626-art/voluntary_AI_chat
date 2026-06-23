@@ -14,6 +14,7 @@ import com.voluntary.chat.server.entity.GroupMember;
 import com.voluntary.chat.server.entity.User;
 import com.voluntary.chat.server.mapper.GroupMapper;
 import com.voluntary.chat.server.mapper.GroupMemberMapper;
+import com.voluntary.chat.server.mapper.MessageMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,6 +51,9 @@ class GroupServiceTest {
 
     @Mock
     private UserService userService;
+
+    @Mock
+    private MessageMapper messageMapper;
 
     @InjectMocks
     private GroupService groupService;
@@ -92,6 +96,7 @@ class GroupServiceTest {
 
         when(userService.findByIds(Set.of(MEMBER_ID_1, MEMBER_ID_2)))
                 .thenReturn(Map.of(MEMBER_ID_1, mockUser2, MEMBER_ID_2, mockUser3));
+        when(userService.findById(OWNER_ID)).thenReturn(mockUser1);
         when(groupMapper.insert(any(GroupEntity.class))).thenAnswer(invocation -> {
             GroupEntity saved = invocation.getArgument(0);
             saved.setId(GROUP_ID);
@@ -135,15 +140,17 @@ class GroupServiceTest {
 
         when(userService.findByIds(Set.of(MEMBER_ID_1)))
                 .thenReturn(Map.of(MEMBER_ID_1, mockUser2));
+        when(userService.findById(OWNER_ID)).thenReturn(mockUser1);
         when(groupMapper.insert(any(GroupEntity.class))).thenAnswer(invocation -> {
             GroupEntity saved = invocation.getArgument(0);
             saved.setId(GROUP_ID);
             return 1;
         });
 
-        groupService.createGroup(OWNER_ID, request);
+        CreateGroupResponse result = groupService.createGroup(OWNER_ID, request);
 
-        // 验证只插入了2条（群主 + 1个成员），排除重复的OWNER_ID
+        assertEquals(GROUP_ID, result.getGroupId());
+        // 创建者被排除，只插入群主 + 成员1
         verify(groupMemberMapper, times(2)).insert(any(GroupMember.class));
     }
 
@@ -292,6 +299,9 @@ class GroupServiceTest {
         // 被邀请人不在群中
         when(groupMemberMapper.selectRoleByGroupIdAndUserId(GROUP_ID, MEMBER_ID_1)).thenReturn(null);
         when(groupMemberMapper.selectRoleByGroupIdAndUserId(GROUP_ID, MEMBER_ID_2)).thenReturn(null);
+        // 被邀请人从未加入过群（包括已删记录）
+        when(groupMemberMapper.selectByGroupIdAndUserIdIncludeDeleted(GROUP_ID, MEMBER_ID_1)).thenReturn(null);
+        when(groupMemberMapper.selectByGroupIdAndUserIdIncludeDeleted(GROUP_ID, MEMBER_ID_2)).thenReturn(null);
 
         InviteMemberRequest request = new InviteMemberRequest();
         request.setUserIds(List.of(MEMBER_ID_1, MEMBER_ID_2));

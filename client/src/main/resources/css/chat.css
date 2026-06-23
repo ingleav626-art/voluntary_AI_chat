@@ -4,6 +4,8 @@
 .chat-area {
     -fx-background-color: #FFF8F0;
     -fx-spacing: 0;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
 }
 
 /* 聊天标题栏 - 暖白 */
@@ -30,11 +32,19 @@
 .message-list {
     -fx-background-color: #FFF8F0;
     -fx-padding: 10;
+    -fx-border-color: transparent;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
 }
 
 .message-list .list-cell {
     -fx-background-color: transparent;
     -fx-padding: 5 15;
+}
+
+/* 去掉消息单元格焦点边框，防止点击时布局偏移 */
+.message-list .list-cell:focused {
+    -fx-background-color: transparent;
 }
 
 /* 消息气泡 - 发送（温暖珊瑚渐变） */
@@ -87,6 +97,14 @@
     -fx-alignment: center;
 }
 
+/* 系统消息（群成员加入等）居中小字 */
+.message-system {
+    -fx-text-fill: #B08968;
+    -fx-font-size: 12px;
+    -fx-padding: 4 0;
+    -fx-alignment: center;
+}
+
 /* 图片消息 */
 .message-image {
     -fx-background-radius: 8;
@@ -119,7 +137,6 @@
     -fx-border-radius: 8;
     -fx-font-size: 14;
     -fx-padding: 8;
-    -fx-pref-width: 999;
 }
 
 .input-textarea:focused {
@@ -141,17 +158,18 @@
 /* 工具栏按钮 - 圆形暖色按钮 */
 .btn-tool {
     -fx-background-color: #FFE8D6;
-    -fx-text-fill: #D4622A;
-    -fx-font-size: 14;
+    -fx-text-fill: #E76F51;
+    -fx-font-size: 18;
     -fx-font-weight: bold;
-    -fx-background-radius: 16;
-    -fx-min-width: 32;
-    -fx-min-height: 32;
-    -fx-pref-width: 32;
-    -fx-pref-height: 32;
+    -fx-background-radius: 18;
+    -fx-min-width: 36;
+    -fx-min-height: 36;
+    -fx-pref-width: 36;
+    -fx-pref-height: 36;
     -fx-alignment: center;
     -fx-cursor: hand;
     -fx-border-color: transparent;
+    -fx-content-display: center;
 }
 
 .btn-tool:hover {

@@ -14,6 +14,8 @@ import com.voluntary.chat.server.dto.response.CreateGroupResponse;
 import com.voluntary.chat.server.dto.response.GroupMemberResponse;
 import com.voluntary.chat.server.dto.response.GroupResponse;
 import com.voluntary.chat.server.service.GroupService;
+import com.voluntary.chat.server.service.UserService;
+import com.voluntary.chat.server.websocket.ChatWebSocketHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,7 +52,9 @@ class GroupControllerTest {
         @BeforeEach
         void setUp() {
                 groupService = mock(GroupService.class);
-                GroupController controller = new GroupController(groupService);
+                ChatWebSocketHandler webSocketHandler = mock(ChatWebSocketHandler.class);
+                UserService userService = mock(UserService.class);
+                GroupController controller = new GroupController(groupService, webSocketHandler, userService);
                 mockMvc = MockMvcBuilders
                                 .standaloneSetup(controller)
                                 .setControllerAdvice(new GlobalExceptionHandler())

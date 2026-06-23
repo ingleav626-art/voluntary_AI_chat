@@ -1,0 +1,43 @@
+16:55:21.152 [JavaFX Application Thread] INFO org.example.client.view.MainViewModel -- 选中会话: sessionId=p_2068293530052964354_2068353587729887234, name=1234567
+16:55:21.169 [JavaFX Application Thread] INFO org.example.client.view.ChatViewModel -- 历史消息加载成功: count=20 
+16:55:21.179 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=2, size=20 
+16:55:21.197 [JavaFX Application Thread] INFO org.example.client.view.ChatViewModel -- 加载更多消息: count=5      
+16:55:23.129 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=3, size=20 
+16:55:23.166 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=4, size=20 
+16:55:23.228 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=5, size=20 
+16:55:23.280 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=6, size=20 
+16:55:23.328 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=7, size=20 
+16:55:23.370 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=8, size=20 
+16:55:23.410 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=9, size=20 
+16:55:23.451 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=10, size=20
+16:55:23.478 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=11, size=20
+16:55:23.524 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=12, size=20
+16:55:23.583 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=13, size=20
+16:55:23.619 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=14, size=20
+16:55:23.655 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=15, size=20
+16:55:23.693 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=16, size=20
+16:55:23.733 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=17, size=20
+16:55:23.841 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=18, size=20
+16:55:23.864 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=19, size=20
+16:55:23.886 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=20, size=20
+16:55:23.916 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=21, size=20
+16:55:24.050 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=22, size=20
+16:55:24.127 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=23, size=20
+16:55:24.152 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=24, size=20
+16:55:24.176 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=25, size=20
+16:55:24.208 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=26, size=20
+16:55:24.232 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=27, size=20
+16:55:24.263 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=28, size=20
+16:55:24.288 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=29, size=20
+16:55:24.305 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=30, size=20
+16:55:24.376 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=31, size=20
+16:55:24.440 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=32, size=20
+16:55:39.681 [JavaFX Application Thread] INFO org.example.client.view.ChatViewModel -- 消息已发送: sessionId=p_2068293530052964354_2068353587729887234
+16:55:46.656 [JavaFX Application Thread] INFO org.example.client.view.ChatViewModel -- 乐观消息已标记撤回，等待 ACK 后执行 REST 撤回: clientId=86e6119e-9482-44a4-a46d-997579c66fa2
+16:55:49.473 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=1, size=20 
+16:55:49.473 [JavaFX Application Thread] INFO org.example.client.view.MainViewModel -- 选中会话: sessionId=p_2068293530052964354_2068353587729887234, name=1234567
+16:55:49.491 [JavaFX Application Thread] INFO org.example.client.view.ChatViewModel -- 历史消息加载成功: count=20 
+16:55:53.310 [JavaFX Application Thread] INFO org.example.client.view.ChatViewModel -- 消息撤回成功: messageId=2068981229926539266
+16:55:56.416 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=1, size=20 
+16:55:56.416 [JavaFX Application Thread] INFO org.example.client.view.MainViewModel -- 选中会话: sessionId=p_2068293530052964354_2068353587729887234, name=1234567
+16:55:56.433 [JavaFX Application Thread] INFO org.example.client.view.ChatViewModel -- 历史消息加载成功: count=20 

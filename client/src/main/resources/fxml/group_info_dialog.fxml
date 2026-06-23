@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox prefHeight="420.0" prefWidth="440.0" spacing="0"
+      styleClass="group-create-root"
+      xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="org.example.client.controller.GroupInfoController">
+
+    <!-- 标题栏 -->
+    <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="group-create-header">
+        <Label styleClass="group-create-title" text="修改群信息"/>
+    </HBox>
+
+    <Separator/>
+
+    <!-- 群名称输入 -->
+    <VBox spacing="6.0" styleClass="group-create-name-section">
+        <Label styleClass="group-create-label" text="群名称 *"/>
+        <TextField fx:id="groupNameField" promptText="请输入群名称（2-50字符）"
+                   styleClass="group-create-input"/>
+    </VBox>
+
+    <Separator/>
+
+    <!-- 群公告 -->
+    <VBox spacing="6.0" styleClass="group-create-members-section" VBox.vgrow="ALWAYS">
+        <Label styleClass="group-create-label" text="群公告"/>
+        <TextArea fx:id="announcementArea" promptText="请输入群公告内容..."
+                   styleClass="group-info-announcement" wrapText="true"
+                   VBox.vgrow="ALWAYS"/>
+        <HBox alignment="CENTER_LEFT" spacing="8.0">
+            <CheckBox fx:id="pinnedCheckBox" text="置顶公告"/>
+        </HBox>
+    </VBox>
+
+    <Separator/>
+
+    <!-- 底部操作栏 -->
+    <HBox alignment="CENTER_RIGHT" spacing="12.0" styleClass="group-create-footer">
+        <Label fx:id="errorLabel" styleClass="error-message" text="" HBox.hgrow="ALWAYS"/>
+        <Button fx:id="cancelButton" mnemonicParsing="false"
+                onAction="#handleCancel" text="取消"/>
+        <Button fx:id="confirmButton" mnemonicParsing="false"
+                onAction="#handleConfirm" styleClass="btn-primary" text="保存修改"/>
+    </HBox>
+</VBox>

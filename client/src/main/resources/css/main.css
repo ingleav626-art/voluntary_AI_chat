@@ -81,6 +81,8 @@
     -fx-background-color: #4A3426;
     -fx-padding: 0;
     -fx-border-color: transparent;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
 }
 
 .conversation-list .list-cell {
@@ -96,6 +98,10 @@
 
 .conversation-list .list-cell:filled:hover {
     -fx-background-color: #5C4033;
+}
+
+.conversation-list .list-cell:focused {
+    -fx-background-color: transparent;
 }
 
 .conversation-cell {

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox prefHeight="520.0" prefWidth="440.0" spacing="0"
+      styleClass="group-create-root"
+      xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="org.example.client.controller.GroupInviteController">
+
+    <!-- 标题栏 -->
+    <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="group-create-header">
+        <Label styleClass="group-create-title" text="邀请成员"/>
+    </HBox>
+
+    <Separator/>
+
+    <!-- 选择成员 -->
+    <VBox spacing="6.0" styleClass="group-create-members-section" VBox.vgrow="ALWAYS">
+        <HBox alignment="CENTER_LEFT" spacing="10.0">
+            <Label styleClass="group-create-label" text="选择好友加入群组"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label fx:id="selectedCountLabel" styleClass="group-create-count" text="已选 0 人"/>
+        </HBox>
+
+        <!-- 搜索好友 -->
+        <TextField fx:id="searchFriendField" promptText="搜索好友..."
+                   styleClass="group-create-input"/>
+
+        <!-- 好友列表（带复选框） -->
+        <ListView fx:id="friendCheckList" styleClass="group-create-friend-list" VBox.vgrow="ALWAYS">
+            <placeholder>
+                <Label text="暂无好友，先添加好友吧"/>
+            </placeholder>
+        </ListView>
+    </VBox>
+
+    <Separator/>
+
+    <!-- 底部操作栏 -->
+    <HBox alignment="CENTER_RIGHT" spacing="12.0" styleClass="group-create-footer">
+        <Label fx:id="errorLabel" styleClass="error-message" text="" HBox.hgrow="ALWAYS"/>
+        <Button fx:id="cancelButton" mnemonicParsing="false"
+                onAction="#handleCancel" text="取消"/>
+        <Button fx:id="confirmInviteButton" mnemonicParsing="false"
+                onAction="#handleInvite" styleClass="btn-primary" text="邀请加入"/>
+    </HBox>
+</VBox>

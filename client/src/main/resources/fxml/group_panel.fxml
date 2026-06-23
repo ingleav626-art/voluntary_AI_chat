@@ -52,6 +52,12 @@
                 <Label fx:id="groupDetailTitle" styleClass="group-panel-title" text="请选择群组"/>
                 <Region HBox.hgrow="ALWAYS"/>
                 <!-- 操作按钮 -->
+                <Button fx:id="inviteMemberButton" mnemonicParsing="false"
+                        onAction="#handleInviteMembers" styleClass="btn-icon" text="邀请成员"
+                        visible="false" managed="false"/>
+                <Button fx:id="editGroupButton" mnemonicParsing="false"
+                        onAction="#handleEditGroupInfo" styleClass="btn-icon" text="修改群信息"
+                        visible="false" managed="false"/>
                 <Button fx:id="dismissGroupButton" mnemonicParsing="false"
                         onAction="#handleDismissGroup" styleClass="btn-danger-sm" text="解散群组"
                         visible="false" managed="false"/>

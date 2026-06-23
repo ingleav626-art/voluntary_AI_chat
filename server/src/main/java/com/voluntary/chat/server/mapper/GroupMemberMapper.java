@@ -71,4 +71,27 @@ public interface GroupMemberMapper extends BaseMapper<GroupMember> {
      */
     @org.apache.ibatis.annotations.Update("UPDATE group_member SET is_deleted = 1 WHERE group_id = #{groupId}")
     void logicalDeleteByGroupId(@Param("groupId") Long groupId);
+
+    /**
+     * 查询用户在群组中的记录（包括已退出的）
+     *
+     * <p>用于判断用户是否曾经加入过群，以便再次邀请时恢复记录。</p>
+     *
+     * @param groupId 群组ID
+     * @param userId  用户ID
+     * @return 群成员记录（包括已退出的），不存在则返回 null
+     */
+    @Select("SELECT * FROM group_member WHERE group_id = #{groupId} AND user_id = #{userId}")
+    GroupMember selectByGroupIdAndUserIdIncludeDeleted(@Param("groupId") Long groupId, @Param("userId") Long userId);
+
+    /**
+     * 恢复已退出的群成员
+     *
+     * <p>将 is_deleted 设置为 0，并更新角色为普通成员。</p>
+     *
+     * @param groupId 群组ID
+     * @param userId  用户ID
+     */
+    @org.apache.ibatis.annotations.Update("UPDATE group_member SET is_deleted = 0, role = 0, update_time = NOW() WHERE group_id = #{groupId} AND user_id = #{userId}")
+    void restoreMember(@Param("groupId") Long groupId, @Param("userId") Long userId);
 }

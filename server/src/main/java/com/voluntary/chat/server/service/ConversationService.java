@@ -57,7 +57,28 @@ public class ConversationService {
         List<ConversationResponse> conversations = new ArrayList<>();
         for (String sessionId : sessionIds) {
             Message lastMsg = messageService.getLastMessage(sessionId);
+            // 群会话即使没有消息也要展示（新创建的群或刚被邀请入群时没有消息）
             if (lastMsg == null) {
+                if (sessionId.startsWith("g_")) {
+                    // 群会话无消息：创建一个仅含群名的占位会话
+                    String[] parts = sessionId.split("_");
+                    Long groupId = Long.parseLong(parts[1]);
+                    GroupEntity group = groupMapper.selectById(groupId);
+                    if (group != null) {
+                        ConversationResponse conv = ConversationResponse.builder()
+                                .sessionId(sessionId)
+                                .targetId(groupId)
+                                .targetType(TargetType.GROUP.name())
+                                .targetName(group.getName())
+                                .targetAvatar(group.getAvatar())
+                                .lastMessage("")
+                                .lastMessageType("")
+                                .lastMessageTime(group.getCreateTime())
+                                .unreadCount(0)
+                                .build();
+                        conversations.add(conv);
+                    }
+                }
                 continue;
             }
 

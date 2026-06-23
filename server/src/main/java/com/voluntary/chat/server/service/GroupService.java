@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.voluntary.chat.common.dto.PageResult;
 import com.voluntary.chat.common.enums.GroupRole;
+import com.voluntary.chat.common.enums.MessageType;
+import com.voluntary.chat.common.enums.SenderType;
 import com.voluntary.chat.common.exception.BusinessException;
 import com.voluntary.chat.common.exception.ErrorCode;
 import com.voluntary.chat.server.dto.request.CreateGroupRequest;
@@ -15,9 +17,11 @@ import com.voluntary.chat.server.dto.response.GroupMemberResponse;
 import com.voluntary.chat.server.dto.response.GroupResponse;
 import com.voluntary.chat.server.entity.GroupEntity;
 import com.voluntary.chat.server.entity.GroupMember;
+import com.voluntary.chat.server.entity.Message;
 import com.voluntary.chat.server.entity.User;
 import com.voluntary.chat.server.mapper.GroupMapper;
 import com.voluntary.chat.server.mapper.GroupMemberMapper;
+import com.voluntary.chat.server.mapper.MessageMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -45,6 +49,7 @@ public class GroupService {
     private final GroupMapper groupMapper;
     private final GroupMemberMapper groupMemberMapper;
     private final UserService userService;
+    private final MessageMapper messageMapper;
 
     /** 默认最大成员数 */
     private static final int DEFAULT_MAX_MEMBER_COUNT = 200;
@@ -74,7 +79,8 @@ public class GroupService {
         owner.setRole(GroupRole.OWNER.getCode());
         groupMemberMapper.insert(owner);
 
-        // 3. 添加初始成员（去重，排除创建者自己）
+        // 3. 添加初始成员（去重，排除创建者自己），并发送系统消息
+        final String groupSessionId = "g_" + group.getId();
         Set<Long> memberIds = request.getMemberIds().stream()
                 .filter(id -> !id.equals(userId))
                 .collect(Collectors.toSet());
@@ -90,7 +96,35 @@ public class GroupService {
                 member.setUserId(memberId);
                 member.setRole(GroupRole.MEMBER.getCode());
                 groupMemberMapper.insert(member);
+
+                // 创建系统消息：XXX 已加入群聊
+                User memberUser = userMap.get(memberId);
+                if (memberUser != null) {
+                    Message sysMsg = new Message();
+                    sysMsg.setSessionId(groupSessionId);
+                    sysMsg.setSenderId(memberId);
+                    sysMsg.setSenderType(SenderType.SYSTEM.ordinal());
+                    sysMsg.setTargetId(group.getId());
+                    sysMsg.setTargetType(1);
+                    sysMsg.setType(MessageType.SYSTEM.ordinal());
+                    sysMsg.setContent(memberUser.getUsername() + " 已加入群聊");
+                    messageMapper.insert(sysMsg);
+                }
             }
+        }
+
+        // 创建"群聊已创建"系统消息
+        {
+            Message sysMsg = new Message();
+            sysMsg.setSessionId(groupSessionId);
+            sysMsg.setSenderId(userId);
+            sysMsg.setSenderType(SenderType.SYSTEM.ordinal());
+            sysMsg.setTargetId(group.getId());
+            sysMsg.setTargetType(1);
+            sysMsg.setType(MessageType.SYSTEM.ordinal());
+            final String groupName = group.getName() != null ? group.getName() : "未命名群聊";
+            sysMsg.setContent(userService.findById(userId).getUsername() + " 创建了" + groupName);
+            messageMapper.insert(sysMsg);
         }
 
         log.info("群组创建成功: groupId={}, name={}, ownerId={}, memberCount={}",
@@ -245,16 +279,44 @@ public class GroupService {
             throw new BusinessException(ErrorCode.GROUP_MEMBER_FULL);
         }
 
-        // 批量添加成员（跳过已在群中的用户）
+        // 批量添加成员（跳过已在群中的用户），并发送系统消息
+        final String groupSessionId = "g_" + groupId;
         for (Long inviteUserId : inviteUserIds) {
+            // 检查用户是否已在群中（is_deleted=0）
             if (isMember(groupId, inviteUserId)) {
+                log.info("用户已在群中，跳过: groupId={}, userId={}", groupId, inviteUserId);
                 continue;
             }
-            GroupMember member = new GroupMember();
-            member.setGroupId(groupId);
-            member.setUserId(inviteUserId);
-            member.setRole(GroupRole.MEMBER.getCode());
-            groupMemberMapper.insert(member);
+
+            // 检查用户是否曾经加入过群但已退出（is_deleted=1）
+            GroupMember existingMember = groupMemberMapper.selectByGroupIdAndUserIdIncludeDeleted(groupId, inviteUserId);
+            if (existingMember != null) {
+                // 恢复已退出的成员记录
+                groupMemberMapper.restoreMember(groupId, inviteUserId);
+                log.info("成员已恢复: groupId={}, userId={}", groupId, inviteUserId);
+            } else {
+                // 新成员，插入新记录
+                GroupMember member = new GroupMember();
+                member.setGroupId(groupId);
+                member.setUserId(inviteUserId);
+                member.setRole(GroupRole.MEMBER.getCode());
+                groupMemberMapper.insert(member);
+                log.info("新成员已加入: groupId={}, userId={}", groupId, inviteUserId);
+            }
+
+            // 创建系统消息：XXX 已加入群聊
+            User invitee = userMap.get(inviteUserId);
+            if (invitee != null) {
+                Message sysMsg = new Message();
+                sysMsg.setSessionId(groupSessionId);
+                sysMsg.setSenderId(inviteUserId);
+                sysMsg.setSenderType(SenderType.SYSTEM.ordinal());
+                sysMsg.setTargetId(groupId);
+                sysMsg.setTargetType(1); // GROUP
+                sysMsg.setType(MessageType.SYSTEM.ordinal());
+                sysMsg.setContent(invitee.getUsername() + " 已加入群聊");
+                messageMapper.insert(sysMsg);
+            }
         }
 
         log.info("成员邀请成功: groupId={}, inviter={}, invitees={}",
