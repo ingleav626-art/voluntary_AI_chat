@@ -161,7 +161,7 @@ class AuthServiceHttpTest {
         var resp = AuthService.getInstance().register(new RegisterRequest("13800138001", "000000", "张三", "pass")).get(5,
                 TimeUnit.SECONDS);
         assertFalse(resp.isSuccess());
-        assertEquals("CODE_ERROR", resp.getMessage());
+        assertEquals("验证码错误或已过期", resp.getMessage());
     }
 
     @Test

@@ -41,7 +41,7 @@ class MessageTypeTest {
     @Test
     @DisplayName("枚举数量")
     void enumCount() {
-        assertEquals(5, MessageType.values().length);
+        assertEquals(6, MessageType.values().length);
     }
 
     @Test
