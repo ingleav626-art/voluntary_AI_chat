@@ -7,6 +7,7 @@ import com.voluntary.chat.server.dto.request.SendMessageRequest;
 import com.voluntary.chat.server.dto.response.SendMessageResponse;
 import com.voluntary.chat.server.entity.User;
 import com.voluntary.chat.server.mapper.GroupMemberMapper;
+import com.voluntary.chat.server.service.AiChatService;
 import com.voluntary.chat.server.service.MessageService;
 import com.voluntary.chat.server.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,6 +50,9 @@ class ChatWebSocketHandlerTest {
     @Mock
     private GroupMemberMapper groupMemberMapper;
 
+    @Mock
+    private AiChatService aiChatService;
+
     private ObjectMapper objectMapper;
 
     @Mock
@@ -65,7 +69,7 @@ class ChatWebSocketHandlerTest {
     void setUp() throws Exception {
         objectMapper = new ObjectMapper();
         objectMapper.findAndRegisterModules();
-        handler = new ChatWebSocketHandler(messageService, userService, groupMemberMapper, objectMapper);
+        handler = new ChatWebSocketHandler(messageService, userService, groupMemberMapper, aiChatService, objectMapper);
 
         // 重置静态 ONLINE_SESSIONS，避免测试间相互影响
         Field field = ChatWebSocketHandler.class.getDeclaredField("ONLINE_SESSIONS");

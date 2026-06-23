@@ -43,6 +43,15 @@ public class MessageInfo {
     /** 消息内容 */
     private String content;
 
+    /** 缩略图URL（仅图片消息有效） */
+    private String thumbnailUrl;
+
+    /** 图片宽度（仅图片消息有效） */
+    private Integer width;
+
+    /** 图片高度（仅图片消息有效） */
+    private Integer height;
+
     /** 创建时间 */
     private LocalDateTime createTime;
 

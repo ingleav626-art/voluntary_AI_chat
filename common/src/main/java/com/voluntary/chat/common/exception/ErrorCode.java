@@ -35,7 +35,8 @@ public enum ErrorCode {
     IMAGE_SIZE_EXCEEDED(4004, "图片大小超出限制"),
 
     AI_API_KEY_INVALID(5001, "API Key 无效"),
-    AI_NOT_FOUND(5002, "AI 不存在或已禁用");
+    AI_NOT_FOUND(5002, "AI 不存在或已禁用"),
+    AI_DISABLED(5003, "AI 已禁用");
 
     private final int code;
     private final String message;

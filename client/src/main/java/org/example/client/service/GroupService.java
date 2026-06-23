@@ -48,6 +48,12 @@ public final class GroupService extends BaseHttpService {
      * @return 异步结果
      */
     public CompletableFuture<ApiResponse<PageResult<GroupInfo>>> getGroupList(final int page, final int size) {
+        // 检查登录状态
+        if (!checkLoginStatus()) {
+            LOG.warn("用户未登录，无法获取群组列表");
+            return CompletableFuture.completedFuture(createNotLoggedInResponse());
+        }
+
         final String path = GROUP_PATH + "/list?page=" + page + "&size=" + size;
         final HttpRequest request = buildGetRequest(path).build();
 
@@ -65,6 +71,12 @@ public final class GroupService extends BaseHttpService {
      * @return 异步结果
      */
     public CompletableFuture<ApiResponse<CreateGroupResponse>> createGroup(final CreateGroupRequest request) {
+        // 检查登录状态
+        if (!checkLoginStatus()) {
+            LOG.warn("用户未登录，无法创建群组");
+            return CompletableFuture.completedFuture(createNotLoggedInResponse());
+        }
+
         final HttpRequest httpRequest = buildPostRequest(GROUP_PATH + "/create", request).build();
 
         LOG.info("创建群组: name={}, memberCount={}", request.getName(),
@@ -198,6 +210,31 @@ public final class GroupService extends BaseHttpService {
         final HttpRequest httpRequest = buildPostRequest(path, body).build();
 
         LOG.info("设置/取消管理员: groupId={}, targetUserId={}, action={}", groupId, targetUserId, action);
+
+        return sendRequest(httpRequest, getTypeFactory().constructParametricType(
+                ApiResponse.class, Void.class));
+    }
+
+    /**
+     * 修改群信息（仅群主可操作）
+     *
+     * @param groupId      群组ID
+     * @param name         群名称
+     * @param announcement 群公告
+     * @param announcementPinned 公告是否置顶
+     * @return 异步结果
+     */
+    public CompletableFuture<ApiResponse<Void>> updateGroup(
+            final Long groupId, final String name,
+            final String announcement, final boolean announcementPinned) {
+        final String path = GROUP_PATH + "/" + groupId;
+        final Map<String, Object> body = new HashMap<>();
+        body.put("name", name);
+        body.put("announcement", announcement);
+        body.put("announcementPinned", announcementPinned);
+        final HttpRequest httpRequest = buildPutRequest(path, body).build();
+
+        LOG.info("修改群信息: groupId={}, name={}", groupId, name);
 
         return sendRequest(httpRequest, getTypeFactory().constructParametricType(
                 ApiResponse.class, Void.class));

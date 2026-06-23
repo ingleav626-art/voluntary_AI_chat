@@ -11,6 +11,8 @@ import java.util.List;
 @Configuration
 public class CorsConfig {
 
+    private static final long CORS_MAX_AGE_SECONDS = 3600L;
+
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
@@ -18,7 +20,7 @@ public class CorsConfig {
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
-        config.setMaxAge(3600L);
+        config.setMaxAge(CORS_MAX_AGE_SECONDS);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

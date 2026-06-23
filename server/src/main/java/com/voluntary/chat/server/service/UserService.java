@@ -32,6 +32,11 @@ public class UserService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
 
+    /** 手机号脱敏：前缀长度 */
+    private static final int PHONE_MASK_PREFIX_LENGTH = 3;
+    /** 手机号脱敏：后缀起始位置 */
+    private static final int PHONE_MASK_SUFFIX_START = 7;
+
     @Transactional
     public User register(RegisterRequest request) {
         checkPhoneNotExists(request.getPhone());
@@ -237,8 +242,8 @@ public class UserService {
     }
 
     UserResponse toResponse(User user) {
-        String maskedPhone = user.getPhone().substring(0, 3)
-                + "****" + user.getPhone().substring(7);
+        String maskedPhone = user.getPhone().substring(0, PHONE_MASK_PREFIX_LENGTH)
+                + "****" + user.getPhone().substring(PHONE_MASK_SUFFIX_START);
         return UserResponse.builder()
                 .userId(user.getId())
                 .phone(maskedPhone)

@@ -16,6 +16,21 @@
 
     <build>
         <plugins>
+            <!-- Maven Compiler Plugin - 确保 Lombok 注解处理器正确配置 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.14.1</version>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
             <!-- JavaFX 运行插件 -->
             <plugin>
                 <groupId>org.openjfx</groupId>
@@ -24,6 +39,29 @@
                 <configuration>
                     <mainClass>org.example.client.Launcher</mainClass>
                 </configuration>
+            </plugin>
+
+            <!-- Spring Boot 打包插件：生成可执行 fat JAR -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>org.example.client.Launcher</mainClass>
+                    <classifier>exec</classifier>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

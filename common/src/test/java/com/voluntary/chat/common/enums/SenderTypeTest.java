@@ -23,7 +23,7 @@ class SenderTypeTest {
     @Test
     @DisplayName("枚举数量")
     void enumCount() {
-        assertEquals(2, SenderType.values().length);
+        assertEquals(3, SenderType.values().length);
     }
 
     @Test

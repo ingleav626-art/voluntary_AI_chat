@@ -178,7 +178,9 @@ public final class GroupCreateController implements Initializable {
 
                     if (response != null && response.isSuccess()) {
                         LOG.info("群组创建成功: name={}", name);
-                        // 关闭窗口并触发回调
+                        // 先弹出成功通知（会阻塞直到用户点击确定）
+                        NotificationDialog.showSuccess("创建成功", "群聊「" + name.trim() + "」创建成功");
+                        // 再关闭窗口并触发回调
                         if (onSuccess != null) {
                             onSuccess.run();
                         }

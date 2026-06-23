@@ -53,6 +53,15 @@ public abstract class BaseHttpService {
     /** 共享 HttpClient 实例 */
     private final HttpClient httpClient;
 
+    /**
+     * 获取共享 HttpClient 实例（供子类使用）
+     *
+     * @return HttpClient 实例
+     */
+    protected HttpClient getHttpClient() {
+        return httpClient;
+    }
+
     protected BaseHttpService() {
         final ClientConfig config = ClientConfig.getInstance();
         httpClient = HttpClient.newBuilder()
@@ -142,6 +151,29 @@ public abstract class BaseHttpService {
         if (token != null && token.getAccessToken() != null) {
             builder.header(AUTH_HEADER, AUTH_HEADER_PREFIX + token.getAccessToken());
         }
+    }
+
+    /**
+     * 检查登录状态
+     *
+     * <p>在调用需要认证的接口前，先检查用户是否已登录。</p>
+     *
+     * @return true 如果已登录，false 如果未登录
+     */
+    protected boolean checkLoginStatus() {
+        final org.example.client.model.LoginResponse token = TokenStorage.load();
+        return token != null && token.getAccessToken() != null;
+    }
+
+    /**
+     * 创建未登录错误响应
+     *
+     * @param <T> 响应数据泛型
+     * @return API 响应
+     */
+    protected <T> ApiResponse<T> createNotLoggedInResponse() {
+        LOG.warn("用户未登录，无法访问需要认证的接口");
+        return createErrorResponse(HTTP_UNAUTHORIZED, "请先登录");
     }
 
     /**

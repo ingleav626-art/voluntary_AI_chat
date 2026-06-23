@@ -17,6 +17,7 @@ import org.example.client.model.RegisterResponse;
 import org.example.client.model.SmsSendRequest;
 import org.example.client.util.ErrorCodeRegistry;
 import org.example.client.util.JsonUtils;
+import org.example.client.util.TokenStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +75,18 @@ public final class AuthService extends BaseHttpService {
 
     public static AuthService getInstance() {
         return INSTANCE;
+    }
+
+    /**
+     * 检查用户是否已登录
+     *
+     * <p>通过检查 TokenStorage 中是否存在有效的 Token 来判断登录状态。</p>
+     *
+     * @return true 如果已登录，false 如果未登录
+     */
+    public boolean isLoggedIn() {
+        final org.example.client.model.LoginResponse token = TokenStorage.load();
+        return token != null && token.getAccessToken() != null;
     }
 
     /**

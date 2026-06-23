@@ -1,11 +1,13 @@
 package org.example.client.view;
 
 import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.example.client.model.ConversationInfo;
 import org.example.client.model.ImageUploadResponse;
@@ -66,11 +68,17 @@ public final class ChatViewModel {
     /** 错误消息 */
     private final StringProperty errorMessage = new SimpleStringProperty("");
 
-    /** 待确认消息（clientId -> MessageInfo） */
-    private final Map<String, MessageInfo> pendingMessages = new HashMap<>();
+    /** 待确认消息（clientId -> MessageInfo），static 确保切换会话后 ACK 仍能找到待处理消息 */
+    private static final Map<String, MessageInfo> pendingMessages = new HashMap<>();
 
-    /** 待撤回消息的 clientId 集合（ACK 到达后自动执行 REST 撤回） */
-    private final java.util.Set<String> pendingRecallClientIds = new java.util.HashSet<>();
+    /** 待撤回消息的 clientId 集合（ACK 到达后自动执行 REST 撤回），static 确保跨 ChatViewModel 实例共享 */
+    private static final java.util.Set<String> pendingRecallClientIds = new java.util.HashSet<>();
+
+    /** 待撤回消息的内容集合（用于刷新后匹配执行延迟撤回），static 确保跨 ChatViewModel 实例共享 */
+    private static final java.util.Set<String> pendingRecallContents = new java.util.HashSet<>();
+
+    /** 待注入的系统消息（sessionId → 消息列表），用于群成员加入等场景 */
+    private static final Map<String, List<MessageInfo>> pendingSystemMessages = new ConcurrentHashMap<>();
 
     /** 当前页码 */
     private int currentPage = 1;
@@ -85,43 +93,68 @@ public final class ChatViewModel {
      */
     public void loadHistory() {
         if (conversation == null) {
+            LOG.warn("loadHistory: 当前会话为空，跳过加载");
             return;
         }
 
+        final String sessionId = conversation.getSessionId();
         loading.set(true);
         currentPage = 1;
+        hasMoreHistory = true;
+        LOG.info("开始加载历史消息: sessionId={}", sessionId);
 
-        ChatService.getInstance().getHistory(conversation.getSessionId(), currentPage, DEFAULT_PAGE_SIZE)
+        ChatService.getInstance().getHistory(sessionId, currentPage, DEFAULT_PAGE_SIZE)
                 .thenAccept(response -> {
                     // 异步回调在 HTTP 线程执行，UI 更新必须切回 JavaFX 线程
                     Platform.runLater(() -> {
                         loading.set(false);
 
+                        // 先注入待处理的系统消息（无论历史加载成功与否都要补入）
+                        drainPendingSystemMessages(sessionId);
+
                         if (response != null && response.isSuccess() && response.getData() != null) {
                             final List<MessageInfo> list = response.getData().getList();
                             if (list != null) {
-                                // 标记是否为当前用户发送
-                                for (final MessageInfo msg : list) {
-                                    msg.setSentByMe(currentUser != null
-                                            && currentUser.getUserId() != null
-                                            && currentUser.getUserId().equals(msg.getSenderId()));
-                                }
-                                // 按时间升序排序（先发的在上方），服务端默认按时间倒序返回
-                                list.sort(java.util.Comparator.comparing(
-                                        MessageInfo::getCreateTime,
-                                        java.util.Comparator.nullsFirst(java.time.LocalDateTime::compareTo)));
-                                messages.setAll(list);
-                                LOG.info("历史消息加载成功: count={}", list.size());
+                                try {
+                                    // 标记是否为当前用户发送
+                                    for (final MessageInfo msg : list) {
+                                        msg.setSentByMe(currentUser != null
+                                                && currentUser.getUserId() != null
+                                                && currentUser.getUserId().equals(msg.getSenderId()));
+                                    }
+                                    // 按时间升序排序（先发的在上方），服务端默认按时间倒序返回
+                                    list.sort(java.util.Comparator.comparing(
+                                            MessageInfo::getCreateTime,
+                                            java.util.Comparator.nullsFirst(java.time.LocalDateTime::compareTo)));
+                                    messages.setAll(list);
+                                    LOG.info("历史消息加载成功: sessionId={}, count={}", sessionId, list.size());
 
-                                // 加载成功后上报已读
-                                reportRead();
+                                    // 检查是否有待撤回的乐观消息（刷新后需要补执行撤回）
+                                    checkAndExecutePendingRecalls(list);
+
+                                    // 加载成功后上报已读
+                                    reportRead();
+                                } catch (final Exception e) {
+                                    LOG.error("处理历史消息时异常: sessionId={}", sessionId, e);
+                                    errorMessage.set("消息渲染异常，请重试");
+                                }
+                            } else {
+                                LOG.info("历史消息列表为 null: sessionId={}", sessionId);
                             }
                         } else {
                             final String msg = response != null ? response.getMessage() : "加载聊天记录失败";
                             errorMessage.set(msg);
-                            LOG.warn("聊天记录加载失败: {}", msg);
+                            LOG.warn("聊天记录加载失败: sessionId={}, error={}", sessionId, msg);
                         }
                     });
+                })
+                .exceptionally(ex -> {
+                    LOG.error("获取历史消息异常: sessionId={}", sessionId, ex);
+                    Platform.runLater(() -> {
+                        loading.set(false);
+                        errorMessage.set("网络异常，加载历史消息失败");
+                    });
+                    return null;
                 });
     }
 
@@ -212,28 +245,59 @@ public final class ChatViewModel {
                 messages.set(index, pending);
             }
 
-            // 如果该消息注册了延迟撤回，ACK 到达后用真实 messageId 执行 REST 撤回
-            // 使用 .join() 同步等待，确保服务端更新完成后再允许刷新
+            // 如果该消息注册了延迟撤回，ACK 到达后异步执行 REST 撤回
             if (pendingRecallClientIds.remove(clientId)) {
-                LOG.info("ACK 到达，执行延迟 REST 撤回: clientId={}, messageId={}", clientId, messageId);
-                try {
-                    final var recallResponse = ChatService.getInstance().recallMessage(messageId).join();
-                    LOG.info("延迟 REST 撤回完成: messageId={}, success={}",
-                            messageId, recallResponse != null && recallResponse.isSuccess());
-                } catch (final Exception e) {
-                    LOG.error("延迟 REST 撤回失败: messageId={}", messageId, e);
-                }
+                LOG.info("ACK 到达，执行异步 REST 撤回: clientId={}, messageId={}", clientId, messageId);
+                final String recallContent = pending.getContent();
+                ChatService.getInstance().recallMessage(messageId)
+                        .thenAccept(response -> {
+                            Platform.runLater(() -> {
+                                if (response != null && response.isSuccess()) {
+                                    // 撤回成功：清理待撤回内容列表，防止 loadHistory 重复执行
+                                    if (recallContent != null) {
+                                        pendingRecallContents.remove(recallContent);
+                                    }
+                                    LOG.info("延迟 REST 撤回成功: messageId={}", messageId);
+                                } else {
+                                    // 撤回失败：不清理 pendingRecallContents，由 checkAndExecutePendingRecalls 重试
+                                    pending.setRecalled(false);
+                                    final int idx = messages.indexOf(pending);
+                                    if (idx >= 0) {
+                                        messages.set(idx, pending);
+                                    }
+                                    final String msg = response != null ? response.getMessage() : "撤回失败";
+                                    errorMessage.set(msg);
+                                    LOG.warn("延迟 REST 撤回失败（保留在待撤回列表以便重试）: messageId={}, error={}",
+                                            messageId, msg);
+                                }
+                            });
+                        })
+                        .exceptionally(ex -> {
+                            LOG.error("延迟 REST 撤回异常（保留在待撤回列表以便重试）: messageId={}", messageId, ex);
+                            Platform.runLater(() -> {
+                                pending.setRecalled(false);
+                                final int idx = messages.indexOf(pending);
+                                if (idx >= 0) {
+                                    messages.set(idx, pending);
+                                }
+                                errorMessage.set("撤回失败，请重试");
+                            });
+                            return null;
+                        });
             }
 
             LOG.debug("消息确认更新: clientId={}, messageId={}", clientId, messageId);
         }
     }
 
+    /** 是否还有更多历史消息可加载 */
+    private boolean hasMoreHistory = true;
+
     /**
      * 加载更多历史消息
      */
     public void loadMoreHistory() {
-        if (conversation == null || loading.get()) {
+        if (conversation == null || loading.get() || !hasMoreHistory) {
             return;
         }
 
@@ -259,9 +323,18 @@ public final class ChatViewModel {
                                         java.util.Comparator.nullsFirst(java.time.LocalDateTime::compareTo)));
                                 messages.addAll(0, list);
                                 LOG.info("加载更多消息: count={}", list.size());
+                            } else {
+                                // 返回空列表说明没有更多历史消息
+                                hasMoreHistory = false;
+                                LOG.debug("没有更多历史消息");
+                            }
+                            // 返回数量小于页数也说明没有更多了
+                            if (list != null && list.size() < DEFAULT_PAGE_SIZE) {
+                                hasMoreHistory = false;
                             }
                         } else {
                             currentPage--;
+                            hasMoreHistory = false;
                             LOG.debug("没有更多历史消息");
                         }
                     });
@@ -294,12 +367,17 @@ public final class ChatViewModel {
             }
             if (clientId != null) {
                 pendingRecallClientIds.add(clientId);
+                // 保存消息内容，用于刷新后匹配执行延迟撤回
+                if (message.getContent() != null) {
+                    pendingRecallContents.add(message.getContent());
+                }
                 message.setRecalled(true);
                 final int index = messages.indexOf(message);
                 if (index >= 0) {
                     messages.set(index, message);
                 }
-                LOG.info("乐观消息已标记撤回，等待 ACK 后执行 REST 撤回: clientId={}", clientId);
+                LOG.info("乐观消息已标记撤回，等待 ACK 后执行 REST 撤回: clientId={}, content={}",
+                        clientId, message.getContent());
                 return;
             }
             LOG.warn("乐观消息未找到对应 clientId，忽略: messageId={}", messageId);
@@ -323,7 +401,71 @@ public final class ChatViewModel {
                             LOG.warn("消息撤回失败: {}", msg);
                         }
                     });
+                })
+                .exceptionally(ex -> {
+                    LOG.error("消息撤回异常: messageId={}", messageId, ex);
+                    Platform.runLater(() -> errorMessage.set("网络异常，撤回失败"));
+                    return null;
                 });
+    }
+
+    /**
+     * 检查并执行待撤回的乐观消息
+     * 刷新历史消息后，如果发现有待撤回的消息（内容匹配），立即执行 REST 撤回
+     *
+     * @param loadedMessages 加载的消息列表
+     */
+    private void checkAndExecutePendingRecalls(final List<MessageInfo> loadedMessages) {
+        if (pendingRecallContents.isEmpty() || loadedMessages == null) {
+            return;
+        }
+
+        LOG.debug("检查待撤回消息: pendingCount={}, loadedCount={}",
+                pendingRecallContents.size(), loadedMessages.size());
+
+        for (final MessageInfo msg : loadedMessages) {
+            // 只检查自己发送的消息，且内容匹配待撤回列表
+            if (msg.isSentByMe() && msg.getContent() != null
+                    && pendingRecallContents.contains(msg.getContent())
+                    && msg.getMessageId() != null && msg.getMessageId() > 0) {
+                LOG.info("发现待撤回消息，立即执行 REST 撤回: messageId={}, content={}",
+                        msg.getMessageId(), msg.getContent());
+                // 从待撤回列表中移除（先移除，避免重试风暴）
+                pendingRecallContents.remove(msg.getContent());
+                // 执行 REST 撤回
+                ChatService.getInstance().recallMessage(msg.getMessageId())
+                        .thenAccept(response -> {
+                            Platform.runLater(() -> {
+                                try {
+                                    if (response != null && response.isSuccess()) {
+                                        msg.setRecalled(true);
+                                        final int index = messages.indexOf(msg);
+                                        if (index >= 0) {
+                                            messages.set(index, msg);
+                                        }
+                                        LOG.info("延迟 REST 撤回成功（刷新后补执行）: messageId={}",
+                                                msg.getMessageId());
+                                    } else {
+                                        final String errorMsg = response != null ? response.getMessage()
+                                                : "撤回失败";
+                                        LOG.warn("延迟 REST 撤回失败: messageId={}, error={}",
+                                                msg.getMessageId(), errorMsg);
+                                        // 撤回失败，重新加入待撤回列表以便用户重试
+                                        if (msg.getContent() != null) {
+                                            pendingRecallContents.add(msg.getContent());
+                                        }
+                                    }
+                                } catch (final Exception e) {
+                                    LOG.error("处理补执行撤回结果时异常: messageId={}", msg.getMessageId(), e);
+                                }
+                            });
+                        })
+                        .exceptionally(ex -> {
+                            LOG.error("延迟 REST 撤回异常: messageId={}", msg.getMessageId(), ex);
+                            return null;
+                        });
+            }
+        }
     }
 
     /**
@@ -377,24 +519,106 @@ public final class ChatViewModel {
         loading.set(true);
         ChatService.getInstance().uploadImage(filePath)
                 .thenAccept(response -> {
-                    loading.set(false);
-                    if (response != null && response.isSuccess() && response.getData() != null) {
-                        final ImageUploadResponse uploadResult = response.getData();
-                        // 通过 WebSocket 发送 IMAGE 类型消息
-                        final String clientId = UUID.randomUUID().toString();
-                        final Map<String, Object> data = new HashMap<>();
-                        data.put("sessionId", conversation.getSessionId());
-                        data.put("msgType", MSG_TYPE_IMAGE);
-                        data.put("content", uploadResult.getUrl());
+                    Platform.runLater(() -> {
+                        loading.set(false);
+                        if (response != null && response.isSuccess() && response.getData() != null) {
+                            final ImageUploadResponse uploadResult = response.getData();
+                            final String clientId = UUID.randomUUID().toString();
 
-                        WebSocketClient.getInstance().send(MessageTypes.SEND_MESSAGE, data);
-                        LOG.info("图片消息发送: url={}", uploadResult.getUrl());
-                    } else {
-                        final String msg = response != null ? response.getMessage() : "图片上传失败";
-                        errorMessage.set(msg);
-                        LOG.warn("图片上传失败: {}", msg);
-                    }
+                            // 创建乐观消息
+                            final MessageInfo optimisticMsg = new MessageInfo();
+                            optimisticMsg.setMessageId(-1L);
+                            optimisticMsg.setSessionId(conversation.getSessionId());
+                            optimisticMsg.setSenderId(currentUser != null ? currentUser.getUserId() : null);
+                            optimisticMsg.setSenderName(currentUser != null ? currentUser.getUsername() : "");
+                            optimisticMsg.setSenderType("USER");
+                            optimisticMsg.setType(MSG_TYPE_IMAGE);
+                            optimisticMsg.setContent(uploadResult.getUrl());
+                            // 设置缩略图URL和尺寸信息
+                            optimisticMsg.setThumbnailUrl(uploadResult.getThumbnailUrl());
+                            optimisticMsg.setWidth(uploadResult.getWidth());
+                            optimisticMsg.setHeight(uploadResult.getHeight());
+                            optimisticMsg.setCreateTime(LocalDateTime.now());
+                            optimisticMsg.setSentByMe(true);
+
+                            // 添加到消息列表并注册待确认
+                            messages.add(optimisticMsg);
+                            pendingMessages.put(clientId, optimisticMsg);
+
+                            // 通过 WebSocket 发送 IMAGE 类型消息
+                            final Map<String, Object> data = new HashMap<>();
+                            data.put("sessionId", conversation.getSessionId());
+                            data.put("msgType", MSG_TYPE_IMAGE);
+                            data.put("content", uploadResult.getUrl());
+                            // 添加缩略图和尺寸信息到WebSocket消息
+                            data.put("thumbnailUrl", uploadResult.getThumbnailUrl());
+                            data.put("width", uploadResult.getWidth());
+                            data.put("height", uploadResult.getHeight());
+
+                            WebSocketClient.getInstance().send(MessageTypes.SEND_MESSAGE, data);
+                            LOG.info("图片消息发送: url={}, thumbnailUrl={}, clientId={}",
+                                    uploadResult.getUrl(), uploadResult.getThumbnailUrl(), clientId);
+                        } else {
+                            final String msg = response != null ? response.getMessage() : "图片上传失败";
+                            errorMessage.set(msg);
+                            LOG.warn("图片上传失败: {}", msg);
+                        }
+                    });
                 });
+    }
+
+    /** 文件消息类型常量 */
+    private static final String MSG_TYPE_FILE = "FILE";
+
+    /**
+     * 发送文件消息
+     * 通过 WebSocket 发送 FILE 类型消息（包含文件名和大小等元信息）
+     *
+     * @param filePath 文件路径
+     */
+    public void sendFile(final Path filePath) {
+        if (conversation == null) {
+            errorMessage.set("未选择会话");
+            return;
+        }
+
+        final java.io.File file = filePath.toFile();
+        if (!file.exists()) {
+            errorMessage.set("文件不存在");
+            return;
+        }
+
+        final String fileName = file.getName();
+        final long fileSize = file.length();
+        final String clientId = UUID.randomUUID().toString();
+
+        // 创建乐观消息
+        final MessageInfo optimisticMsg = new MessageInfo();
+        optimisticMsg.setMessageId(-1L);
+        optimisticMsg.setSessionId(conversation.getSessionId());
+        optimisticMsg.setSenderId(currentUser != null ? currentUser.getUserId() : null);
+        optimisticMsg.setSenderName(currentUser != null ? currentUser.getUsername() : "");
+        optimisticMsg.setSenderType("USER");
+        optimisticMsg.setType(MSG_TYPE_FILE);
+        optimisticMsg.setContent(fileName);
+        optimisticMsg.setExtra(String.format("{\"fileSize\": %d, \"filePath\": \"%s\"}",
+                fileSize, filePath.toString().replace("\\", "\\\\")));
+        optimisticMsg.setCreateTime(LocalDateTime.now());
+        optimisticMsg.setSentByMe(true);
+
+        // 添加到消息列表并注册待确认
+        messages.add(optimisticMsg);
+        pendingMessages.put(clientId, optimisticMsg);
+
+        // 通过 WebSocket 发送 FILE 类型消息
+        final Map<String, Object> data = new HashMap<>();
+        data.put("sessionId", conversation.getSessionId());
+        data.put("msgType", MSG_TYPE_FILE);
+        data.put("content", fileName);
+        data.put("fileSize", fileSize);
+
+        WebSocketClient.getInstance().send(MessageTypes.SEND_MESSAGE, data);
+        LOG.info("文件消息发送: fileName={}, fileSize={}, clientId={}", fileName, fileSize, clientId);
     }
 
     /**
@@ -438,5 +662,28 @@ public final class ChatViewModel {
 
     public StringProperty errorMessageProperty() {
         return errorMessage;
+    }
+
+    /**
+     * 向指定会话添加待注入的系统消息（群成员加入等）
+     *
+     * @param sessionId 会话ID
+     * @param message   系统消息
+     */
+    public static void addPendingSystemMessage(final String sessionId, final MessageInfo message) {
+        pendingSystemMessages.computeIfAbsent(sessionId, k -> new ArrayList<>()).add(message);
+    }
+
+    /**
+     * 取出并注入所有待处理的系统消息到当前消息列表
+     *
+     * @param sessionId 会话ID
+     */
+    private void drainPendingSystemMessages(final String sessionId) {
+        final List<MessageInfo> pending = pendingSystemMessages.remove(sessionId);
+        if (pending != null && !pending.isEmpty()) {
+            messages.addAll(pending);
+            LOG.info("注入系统消息: sessionId={}, count={}", sessionId, pending.size());
+        }
     }
 }
