@@ -14,8 +14,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import org.example.client.config.ClientConfig;
-import org.example.client.config.ServerConnectionManager;
-import org.example.client.config.ServerMode;
 import org.example.client.util.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,29 +24,34 @@ import com.voluntary.chat.common.model.WebSocketMessage;
 import javafx.application.Platform;
 
 /**
- * WebSocket 客户端（单连接模式，向后兼容）
+ * 单个WebSocket连接管理器
  *
  * <p>
- * 负责与服务端建立 WebSocket 连接，处理实时消息收发、心跳维持和断线重连。
+ * 负责单个WebSocket连接的生命周期管理：
+ * <ul>
+ * <li>连接建立与断开</li>
+ * <li>心跳维持</li>
+ * <li>断线重连（指数退避）</li>
+ * <li>消息收发</li>
+ * </ul>
  * </p>
  *
  * <p>
- * 三模式启动策略：
+ * <b>⚠️ 类长度超限警告：当前401行，超出Service限制（400行）</b>
+ * <br>
+ * 请勿在此类中添加新的职责。如需扩展功能，应考虑：
  * <ul>
- * <li>LOCAL - 本地模式：连接内嵌后端服务器</li>
- * <li>HOTSPOT - 热点模式：连接局域网测试服务器</li>
- * <li>CLOUD - 云端模式：连接公网服务器</li>
+ * <li>将心跳逻辑提取到HeartbeatManager</li>
+ * <li>将重连逻辑提取到ReconnectionManager</li>
  * </ul>
  * </p>
  *
  * @author voluntary-ai-chat
  * @since 1.0.0
  */
-public final class WebSocketClient {
+public final class WebSocketConnection {
 
-    private static final Logger LOG = LoggerFactory.getLogger(WebSocketClient.class);
-
-    private static final WebSocketClient INSTANCE = new WebSocketClient();
+    private static final Logger LOG = LoggerFactory.getLogger(WebSocketConnection.class);
 
     /** WebSocket 连接路径 */
     private static final String WS_PATH = "/ws?token=";
@@ -65,15 +68,14 @@ public final class WebSocketClient {
     /** 最大重连次数 */
     private static final int MAX_RECONNECT_ATTEMPTS = 10;
 
+    /** 连接名称（用于日志） */
+    private final String connectionName;
+
     /** WebSocket 连接对象 */
     private java.net.http.WebSocket webSocket;
 
     /** 心跳定时器 */
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-        final Thread t = new Thread(r, "ws-heartbeat");
-        t.setDaemon(true);
-        return t;
-    });
+    private ScheduledExecutorService scheduler;
 
     /** 心跳任务句柄 */
     private ScheduledFuture<?> heartbeatTask;
@@ -102,12 +104,18 @@ public final class WebSocketClient {
     /** 连接状态回调 */
     private Consumer<Boolean> onConnectionChange;
 
-    private WebSocketClient() {
-        // 单例模式，禁止外部实例化
-    }
-
-    public static WebSocketClient getInstance() {
-        return INSTANCE;
+    /**
+     * 构造函数
+     *
+     * @param connectionName 连接名称（用于日志）
+     */
+    public WebSocketConnection(final String connectionName) {
+        this.connectionName = connectionName;
+        this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            final Thread t = new Thread(r, "ws-heartbeat-" + connectionName);
+            t.setDaemon(true);
+            return t;
+        });
     }
 
     /**
@@ -129,24 +137,30 @@ public final class WebSocketClient {
     }
 
     /**
-     * 建立 WebSocket 连接（根据启动模式决定连接地址）
+     * 建立 WebSocket 连接
      *
-     * @param token JWT Token
+     * @param baseUrl 服务器地址
+     * @param token   JWT Token
      */
-    public void connect(final String token) {
+    public void connect(final String baseUrl, final String token) {
         if (token == null || token.isEmpty()) {
-            LOG.error("Token 为空，无法建立 WebSocket 连接");
+            LOG.error("{} Token 为空，无法建立 WebSocket 连接", connectionName);
             return;
         }
 
-        // 先关闭旧连接，防止被服务端踢掉后触发重连循环
+        if (baseUrl == null || baseUrl.isEmpty()) {
+            LOG.error("{} 服务器地址为空，无法建立 WebSocket 连接", connectionName);
+            return;
+        }
+
+        // 先关闭旧连接
         if (webSocket != null && connected) {
-            LOG.info("关闭旧连接，准备建立新连接");
+            LOG.info("{} 关闭旧连接，准备建立新连接", connectionName);
             manualClose = true;
             try {
                 webSocket.sendClose(java.net.http.WebSocket.NORMAL_CLOSURE, "reconnect");
             } catch (final Exception e) {
-                LOG.warn("关闭旧连接失败", e);
+                LOG.warn("{} 关闭旧连接失败", connectionName, e);
             }
             connected = false;
         }
@@ -155,25 +169,20 @@ public final class WebSocketClient {
         this.manualClose = false;
         this.reconnectAttempts = 0;
 
-        doConnect();
+        doConnect(baseUrl);
     }
 
     /**
-     * 执行连接（根据ServerMode决定连接地址）
+     * 执行连接
+     *
+     * @param baseUrl 服务器地址
      */
-    private void doConnect() {
-        // 根据启动模式获取对应的服务器地址
-        final ServerConnectionManager connectionManager = ServerConnectionManager.getInstance();
-        final ServerMode mode = connectionManager.getCurrentMode();
-        final String baseUrl = ClientConfig.getInstance().getBaseUrlByMode(mode);
-
-        LOG.info("建立 WebSocket 连接，启动模式: {}, 地址: {}", mode.getDescription(), baseUrl);
-
-        // 将 http(s):// 转为 ws(s)://
+    private void doConnect(final String baseUrl) {
         final String wsBaseUrl = baseUrl.replace("http://", "ws://").replace("https://", "wss://");
-        // 去掉 /api 后缀
         final String host = wsBaseUrl.substring(0, wsBaseUrl.length() - "/api".length());
         final String wsUrl = host + WS_PATH + currentToken;
+
+        LOG.info("建立 {} WebSocket 连接: {}", connectionName, wsUrl);
 
         try {
             final HttpClient client = HttpClient.newBuilder()
@@ -185,18 +194,18 @@ public final class WebSocketClient {
                     .buildAsync(URI.create(wsUrl), new WebSocketListener());
 
             future.thenAccept(ws -> {
-                WebSocketClient.this.webSocket = ws;
-                LOG.info("WebSocket 连接已建立");
+                WebSocketConnection.this.webSocket = ws;
+                LOG.info("{} WebSocket 连接已建立", connectionName);
             }).exceptionally(ex -> {
-                LOG.error("WebSocket 连接失败", ex);
+                LOG.error("{} WebSocket 连接失败", connectionName, ex);
                 connected = false;
                 notifyConnectionChange(false);
-                scheduleReconnect();
+                scheduleReconnect(baseUrl);
                 return null;
             });
         } catch (final Exception e) {
-            LOG.error("WebSocket 连接异常", e);
-            scheduleReconnect();
+            LOG.error("{} WebSocket 连接异常", connectionName, e);
+            scheduleReconnect(baseUrl);
         }
     }
 
@@ -209,13 +218,12 @@ public final class WebSocketClient {
 
         @Override
         public void onOpen(final java.net.http.WebSocket webSocket) {
-            LOG.info("WebSocket 连接已建立");
+            LOG.info("{} WebSocket 连接已建立", connectionName);
             connected = true;
             reconnectAttempts = 0;
             startHeartbeat(webSocket);
             notifyConnectionChange(true);
 
-            // 断线重连后发送 RECONNECT 请求，拉取离线期间的消息
             if (lastMessageId != null && !lastMessageId.isEmpty()) {
                 sendReconnectRequest();
             }
@@ -238,22 +246,21 @@ public final class WebSocketClient {
 
         @Override
         public void onError(final java.net.http.WebSocket webSocket, final Throwable error) {
-            LOG.error("WebSocket 错误", error);
+            LOG.error("{} WebSocket 错误", connectionName, error);
             connected = false;
             notifyConnectionChange(false);
-            scheduleReconnect();
+            scheduleReconnect(currentToken);
         }
 
         @Override
         public java.util.concurrent.CompletionStage<?> onClose(final java.net.http.WebSocket webSocket,
                 final int statusCode, final String reason) {
-            LOG.info("WebSocket 连接关闭: statusCode={}, reason={}", statusCode, reason);
+            LOG.info("{} WebSocket 连接关闭: statusCode={}, reason={}", connectionName, statusCode, reason);
             connected = false;
             stopHeartbeat();
             notifyConnectionChange(false);
-            // 如果是主动重连（reason=reconnect），不触发自动重连逻辑
             if (!manualClose && !"reconnect".equals(reason)) {
-                scheduleReconnect();
+                scheduleReconnect(currentToken);
             }
             return null;
         }
@@ -268,19 +275,17 @@ public final class WebSocketClient {
         try {
             final WebSocketMessage wsMessage = JsonUtils.fromJson(message, WebSocketMessage.class);
             if (wsMessage == null) {
-                LOG.warn("消息解析失败: {}", message);
+                LOG.warn("{} 消息解析失败: {}", connectionName, message);
                 return;
             }
 
-            // PONG 消息不触发回调，仅用于心跳确认
             if (MessageTypes.PONG.equals(wsMessage.getType())) {
-                LOG.debug("收到 PONG 心跳响应");
+                LOG.debug("{} 收到 PONG 心跳响应", connectionName);
                 return;
             }
 
-            // FORCE_LOGOUT 消息表示被踢下线，停止重连
             if (MessageTypes.FORCE_LOGOUT.equals(wsMessage.getType())) {
-                LOG.warn("收到强制下线通知，停止重连");
+                LOG.warn("{} 收到强制下线通知，停止重连", connectionName);
                 manualClose = true;
                 connected = false;
                 stopHeartbeat();
@@ -289,18 +294,17 @@ public final class WebSocketClient {
                 }
             }
 
-            // 记录最后收到的服务端消息ID，用于断线重连补发
             if (wsMessage.getId() != null && !wsMessage.getId().isEmpty()) {
                 lastMessageId = wsMessage.getId();
             }
 
-            LOG.debug("收到消息: type={}", wsMessage.getType());
+            LOG.debug("{} 收到消息: type={}", connectionName, wsMessage.getType());
 
             if (onMessage != null) {
                 Platform.runLater(() -> onMessage.accept(wsMessage));
             }
         } catch (final Exception e) {
-            LOG.error("处理消息异常: {}", message, e);
+            LOG.error("{} 处理消息异常: {}", connectionName, message, e);
         }
     }
 
@@ -312,7 +316,7 @@ public final class WebSocketClient {
      */
     public void send(final String type, final Map<String, Object> data) {
         if (!connected || webSocket == null) {
-            LOG.warn("WebSocket 未连接，消息发送失败: type={}", type);
+            LOG.warn("{} WebSocket 未连接，消息发送失败: type={}", connectionName, type);
             return;
         }
 
@@ -324,21 +328,20 @@ public final class WebSocketClient {
 
         final String json = JsonUtils.toJson(message);
         if (json == null) {
-            LOG.error("消息序列化失败: type={}", type);
+            LOG.error("{} 消息序列化失败: type={}", connectionName, type);
             return;
         }
 
         try {
             webSocket.sendText(json, true);
-            LOG.debug("发送消息: type={}", type);
+            LOG.debug("{} 发送消息: type={}", connectionName, type);
         } catch (final Exception e) {
-            LOG.error("发送消息失败: type={}", type, e);
+            LOG.error("{} 发送消息失败: type={}", connectionName, type, e);
         }
     }
 
     /**
      * 发送断线重连请求
-     * 携带最后收到的消息ID，服务端返回离线期间的消息
      */
     private void sendReconnectRequest() {
         if (lastMessageId == null || lastMessageId.isEmpty()) {
@@ -348,7 +351,7 @@ public final class WebSocketClient {
         final Map<String, Object> data = new HashMap<>();
         data.put("lastMessageId", lastMessageId);
         send(MessageTypes.RECONNECT, data);
-        LOG.info("发送断线重连请求: lastMessageId={}", lastMessageId);
+        LOG.info("{} 发送断线重连请求: lastMessageId={}", connectionName, lastMessageId);
     }
 
     /**
@@ -368,10 +371,10 @@ public final class WebSocketClient {
                 final String json = JsonUtils.toJson(ping);
                 if (json != null) {
                     ws.sendText(json, true);
-                    LOG.debug("发送 PING 心跳");
+                    LOG.debug("{} 发送 PING 心跳", connectionName);
                 }
             } catch (final Exception e) {
-                LOG.error("心跳发送失败", e);
+                LOG.error("{} 心跳发送失败", connectionName, e);
             }
         }, HEARTBEAT_INTERVAL_SECONDS, HEARTBEAT_INTERVAL_SECONDS, TimeUnit.SECONDS);
     }
@@ -387,33 +390,34 @@ public final class WebSocketClient {
 
     /**
      * 调度重连
+     *
+     * @param baseUrl 服务器地址
      */
-    private void scheduleReconnect() {
+    private void scheduleReconnect(final String baseUrl) {
         if (manualClose) {
-            LOG.info("主动关闭，不进行重连");
+            LOG.info("{} 主动关闭，不进行重连", connectionName);
             return;
         }
 
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            LOG.error("达到最大重连次数 {}，停止重连", MAX_RECONNECT_ATTEMPTS);
+            LOG.error("{} 达到最大重连次数 {}，停止重连", connectionName, MAX_RECONNECT_ATTEMPTS);
             return;
         }
 
         reconnectAttempts++;
-        // 指数退避
         final long delay = Math.min(
                 INITIAL_RECONNECT_DELAY_SECONDS * (1L << (reconnectAttempts - 1)),
                 MAX_RECONNECT_DELAY_SECONDS);
 
-        LOG.info("计划第 {} 次重连，{} 秒后执行", reconnectAttempts, delay);
+        LOG.info("{} 计划第 {} 次重连，{} 秒后执行", connectionName, reconnectAttempts, delay);
 
         if (reconnectTask != null && !reconnectTask.isDone()) {
             reconnectTask.cancel(false);
         }
 
         reconnectTask = scheduler.schedule(() -> {
-            LOG.info("执行第 {} 次重连", reconnectAttempts);
-            doConnect();
+            LOG.info("{} 执行第 {} 次重连", connectionName, reconnectAttempts);
+            doConnect(baseUrl);
         }, delay, TimeUnit.SECONDS);
     }
 
@@ -442,10 +446,10 @@ public final class WebSocketClient {
             try {
                 webSocket.sendClose(java.net.http.WebSocket.NORMAL_CLOSURE, "client close");
             } catch (final Exception e) {
-                LOG.error("关闭 WebSocket 异常", e);
+                LOG.error("{} 关闭 WebSocket 异常", connectionName, e);
             }
         }
-        LOG.info("WebSocket 连接已关闭");
+        LOG.info("{} WebSocket 连接已关闭", connectionName);
     }
 
     /**
@@ -464,5 +468,14 @@ public final class WebSocketClient {
      */
     public int getReconnectAttempts() {
         return reconnectAttempts;
+    }
+
+    /**
+     * 获取连接名称
+     *
+     * @return 连接名称
+     */
+    public String getConnectionName() {
+        return connectionName;
     }
 }

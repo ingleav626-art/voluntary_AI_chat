@@ -10,18 +10,33 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 import javafx.application.Application;
+import org.example.client.config.ServerConnectionManager;
+import org.example.client.config.ServerMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.context.ConfigurableApplicationContext;
 
 /**
- * JavaFX 启动器
+ * JavaFX 启动器（三模式启动策略）
  *
  * <p>
- * JavaFX 17 要求主类不能直接继承 {@link Application}，
- * 否则启动时会报 "缺少 JavaFX 运行时组件"。
- * 此启动器作为入口，内嵌启动后端服务，再启动前端 GUI。
+ * 支持三种启动模式：
+ * <ul>
+ * <li>LOCAL - 本地模式：内嵌后端，H2数据库，AI隐私数据本地存储</li>
+ * <li>HOTSPOT - 热点模式：连接局域网测试服务器，用于开发测试</li>
+ * <li>CLOUD - 云端模式：连接公网服务器，真人实时通信</li>
+ * </ul>
+ * </p>
+ *
+ * <p>
+ * 启动策略：
+ * <ol>
+ * <li>检查环境变量 SERVER_MODE，确定启动模式</li>
+ * <li>同时检查云端服务器连接状态（异步）</li>
+ * <li>默认使用本地模式，云端可用时覆盖</li>
+ * <li>隐私模式开启时强制使用本地模式</li>
+ * </ol>
  * </p>
  *
  * @author voluntary-ai-chat
@@ -44,7 +59,7 @@ public final class Launcher {
     }
 
     /**
-     * 应用程序入口
+     * 应用程序入口（三模式启动策略）
      *
      * @param args 命令行参数
      */
@@ -53,13 +68,41 @@ public final class Launcher {
             // 启动前确保日志目录存在
             ensureDataDirectory();
 
-            // 热点模式下跳过内嵌后端启动，连接远程服务器
-            final String skipServer = System.getenv("SKIP_EMBEDDED_SERVER");
-            if ("true".equalsIgnoreCase(skipServer)) {
-                LOG.info("SKIP_EMBEDDED_SERVER=true，跳过内嵌后端启动，将连接远程服务器");
-            } else {
-                startEmbeddedServer();
+            // 初始化服务器连接管理器
+            final ServerConnectionManager connectionManager = ServerConnectionManager.getInstance();
+            final ServerMode mode = connectionManager.getCurrentMode();
+
+            LOG.info("启动模式: {}", mode.getDescription());
+
+            // 根据启动模式决定是否启动内嵌后端
+            switch (mode) {
+                case HOTSPOT:
+                    // 热点模式：跳过内嵌后端，连接局域网测试服务器
+                    LOG.info("热点模式：跳过内嵌后端启动，将连接热点服务器");
+                    break;
+
+                case CLOUD:
+                    // 云端模式：跳过内嵌后端，连接公网服务器
+                    LOG.info("云端模式：跳过内嵌后端启动，将连接云端服务器");
+                    break;
+
+                case LOCAL:
+                    // 本地模式：启动内嵌后端
+                    LOG.info("本地模式：启动内嵌后端服务");
+                    startEmbeddedServer();
+                    break;
+
+                default:
+                    // 默认启动内嵌后端
+                    startEmbeddedServer();
             }
+
+            // 异步检查云端服务器连接状态（不阻塞UI启动）
+            connectionManager.checkServerAvailabilityAsync()
+                    .thenAccept(serverUrl -> {
+                        LOG.info("服务器连接检查完成，最终连接地址: {}", serverUrl);
+                    });
+
             Application.launch(App.class, args);
         } catch (final Throwable e) {
             writeErrorToFile("启动失败", e);
@@ -69,6 +112,15 @@ public final class Launcher {
 
     /**
      * 在当前 JVM 内嵌启动 Spring Boot 后端（守护线程）
+     *
+     * <p>
+     * 根据启动模式选择不同的配置文件：
+     * <ul>
+     * <li>LOCAL - 使用 application-local.yml（H2数据库，精简组件）</li>
+     * <li>HOTSPOT - 不启动内嵌后端</li>
+     * <li>CLOUD - 不启动内嵌后端</li>
+     * </ul>
+     * </p>
      */
     private static void startEmbeddedServer() {
         if (isPortInUse(SERVER_PORT)) {
@@ -79,13 +131,15 @@ public final class Launcher {
         final Thread serverThread = new Thread(() -> {
             try {
                 LOG.info("正在启动内嵌后端服务...");
-                // 打包分发时自动使用 H2 内嵌数据库；开发环境可设置 DB_PROFILE=local 使用 MySQL
-                final String dbProfile = System.getenv().getOrDefault("DB_PROFILE", "h2");
+
+                // 本地模式使用精简配置（H2数据库，仅AI组件）
+                final String profile = "local";
+
                 serverContext = SpringApplication.run(
                         org.example.client.server.EmbeddedServerStarter.class,
-                        "--spring.profiles.active=" + dbProfile,
+                        "--spring.profiles.active=" + profile,
                         "--server.port=" + SERVER_PORT);
-                LOG.info("内嵌后端服务启动成功，端口: {}", SERVER_PORT);
+                LOG.info("内嵌后端服务启动成功，端口: {}, 配置: {}", SERVER_PORT, profile);
             } catch (final Exception e) {
                 LOG.error("内嵌后端服务启动失败", e);
                 writeErrorToFile("内嵌后端服务启动失败", e);
@@ -182,7 +236,8 @@ public final class Launcher {
             pw.println("Exception: " + e.getClass().getName() + ": " + e.getMessage());
             e.printStackTrace(pw);
             pw.println();
-            Files.writeString(logFile, sw.toString(), java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+            Files.writeString(logFile, sw.toString(), java.nio.file.StandardOpenOption.CREATE,
+                    java.nio.file.StandardOpenOption.APPEND);
             System.err.println("[Launcher] 错误已写入: " + logFile.toAbsolutePath());
         } catch (final IOException ex) {
             System.err.println("[Launcher] 无法写入错误日志: " + ex.getMessage());

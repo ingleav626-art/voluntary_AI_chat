@@ -34,6 +34,16 @@ import javafx.collections.ObservableList;
  * 管理当前用户信息、会话列表、WebSocket 连接和消息分发。
  * </p>
  *
+ * <p>
+ * <b>TODO:⚠️ 类长度超限警告：当前526行，超出Service限制（400行）</b>
+ * <br>请勿在此类中添加新的职责，应拆分为：
+ * <ul>
+ * <li>WebSocketMessageHandler（WebSocket消息处理）</li>
+ * <li>ConversationManager（会话列表管理）</li>
+ * <li>MainViewModel（主视图模型，协调上述组件）</li>
+ * </ul>
+ * </p>
+ *
  * @author voluntary-ai-chat
  * @since 1.0.0
  */

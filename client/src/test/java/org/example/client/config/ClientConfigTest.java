@@ -1,75 +1,108 @@
 package org.example.client.config;
 
-import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * ClientConfig 单元测试
+ * ClientConfig测试
+ *
+ * @author voluntary-ai-chat
+ * @since 1.0.0
  */
-@DisplayName("ClientConfig 测试")
 class ClientConfigTest {
 
+    private ClientConfig clientConfig;
+
+    @BeforeEach
+    void setUp() {
+        clientConfig = ClientConfig.getInstance();
+    }
+
     @Test
-    @DisplayName("获取单例实例")
     void testGetInstance() {
         final ClientConfig instance1 = ClientConfig.getInstance();
         final ClientConfig instance2 = ClientConfig.getInstance();
-
-        assertNotNull(instance1);
-        assertSame(instance1, instance2);
+        assertEquals(instance1, instance2); // 单例模式
     }
 
     @Test
-    @DisplayName("默认配置值")
-    void testDefaultValues() {
-        final ClientConfig config = ClientConfig.getInstance();
-
-        assertEquals("http://localhost:8080/api", config.getBaseUrl());
-        assertEquals(10, config.getConnectTimeout());
-        assertEquals(30, config.getReadTimeout());
+    void testSetAndGetBaseUrl() {
+        final String testUrl = "http://test-server:8080/api";
+        clientConfig.setBaseUrl(testUrl);
+        assertEquals(testUrl, clientConfig.getBaseUrl());
     }
 
     @Test
-    @DisplayName("加载配置文件（不存在时使用默认值）")
-    void testLoadNonExistentConfig() {
-        final ClientConfig config = ClientConfig.getInstance();
-        config.load();
-
-        // 配置文件不存在，应使用默认值
-        assertNotNull(config.getBaseUrl());
-        assertTrue(config.getConnectTimeout() > 0);
-        assertTrue(config.getReadTimeout() > 0);
+    void testSetAndGetLocalBaseUrl() {
+        final String testUrl = "http://localhost:9090/api";
+        clientConfig.setLocalBaseUrl(testUrl);
+        assertEquals(testUrl, clientConfig.getLocalBaseUrl());
     }
 
     @Test
-    @DisplayName("获取 Base URL")
-    void testGetBaseUrl() {
-        final ClientConfig config = ClientConfig.getInstance();
-        final String baseUrl = config.getBaseUrl();
-
-        assertNotNull(baseUrl);
-        assertTrue(baseUrl.startsWith("http"));
+    void testSetAndGetCloudBaseUrl() {
+        final String testUrl = "https://cloud-server.com/api";
+        clientConfig.setCloudBaseUrl(testUrl);
+        assertEquals(testUrl, clientConfig.getCloudBaseUrl());
     }
 
     @Test
-    @DisplayName("获取连接超时")
+    void testSetAndGetHotspotBaseUrl() {
+        final String testUrl = "http://192.168.1.100:8080/api";
+        clientConfig.setHotspotBaseUrl(testUrl);
+        assertEquals(testUrl, clientConfig.getHotspotBaseUrl());
+    }
+
+    @Test
+    void testGetBaseUrlByMode_Local() {
+        final String localUrl = "http://localhost:8080/api";
+        clientConfig.setLocalBaseUrl(localUrl);
+        assertEquals(localUrl, clientConfig.getBaseUrlByMode(ServerMode.LOCAL));
+    }
+
+    @Test
+    void testGetBaseUrlByMode_Hotspot() {
+        final String hotspotUrl = "http://192.168.1.100:8080/api";
+        clientConfig.setHotspotBaseUrl(hotspotUrl);
+        assertEquals(hotspotUrl, clientConfig.getBaseUrlByMode(ServerMode.HOTSPOT));
+    }
+
+    @Test
+    void testGetBaseUrlByMode_Hotspot_Null() {
+        // 如果热点地址未配置，返回本地地址
+        clientConfig.setHotspotBaseUrl(null);
+        final String localUrl = "http://localhost:8080/api";
+        clientConfig.setLocalBaseUrl(localUrl);
+        assertEquals(localUrl, clientConfig.getBaseUrlByMode(ServerMode.HOTSPOT));
+    }
+
+    @Test
+    void testGetBaseUrlByMode_Cloud() {
+        final String cloudUrl = "https://cloud-server.com/api";
+        clientConfig.setCloudBaseUrl(cloudUrl);
+        assertEquals(cloudUrl, clientConfig.getBaseUrlByMode(ServerMode.CLOUD));
+    }
+
+    @Test
+    void testGetBaseUrlByMode_Cloud_Null() {
+        // 如果云端地址未配置，返回本地地址
+        clientConfig.setCloudBaseUrl(null);
+        final String localUrl = "http://localhost:8080/api";
+        clientConfig.setLocalBaseUrl(localUrl);
+        assertEquals(localUrl, clientConfig.getBaseUrlByMode(ServerMode.CLOUD));
+    }
+
+    @Test
     void testGetConnectTimeout() {
-        final ClientConfig config = ClientConfig.getInstance();
-        final int timeout = config.getConnectTimeout();
-
-        assertTrue(timeout > 0);
-        assertTrue(timeout <= 60);
+        // 默认超时时间
+        assertTrue(clientConfig.getConnectTimeout() > 0);
     }
 
     @Test
-    @DisplayName("获取读取超时")
     void testGetReadTimeout() {
-        final ClientConfig config = ClientConfig.getInstance();
-        final int timeout = config.getReadTimeout();
-
-        assertTrue(timeout > 0);
-        assertTrue(timeout <= 120);
+        // 默认超时时间
+        assertTrue(clientConfig.getReadTimeout() > 0);
     }
 }

@@ -42,6 +42,16 @@ import org.slf4j.LoggerFactory;
  *
  * <p>负责会话列表展示、会话切换、聊天区域交互、WebSocket 连接状态展示。</p>
  *
+ * <p>
+ * <b>TODO:⚠️ 类长度超限警告：当前545行，超出Controller限制（300行）</b>
+ * <br>请勿在此类中添加新的职责，应拆分为：
+ * <ul>
+ * <li>ConversationListController（会话列表管理）</li>
+ * <li>ChatAreaController（聊天区域管理）</li>
+ * <li>MainController（主控制器，协调上述组件）</li>
+ * </ul>
+ * </p>
+ *
  * @author voluntary-ai-chat
  * @since 1.0.0
  */

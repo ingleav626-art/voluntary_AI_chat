@@ -64,3 +64,6 @@ server:
   # 绑定到所有网络接口，允许局域网访问
   address: 0.0.0.0
   port: 8080
+  # 热点模式启用广播服务
+  broadcast:
+    enabled: true

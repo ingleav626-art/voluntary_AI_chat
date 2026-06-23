@@ -4,11 +4,135 @@
 
 ---
 
+## 架构分离说明
+
+本系统采用**云端+本地混合架构**，支持三种启动模式：
+
+### 三模式启动策略
+
+| 模式 | 用途 | 数据存储 | 启动方式 | 适用场景 |
+|------|------|---------|---------|---------|
+| **LOCAL（本地）** | AI隐私数据管理 | H2本地数据库 | 内嵌后端，精简启动 | 纯AI聊天、隐私模式、云端不可用 |
+| **HOTSPOT（热点）** | 开发测试 | MySQL+Redis | 连接局域网服务器 | 功能测试、多人协作验证 |
+| **CLOUD（云端）** | 真人实时通信 | MySQL+Redis | 连接公网服务器 | 真人聊天、群聊（含AI）、多人协作 |
+
+#### 启动流程
+
+```
+用户双击应用 → 检查 SERVER_MODE 环境变量
+                ↓
+        ┌───────┴───────┐
+        │               │
+    LOCAL            HOTSPOT/CLOUD
+        │               │
+  启动内嵌后端      跳过内嵌后端
+        │               │
+  H2数据库         连接远程服务器
+        │               │
+        └───────┬───────┘
+                ↓
+        异步检查云端服务器
+                ↓
+        云端可用 → 覆盖本地连接（真人聊天）
+        云端不可用 → 仅使用本地模式
+                ↓
+        隐私模式开启 → 强制本地模式
+```
+
+#### 环境变量配置
+
+| 变量 | 说明 | 示例 |
+|------|------|------|
+| `SERVER_MODE` | 启动模式选择 | `local` / `hotspot` / `cloud` |
+| `CLOUD_SERVER_URL` | 云端服务器地址 | `https://your-cloud-server.com/api` |
+| `HOTSPOT_SERVER_URL` | 热点服务器地址 | `http://192.168.1.100:8080/api` |
+| `PRIVACY_MODE` | 隐私模式开关 | `true` / `false` |
+
+#### 群聊AI网络需求判断
+
+| 场景 | 是否需要云端 | 说明 |
+|------|-------------|------|
+| 纯AI聊天（不含群主） | ❌ 不需要 | 可以使用本地模式 |
+| 群聊包含真人成员 | ✅ 需要 | 真人消息需要云端转发 |
+| 群聊包含AI | ✅ 需要 | AI回复需云端广播给其他成员 |
+| 隐私模式开启 | ❌ 强制本地 | 用户主动选择隐私保护 |
+
+#### 配置文件说明
+
+| 配置文件 | 用途 | 特点 |
+|---------|------|------|
+| `application-local.yml` | 本地模式 | H2数据库，仅AI组件，精简启动（~3秒） |
+| `application-hotspot.yml` | 热点模式 | MySQL+Redis，完整功能，局域网访问 |
+| `application-cloud.yml` | 云端模式 | MySQL+Redis，HTTPS，CORS配置 |
+
+---
+
+### 云端API（公网服务器）
+
+**用途**：真人实时通信、多人协作、在线状态管理
+
+**数据特点**：需要多人共享、实时同步、持久化存储
+
+**Base URL**: `https://your-cloud-server.com/api`（或公网IP）
+
+**模块归属**：
+- 认证模块（`/auth/*`）：用户登录、注册、验证码
+- 用户模块（`/user/*`）：个人信息、搜索用户
+- 好友模块（`/friend/*`）：好友申请、好友列表、在线状态
+- 群组模块（`/group/*`）：创建群、群成员管理、群信息
+- 消息模块（真人）：`/message/*`（真人消息发送、撤回、已读）
+- 会话模块（`/conversation/*`）：真人会话列表
+- 图片上传（`/message/upload/image`）：真人聊天图片存储
+- WebSocket（真人消息）：`SEND_MESSAGE`、`RECEIVE_MESSAGE`、`GROUP_MESSAGE`
+
+### 本地API（内嵌服务器）
+
+**用途**：AI隐私数据管理、本地向量检索、离线AI聊天
+
+**数据特点**：敏感数据、不应离开用户设备、本地H2存储
+
+**Base URL**: `http://localhost:8080/api`（内嵌服务）
+
+**模块归属**：
+- AI模块（`/ai/*`）：AI角色管理、AI对话、AI记忆、AI群配置
+- 本地健康检查（`/local/health`）：本地服务状态
+- 本地配置管理（`/local/config`）：本地服务配置
+- 向量检索（`/local/vector/*`）：本地向量存储与检索（补充API）
+- WebSocket（AI消息）：`AI_CHAT`、`AI_STREAM`
+
+### 混合场景说明
+
+| 场景 | 云端API | 本地API | 说明 |
+|------|---------|---------|------|
+| 用户登录 | `/auth/login` | - | 认证走云端 |
+| AI角色创建 | - | `/ai/create` | AI配置本地存储 |
+| 真人聊天 | `/message/send` | - | 真人消息云端转发 |
+| AI聊天 | - | WebSocket `AI_CHAT` | AI对话本地处理 |
+| 群聊（真人） | WebSocket `GROUP_MESSAGE` | - | 真人消息云端广播 |
+| 群聊（AI） | WebSocket `GROUP_MESSAGE`（真人部分） | WebSocket `AI_CHAT`（AI部分） | 双通道协作 |
+| 会话列表 | `/conversation/list`（真人会话） | `/ai/conversations`（AI会话） | 客户端合并展示 |
+
+---
+
 ## 基础信息
+
+### 云端服务器
+
+**Base URL**: `https://your-cloud-server.com/api`
+
+**认证方式**: JWT Token（云端颁发，本地验证）
+
+**请求头**:
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+### 本地服务器
 
 **Base URL**: `http://localhost:8080/api`
 
-**认证方式**: JWT Token（除登录注册外，所有接口需要携带Token）
+**认证方式**: JWT Token（云端颁发，本地公钥验签）
 
 **请求头**:
 ```
@@ -1287,3 +1411,270 @@ ws://localhost:8080/ws?token={jwt_token}
 ```
 
 **说明**: `missedCount` 为补发的离线消息数量。
+
+---
+
+## 八、本地服务API（补充）
+
+以下API仅在内嵌本地服务器提供，用于AI隐私数据管理和本地向量检索。
+
+### 8.1 本地健康检查
+```
+GET /local/health
+```
+
+**说明**: 检查本地服务状态，无需认证。
+
+**响应**:
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "status": "UP",
+    "database": "H2",
+    "vectorStore": "Lucene",
+    "uptime": 3600,
+    "version": "1.0.0"
+  }
+}
+```
+
+### 8.2 本地配置查询
+```
+GET /local/config
+```
+
+**说明**: 获取本地服务配置信息，无需认证。
+
+**响应**:
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "dataDir": "/Users/xxx/AppData/Voluntary-AI-Chat/data",
+    "vectorStoreEnabled": true,
+    "embeddingModel": "text-embedding-3-small",
+    "maxMemoryCount": 10,
+    "memorySimilarityThreshold": 0.7
+  }
+}
+```
+
+### 8.3 向量存储
+```
+POST /local/vector/store
+```
+
+**说明**: 存储向量到本地向量库（Lucene），仅内部服务调用，客户端不直接使用。
+
+**请求参数**:
+```json
+{
+  "id": "mem_001",
+  "vector": [0.1, 0.2, 0.3, ...],
+  "content": "用户喜欢编程和音乐",
+  "metadata": {
+    "aiId": "ai_001",
+    "userId": "user_001"
+  }
+}
+```
+
+**响应**:
+```json
+{
+  "code": 200,
+  "message": "存储成功",
+  "data": {
+    "vectorId": "vec_001"
+  }
+}
+```
+
+### 8.4 向量检索
+```
+POST /local/vector/search
+```
+
+**说明**: 从本地向量库检索相似向量，仅内部服务调用，客户端不直接使用。
+
+**请求参数**:
+```json
+{
+  "queryVector": [0.1, 0.2, 0.3, ...],
+  "aiId": "ai_001",
+  "userId": "user_001",
+  "topK": 10,
+  "minScore": 0.7
+}
+```
+
+**响应**:
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "results": [
+      {
+        "id": "mem_001",
+        "score": 0.85,
+        "content": "用户喜欢编程和音乐",
+        "metadata": {
+          "aiId": "ai_001",
+          "userId": "user_001"
+        }
+      }
+    ]
+  }
+}
+```
+
+### 8.5 向量删除
+```
+DELETE /local/vector/{vectorId}
+```
+
+**说明**: 删除本地向量库中的向量，仅内部服务调用。
+
+**响应**:
+```json
+{
+  "code": 200,
+  "message": "删除成功",
+  "data": null
+}
+```
+
+### 8.6 AI会话列表（本地）
+```
+GET /ai/conversations?page=1&size=20
+```
+
+**说明**: 获取AI会话列表（仅本地存储的AI对话），与云端真人会话列表分离。客户端需合并两个列表展示。
+
+**响应**:
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "list": [
+      {
+        "sessionId": "a_3001_1001",
+        "aiId": "ai_001",
+        "aiName": "小助手",
+        "aiAvatar": "http://localhost:8080/files/ai/001.jpg",
+        "lastMessage": "你好！有什么我可以帮助你的吗？",
+        "lastMessageType": "TEXT",
+        "lastMessageTime": "2024-01-01T10:00:00Z",
+        "unreadCount": 0
+      }
+    ],
+    "total": 5,
+    "page": 1,
+    "size": 20
+  }
+}
+```
+
+### 8.7 本地数据导出
+```
+GET /local/export
+```
+
+**说明**: 导出本地所有AI数据（AI角色、AI对话、AI记忆），用于备份或迁移。
+
+**响应**:
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "exportUrl": "http://localhost:8080/files/export/data_20240101.json",
+    "expiresIn": 3600
+  }
+}
+```
+
+### 8.8 本地数据导入
+```
+POST /local/import
+Content-Type: multipart/form-data
+```
+
+**说明**: 导入AI数据备份文件，恢复本地AI配置和记忆。
+
+**请求参数**:
+```
+file: [JSON备份文件]
+```
+
+**响应**:
+```json
+{
+  "code": 200,
+  "message": "导入成功",
+  "data": {
+    "aiProfiles": 3,
+    "messages": 150,
+    "memories": 10
+  }
+}
+```
+
+---
+
+## 九、WebSocket双连接说明
+
+客户端需要维护两个WebSocket连接：
+
+### 云端WebSocket（真人消息）
+
+**连接地址**: `wss://your-cloud-server.com/ws?token={jwt_token}`
+
+**消息类型**:
+- `SEND_MESSAGE`：发送真人消息
+- `RECEIVE_MESSAGE`：接收私聊消息
+- `GROUP_MESSAGE`：接收群聊消息
+- `MESSAGE_RECALL`：消息撤回通知
+- `READ_RECEIPT`：已读通知
+- `STATUS_CHANGE`：在线状态变更
+- `PING/PONG`：心跳
+- `RECONNECT`：断线重连
+
+### 本地WebSocket（AI消息）
+
+**连接地址**: `ws://localhost:8080/ws?token={jwt_token}`
+
+**消息类型**:
+- `AI_CHAT`：发送AI对话请求
+- `AI_STREAM`：接收AI流式响应
+- `PING/PONG`：心跳
+
+### 双连接协作示例
+
+**群聊场景（真人+AI）**：
+
+1. 用户发送消息 → 客户端同时发送：
+   - 云端WebSocket：`SEND_MESSAGE`（真人消息转发给其他群成员）
+   - 本地WebSocket：`AI_CHAT`（触发AI回复）
+
+2. AI回复 → 本地WebSocket推送 `AI_STREAM` → 仅本机客户端接收
+
+3. 真人回复 → 云端WebSocket推送 `GROUP_MESSAGE` → 所有在线群成员接收
+
+---
+
+## 十、错误码补充
+
+**本地服务错误码**:
+| 错误码 | 模块 | 说明 |
+|--------|------|------|
+| 6001 | 本地服务 | 本地服务未启动 |
+| 6002 | 本地服务 | 数据目录权限不足 |
+| 6003 | 本地服务 | 向量库初始化失败 |
+| 6004 | 本地服务 | 数据导入格式错误 |
+| 6005 | 本地服务 | 备份文件已过期 |

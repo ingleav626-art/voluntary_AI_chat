@@ -34,6 +34,15 @@ import javafx.collections.ObservableList;
  *
  * <p>管理当前会话的消息列表、消息发送和历史记录加载。</p>
  *
+ * <p>
+ * <b>TODO:⚠️ 类长度接近限制警告：当前379行，接近Service限制（400行）</b>
+ * <br>请谨慎添加新功能，避免超限。如需扩展，应考虑拆分为：
+ * <ul>
+ * <li>MessageSender（消息发送逻辑）</li>
+ * <li>MessageListManager（消息列表管理）</li>
+ * </ul>
+ * </p>
+ *
  * @author voluntary-ai-chat
  * @since 1.0.0
  */
