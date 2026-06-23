@@ -64,5 +64,9 @@ test_error
 logs/
 *.log
 
+# 上传文件（图片、文件等）
+server/uploads/
+uploads/
+
 # AI 开发规范（每次发送给 AI，不提交）
 AGENTS.md
