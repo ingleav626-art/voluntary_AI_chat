@@ -134,7 +134,15 @@ public final class ClientConfig {
             hotspotBaseUrl = props.getProperty("client.hotspot-base-url");
 
             // 读取当前服务器地址（如果配置文件中指定）
-            currentBaseUrl = props.getProperty("client.base-url", localBaseUrl);
+            // 注意：如果已经通过 ServerConnectionManager 设置了地址（如自动发现），不覆盖
+            final String configBaseUrl = props.getProperty("client.base-url");
+            if (configBaseUrl != null && !configBaseUrl.isEmpty()) {
+                // 只有当 currentBaseUrl 还是默认值时才从配置文件覆盖
+                // 热点/云端模式会自动发现并设置正确的地址，不应被配置文件覆盖
+                if (currentBaseUrl == null || DEFAULT_LOCAL_BASE_URL.equals(currentBaseUrl)) {
+                    currentBaseUrl = configBaseUrl;
+                }
+            }
 
             // 读取超时配置
             connectTimeout = Integer.parseInt(props.getProperty("client.connect-timeout",

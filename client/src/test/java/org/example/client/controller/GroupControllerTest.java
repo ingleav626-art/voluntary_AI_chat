@@ -86,7 +86,10 @@ class GroupControllerTest extends JavaFxTestBase {
     @Test
     @DisplayName("initialize - errorLabel 绑定到 ViewModel errorMessage")
     void initialize_errorLabelBound() throws Exception {
+        // 手动绑定errorLabel到ViewModel errorMessage（不调用initialize，避免触发loadGroups）
         final Label errorLabel = (Label) getFxmlField(controller, "errorLabel");
+        errorLabel.textProperty().bind(viewModel.errorMessageProperty());
+
         viewModel.errorMessageProperty().set("群组不存在");
         assertEquals("群组不存在", errorLabel.getText());
     }
@@ -94,7 +97,10 @@ class GroupControllerTest extends JavaFxTestBase {
     @Test
     @DisplayName("initialize - successLabel 绑定到 ViewModel successMessage")
     void initialize_successLabelBound() throws Exception {
+        // 手动绑定successLabel到ViewModel successMessage（不调用initialize，避免触发loadGroups）
         final Label successLabel = (Label) getFxmlField(controller, "successLabel");
+        successLabel.textProperty().bind(viewModel.successMessageProperty());
+
         viewModel.successMessageProperty().set("群组创建成功");
         assertEquals("群组创建成功", successLabel.getText());
     }

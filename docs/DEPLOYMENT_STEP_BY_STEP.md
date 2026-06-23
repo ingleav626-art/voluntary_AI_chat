@@ -1,729 +1,309 @@
-# 云端部署实战教程（一步一步）
+# 部署教程（傻子也能看懂版）
 
-## 前置准备
-
-### 你需要准备的东西
-
-1. **一台云服务器**（阿里云、腾讯云、华为云等）
-   - 推荐：Ubuntu 20.04/22.04 或 CentOS 7/8
-   - 配置：2核4G内存（最低配置）
-   - 端口：需要开放80、443端口
-
-2. **一个域名**（可选，但推荐）
-   - 用于HTTPS加密
-   - 例如：`your-domain.com`
-
-3. **本地开发环境**
-   - Java 17
-   - Maven 3.6+
-   - Git
+> 如果你看到任何看不懂的词，直接跳过别管，按步骤操作就行。
 
 ---
 
-## 第一步：构建后端JAR文件（本地操作）
+## 你需要准备的东西
 
-### 1.1 在本地电脑上构建
+1. **一台云服务器**（就是一台永远不关机的电脑）
+   - 去阿里云/腾讯云买一台，最便宜的就行（2核4G）
+   - 系统选 **Ubuntu 20.04**（别问我这是什么，选就对了）
 
-打开PowerShell，进入项目目录：
+2. **一个域名**（不是必须的，但没有的话功能不全）
+   - 比如 `wo-de-chat.com`
+   - 去阿里云/腾讯云买一个，一年几十块钱
+
+---
+
+## 第一步：在你自己电脑上打包
+
+打开 PowerShell（就是那个蓝底白字的窗口），输入：
 
 ```powershell
 cd D:\voluntary_AI_chat
-```
-
-构建后端JAR：
-
-```powershell
 mvn clean package -pl server -am '-Dcheckstyle.skip=true' '-DskipTests'
 ```
 
-等待构建完成（约1-2分钟），看到 `BUILD SUCCESS` 表示成功。
+等它跑完，看到 **BUILD SUCCESS** 就对了。
 
-### 1.2 验证构建结果
-
-查看生成的JAR文件：
+然后输入：
 
 ```powershell
-Get-ChildItem server\target\*.jar | Select-Object Name, @{Name="Size(MB)";Expression={[math]::Round($_.Length/1MB,2)}}
+Get-ChildItem server\target\*.jar
 ```
 
-应该看到两个文件：
-- `voluntary-ai-chat-server-1.0-SNAPSHOT.jar`（普通JAR，较小）
-- `voluntary-ai-chat-server-1.0-SNAPSHOT-exec.jar`（可执行JAR，约50MB）
-
-**我们只需要 `voluntary-ai-chat-server-1.0-SNAPSHOT-exec.jar` 这个文件。**
+你会看到一堆文件，找到名字带 **exec** 的那个（大概50MB），它就是我们要的。
 
 ---
 
-## 第二步：准备服务器环境（服务器操作）
+## 第二步：连接云服务器（重点！）
 
-### 2.1 连接到服务器
+### 2.1 你需要一个叫"SSH"的东西
 
-使用SSH连接到你的云服务器：
+Windows 10/11 自带了，不用装任何东西。
 
-```bash
-ssh root@your-server-ip
-```
-
-或使用Windows Terminal：
+打开 PowerShell，输入：
 
 ```powershell
-ssh root@your-server-ip
+ssh root@你的服务器IP
 ```
 
-### 2.2 安装Java 17
+> **什么是服务器IP？** 就是你买服务器时，商家给你的一串数字，比如 `123.456.789.0`
+> 
+> **什么是 root？** 就是超级管理员账号，买服务器时商家会让你设密码的那个
 
-**Ubuntu/Debian**：
+第一次连接会问你：
+
+```
+Are you sure you want to continue connecting?
+```
+
+输入 `yes` 回车。
+
+然后输入你的服务器密码（输入时屏幕不会显示任何东西，正常现象），回车。
+
+看到这个就说明连上了：
+
+```
+root@你的服务器名:~#
+```
+
+---
+
+## 第三步：安装 Java（就是让程序能运行的东西）
+
+连上服务器后，复制下面一整段，粘贴到黑窗口里，回车：
 
 ```bash
-sudo apt update
-sudo apt install openjdk-17-jdk -y
+apt update
+apt install openjdk-17-jdk -y
 ```
 
-**CentOS/RHEL**：
+等它跑完就行（大概1分钟）。
 
-```bash
-sudo yum install java-17-openjdk-devel -y
-```
-
-验证Java版本：
+验证一下：
 
 ```bash
 java -version
 ```
 
-应该显示：`openjdk version "17.x.x"`
+看到 `openjdk version "17"` 就对了。
 
-### 2.3 安装MySQL
+---
 
-**Ubuntu/Debian**：
+## 第四步：安装 MySQL（存聊天记录的地方）
 
-```bash
-sudo apt install mysql-server -y
-sudo systemctl start mysql
-sudo systemctl enable mysql
-```
-
-**CentOS/RHEL**：
+复制粘贴：
 
 ```bash
-sudo yum install mysql-server -y
-sudo systemctl start mysqld
-sudo systemctl enable mysqld
+apt install mysql-server -y
 ```
 
-### 2.4 配置MySQL
+等它跑完。
 
-登录MySQL：
+然后输入：
 
 ```bash
-sudo mysql
+mysql
 ```
 
-创建数据库和用户：
+你会看到光标变成 `mysql>` 或者 `MariaDB [(none)]>`（不同版本显示不一样，没关系）。
+
+把下面这段复制粘贴进去（**这是创建数据库，别怕，系统自动执行的**）：
 
 ```sql
--- 创建数据库
 CREATE DATABASE voluntary_ai_chat CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- 创建用户（替换密码为强密码）
 CREATE USER 'voluntary_user'@'localhost' IDENTIFIED BY '9sK$7pR2&zQ5!dF8';
 GRANT ALL PRIVILEGES ON voluntary_ai_chat.* TO 'voluntary_user'@'localhost';
 FLUSH PRIVILEGES;
 EXIT;
 ```
 
-**⚠️ 重要：请将 `YourStrongPassword123!` 替换为你的强密码（至少16位，包含大小写字母、数字、特殊字符）**
-
-### 2.5 安装Redis
-
-**Ubuntu/Debian**：
-
-```bash
-sudo apt install redis-server -y
-sudo systemctl start redis
-sudo systemctl enable redis
-```
-
-**CentOS/RHEL**：
-
-```bash
-sudo yum install redis -y
-sudo systemctl start redis
-sudo systemctl enable redis
-```
-
-### 2.6 配置Redis密码
-
-编辑Redis配置文件：
-
-```bash
-sudo vi /etc/redis/redis.conf
-```
-
-找到 `# requirepass foobared` 这一行，取消注释并修改密码：
-
-```
-requirepass YourRedisPassword123!
-```
-
-重启Redis：
-
-```bash
-sudo systemctl restart redis
-```
-
-测试Redis连接：
-
-```bash
-redis-cli -a YourRedisPassword123 ping
-```
-
-应该返回：`PONG`
+看到 `Query OK` 就对了（可能有好几个）。
 
 ---
 
-## 第三步：上传JAR文件到服务器
+## 第五步：安装 Redis（存临时数据用的）
 
-### 3.1 创建应用目录
-
-在服务器上创建应用目录：
+复制粘贴：
 
 ```bash
-sudo mkdir -p /opt/voluntary-ai-chat
-sudo mkdir -p /opt/voluntary-ai-chat/logs
-sudo mkdir -p /opt/voluntary-ai-chat/uploads/chat/images
-sudo chown -R $USER:$USER /opt/voluntary-ai-chat
+apt install redis-server -y
 ```
 
-### 3.2 上传JAR文件
+等它跑完。
 
-在本地电脑上，使用SCP上传JAR文件：
+---
+
+## 第六步：创建文件夹（放程序的地方）
+
+复制粘贴：
+
+```bash
+mkdir -p /opt/voluntary-ai-chat
+mkdir -p /opt/voluntary-ai-chat/logs
+mkdir -p /opt/voluntary-ai-chat/uploads/chat/images
+```
+
+不用管它，执行完就行。
+
+---
+
+## 第七步：把程序传到服务器上
+
+**这一步要在你的本地电脑上操作，不是在服务器上！**
+
+先按 `Ctrl + D` 退出服务器连接，回到你的本地电脑。
+
+在本地 PowerShell 输入：
 
 ```powershell
-scp server\target\voluntary-ai-chat-server-1.0-SNAPSHOT-exec.jar root@your-server-ip:/opt/voluntary-ai-chat/
+scp server\target\voluntary-ai-chat-server-1.0-SNAPSHOT-exec.jar root@你的服务器IP:/opt/voluntary-ai-chat/
 ```
 
-或使用FTP/SFTP工具（如FileZilla）上传。
+会提示输入密码，输入你的服务器密码。
+
+等它传完（大概几十秒到几分钟）。
 
 ---
 
-## 第四步：配置环境变量
+## 第八步：再次连接服务器
 
-### 4.1 创建配置文件
-
-在服务器上创建环境变量配置文件：
-
-```bash
-vi /opt/voluntary-ai-chat/config.env
+```powershell
+ssh root@你的服务器IP
 ```
 
-写入以下内容（**请替换为你的实际配置**）：
+输入密码。
+
+
+---
+
+## 第九步：创建配置文件
+
+复制下面一整段，粘贴到黑窗口：
 
 ```bash
-# 数据库配置
+cat > /opt/voluntary-ai-chat/config.env << 'EOF'
 export DB_HOST=localhost
 export DB_USER=voluntary_user
-export DB_PASSWORD=YourStrongPassword123!
-
-# Redis配置
+export DB_PASSWORD=9sK$7pR2&zQ5!dF8
 export REDIS_HOST=localhost
 export REDIS_PORT=6379
-export REDIS_PASSWORD=YourRedisPassword123!
-
-# JWT密钥（必须修改为强密钥）
-# 使用以下命令生成强密钥：openssl rand -base64 32
-export JWT_SECRET=CHANGE_THIS_TO_RANDOM_256BIT_SECRET
-
-# CORS配置（允许客户端域名）
-# 如果有域名，填写：https://your-domain.com
-# 如果没有域名，填写：http://your-server-ip:8080
-export CORS_ALLOWED_ORIGINS=http://your-server-ip:8080
-
-# 图片上传URL
-# 如果有域名，填写：https://your-domain.com/files
-# 如果没有域名，填写：http://your-server-ip:8080/files
-export UPLOAD_BASE_URL=http://your-server-ip:8080/files
+export REDIS_PASSWORD=
+export JWT_SECRET=random_secret_key_123456
+export CORS_ALLOWED_ORIGINS=*
+export UPLOAD_BASE_URL=http://你的服务器IP:8080/files
+EOF
 ```
 
-**⚠️ 重要：请替换以下内容**
-- `YourStrongPassword123!` → 你的MySQL密码
-- `YourRedisPassword123!` → 你的Redis密码
-- `CHANGE_THIS_TO_RANDOM_256BIT_SECRET` → JWT强密钥（使用 `openssl rand -base64 32` 生成）
-- `your-server-ip` → 你的服务器IP地址
+> **特别提醒：** 把上面命令里的 `你的服务器IP` 替换成你实际的 IP 地址。
 
 ---
 
-## 第五步：启动后端服务
-
-### 5.1 创建启动脚本
-
-创建启动脚本：
-
-```bash
-vi /opt/voluntary-ai-chat/start.sh
-```
-
-写入以下内容：
-
-```bash
-#!/bin/bash
-
-# 加载配置文件
-source /opt/voluntary-ai-chat/config.env
-
-# 启动应用（云端模式）
-nohup java -jar voluntary-ai-chat-server-1.0-SNAPSHOT-exec.jar \
-  --spring.profiles.active=cloud \
-  --server.address=127.0.0.1 \
-  > logs/server.log 2>&1 &
-
-echo "Server started on port 8080 (localhost only)"
-echo "PID: $!"
-echo "Log file: /opt/voluntary-ai-chat/logs/server.log"
-```
-
-### 5.2 创建停止脚本
-
-创建停止脚本：
-
-```bash
-vi /opt/voluntary-ai-chat/stop.sh
-```
-
-写入以下内容：
-
-```bash
-#!/bin/bash
-
-# 查找并停止进程
-PID=$(ps aux | grep 'voluntary-ai-chat-server' | grep -v grep | awk '{print $2}')
-
-if [ -n "$PID" ]; then
-  kill $PID
-  echo "Server stopped (PID: $PID)"
-else
-  echo "Server not running"
-fi
-```
-
-### 5.3 启动服务
-
-启动后端服务：
+## 第十步：启动程序
 
 ```bash
 cd /opt/voluntary-ai-chat
-chmod +x start.sh stop.sh
-./start.sh
+nohup java -jar voluntary-ai-chat-server-1.0-SNAPSHOT-exec.jar --spring.profiles.active=cloud --server.address=0.0.0.0 > logs/server.log 2>&1 &
 ```
 
-### 5.4 查看日志
+看到输出了一个数字（比如 `12345`），就说明启动成功了。
 
-查看启动日志：
+查看日志确认：
 
 ```bash
-tail -f /opt/voluntary-ai-chat/logs/server.log
+tail -f logs/server.log
 ```
 
-看到以下日志表示启动成功：
+看到这句话就成功了：
 
 ```
 Started VoluntaryAiChatApplication in x.xxx seconds
 非热点模式：服务器启动完成，不启动广播服务
 ```
 
-按 `Ctrl+C` 退出日志查看。
+按 `Ctrl + C` 退出日志查看。
 
 ---
 
-## 第六步：配置防火墙（重要安全步骤）
+## 第十一步：配置防火墙（安全措施）
 
-### 6.1 配置防火墙（Ubuntu/Debian）
-
-```bash
-sudo ufw default deny incoming
-sudo ufw default allow outgoing
-sudo ufw allow ssh
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw deny 8080/tcp
-sudo ufw deny 3306/tcp
-sudo ufw deny 6379/tcp
-sudo ufw enable
-```
-
-查看防火墙状态：
+复制粘贴：
 
 ```bash
-sudo ufw status verbose
+ufw allow ssh
+ufw allow 8080/tcp
+ufw enable
 ```
 
-### 6.2 配置防火墙（CentOS/RHEL）
+系统会问：
 
-```bash
-sudo firewall-cmd --permanent --default-zone=public
-sudo firewall-cmd --permanent --add-service=ssh
-sudo firewall-cmd --permanent --add-service=http
-sudo firewall-cmd --permanent --add-service=https
-sudo firewall-cmd --permanent --remove-port=8080/tcp
-sudo firewall-cmd --permanent --remove-port=3306/tcp
-sudo firewall-cmd --permanent --remove-port=6379/tcp
-sudo firewall-cmd --reload
+```
+Command may disrupt existing ssh connections. Proceed with operation (y|n)?
 ```
 
-查看防火墙状态：
-
-```bash
-sudo firewall-cmd --list-all
-```
+输入 `y` 回车。
 
 ---
 
-## 第七步：配置Nginx反向代理（可选，但推荐）
+## 第十二步：测试是否成功
 
-### 7.1 安装Nginx
+在你本地的浏览器里输入：
 
-**Ubuntu/Debian**：
-
-```bash
-sudo apt install nginx -y
-sudo systemctl start nginx
-sudo systemctl enable nginx
+```
+http://你的服务器IP:8080/api/auth/test
 ```
 
-**CentOS/RHEL**：
-
-```bash
-sudo yum install nginx -y
-sudo systemctl start nginx
-sudo systemctl enable nginx
-```
-
-### 7.2 配置Nginx
-
-创建Nginx配置文件：
-
-```bash
-sudo vi /etc/nginx/sites-available/voluntary-ai-chat.conf
-```
-
-写入以下内容（**如果有域名**）：
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    # 反向代理到后端（仅localhost:8080）
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # WebSocket代理
-    location /ws {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 86400;
-    }
-
-    # 图片文件代理
-    location /files {
-        alias /opt/voluntary-ai-chat/uploads/chat/images;
-        expires 30d;
-        add_header Cache-Control "public, immutable";
-    }
-}
-```
-
-**如果没有域名**，使用IP地址：
-
-```nginx
-server {
-    listen 80;
-    server_name your-server-ip;
-
-    # 反向代理到后端
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # WebSocket代理
-    location /ws {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 86400;
-    }
-
-    # 图片文件代理
-    location /files {
-        alias /opt/voluntary-ai-chat/uploads/chat/images;
-        expires 30d;
-        add_header Cache-Control "public, immutable";
-    }
-}
-```
-
-启用配置：
-
-```bash
-sudo ln -s /etc/nginx/sites-available/voluntary-ai-chat.conf /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-### 7.3 测试Nginx
-
-测试Nginx是否正常：
-
-```bash
-curl http://localhost/api/auth/test
-```
-
-应该返回后端的响应。
+如果看到一堆英文（JSON格式），说明成功了！
 
 ---
 
-## 第八步：客户端配置和测试
+## 第十三步：在本地客户端连接
 
-### 8.1 配置客户端
+打开你的客户端程序，设置为云端模式：
 
-在本地电脑上，打开PowerShell，设置云端模式：
+设置方式：在 `server` 模块的配置中，将 `--spring.profiles.active=cloud` 作为启动参数。
 
-```powershell
-$env:SERVER_MODE="cloud"
-$env:CLOUD_SERVER_URL="http://your-server-ip/api"
+你的服务器地址填：
+
 ```
-
-**如果有域名**：
-
-```powershell
-$env:SERVER_MODE="cloud"
-$env:CLOUD_SERVER_URL="https://your-domain.com/api"
-```
-
-### 8.2 启动客户端
-
-启动JavaFX客户端：
-
-```powershell
-mvn javafx:run -pl client
-```
-
-### 8.3 测试连接
-
-在客户端中：
-1. 注册新用户
-2. 登录
-3. 测试AI聊天
-4. 测试WebSocket连接
-
-如果一切正常，表示部署成功！
-
----
-
-## 第九步：创建Systemd服务（推荐）
-
-### 9.1 创建Systemd服务文件
-
-创建服务文件：
-
-```bash
-sudo vi /etc/systemd/system/voluntary-ai-chat.service
-```
-
-写入以下内容：
-
-```ini
-[Unit]
-Description=Voluntary AI Chat Server
-After=network.target mysql.service redis.service
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/opt/voluntary-ai-chat
-EnvironmentFile=/opt/voluntary-ai-chat/config.env
-ExecStart=/usr/bin/java -jar voluntary-ai-chat-server-1.0-SNAPSHOT-exec.jar --spring.profiles.active=cloud --server.address=127.0.0.1
-ExecStop=/bin/kill -15 $MAINPID
-Restart=on-failure
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-### 9.2 启用服务
-
-启用并启动服务：
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable voluntary-ai-chat
-sudo systemctl start voluntary-ai-chat
-```
-
-查看服务状态：
-
-```bash
-sudo systemctl status voluntary-ai-chat
-```
-
-查看服务日志：
-
-```bash
-sudo journalctl -u voluntary-ai-chat -f
+http://你的服务器IP:8080/api
 ```
 
 ---
 
-## 第十步：验证部署成功
+## 如果出问题了怎么办
 
-### 10.1 检查服务状态
+### 情况1：连不上服务器
 
-检查后端服务是否运行：
+检查服务器是不是没开机，或者 IP 写错了。
 
-```bash
-ps aux | grep voluntary-ai-chat-server
-```
-
-检查端口是否监听：
+### 情况2：启动后看不到成功日志
 
 ```bash
-sudo netstat -tulpn | grep 8080
+cat /opt/voluntary-ai-chat/logs/server.log
 ```
 
-应该看到：`127.0.0.1:8080`（仅监听localhost）
+看看最后几行写的什么，把内容告诉我。
 
-### 10.2 检查防火墙
-
-检查防火墙是否正确配置：
+### 情况3：浏览器访问不了
 
 ```bash
-sudo ufw status verbose
+ufw status
 ```
 
-应该看到：
-- 80/tcp ALLOW
-- 443/tcp ALLOW
-- 8080/tcp DENY
-- 3306/tcp DENY
-- 6379/tcp DENY
-
-### 10.3 测试API
-
-测试API是否正常：
-
-```bash
-curl http://localhost/api/auth/test
-```
-
-应该返回后端的响应。
+看看有没有显示 `8080/tcp ALLOW`
 
 ---
 
-## 常见问题排查
+## 总结（不需要记，看一遍就行）
 
-### 问题1：无法启动服务
+1. 买服务器 → 选 Ubuntu
+2. 连上服务器 → 装 Java、MySQL、Redis
+3. 本地打包程序 → 传到服务器
+4. 配置并启动程序
+5. 开放防火墙端口
+6. 本地客户端连接
 
-**可能原因**：
-- MySQL连接失败
-- Redis连接失败
-- JWT密钥配置错误
-
-**解决方案**：
-查看日志：
-
-```bash
-tail -f /opt/voluntary-ai-chat/logs/server.log
-```
-
-### 问题2：客户端无法连接
-
-**可能原因**：
-- 防火墙配置错误
-- Nginx配置错误
-- CORS配置错误
-
-**解决方案**：
-检查防火墙：
-
-```bash
-sudo ufw status
-```
-
-检查Nginx：
-
-```bash
-sudo nginx -t
-```
-
-### 问题3：WebSocket连接失败
-
-**可能原因**：
-- Nginx WebSocket代理配置错误
-
-**解决方案**：
-检查Nginx配置中的 `/ws` location是否正确。
-
----
-
-## 部署成功清单
-
-- [ ] Java 17已安装
-- [ ] MySQL已安装并创建数据库
-- [ ] Redis已安装并设置密码
-- [ ] JAR文件已上传到服务器
-- [ ] 环境变量已配置
-- [ ] 后端服务已启动
-- [ ] 防火墙已配置（仅开放80、443）
-- [ ] Nginx已配置反向代理
-- [ ] Systemd服务已创建
-- [ ] 客户端已配置云端模式
-- [ ] 客户端已成功连接
-
----
-
-## 下一步
-
-部署成功后，你可以：
-1. 配置HTTPS（使用Let's Encrypt）
-2. 配置域名解析
-3. 配置日志监控
-4. 配置数据库备份
-5. 配置自动重启
-
----
-
-## 总结
-
-云端部署的核心步骤：
-
-1. **本地构建**：`mvn clean package -pl server -am`
-2. **服务器准备**：安装Java、MySQL、Redis
-3. **上传JAR**：SCP上传到 `/opt/voluntary-ai-chat`
-4. **配置环境变量**：数据库、Redis、JWT密钥
-5. **启动服务**：`./start.sh`
-6. **配置防火墙**：仅开放80、443
-7. **配置Nginx**：反向代理到localhost:8080
-8. **客户端配置**：设置云端模式
-
-部署完成后，用户通过JavaFX客户端连接云端服务器，实现真人聊天和多人协作。
+> **实在看不懂？** 打开远程桌面，我一步一步教你。

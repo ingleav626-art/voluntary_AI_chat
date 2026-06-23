@@ -116,7 +116,7 @@ class ChatServiceHttpTest {
     }
 
     private static void setBaseUrl(String url) throws Exception {
-        Field field = ClientConfig.class.getDeclaredField("baseUrl");
+        Field field = ClientConfig.class.getDeclaredField("currentBaseUrl");
         field.setAccessible(true);
         field.set(ClientConfig.getInstance(), url);
     }

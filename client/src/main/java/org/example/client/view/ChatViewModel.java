@@ -125,11 +125,25 @@ public final class ChatViewModel {
                             final List<MessageInfo> list = response.getData().getList();
                             if (list != null) {
                                 try {
+                                    // 保存旧消息的已读状态（服务端返回的消息不含 read 字段）
+                                    // 避免 setAll 后本地的已读状态丢失
+                                    final java.util.Map<Long, Boolean> oldReadStatus = new java.util.HashMap<>();
+                                    for (final MessageInfo old : messages) {
+                                        if (old.getMessageId() != null && old.getMessageId() > 0) {
+                                            oldReadStatus.put(old.getMessageId(), old.isRead());
+                                        }
+                                    }
+
                                     // 标记是否为当前用户发送
                                     for (final MessageInfo msg : list) {
                                         msg.setSentByMe(currentUser != null
                                                 && currentUser.getUserId() != null
                                                 && currentUser.getUserId().equals(msg.getSenderId()));
+                                        // 恢复已读状态（仅在旧消息中有标记时恢复）
+                                        final Boolean wasRead = oldReadStatus.get(msg.getMessageId());
+                                        if (wasRead != null) {
+                                            msg.setRead(wasRead);
+                                        }
                                     }
                                     // 按时间升序排序（先发的在上方），服务端默认按时间倒序返回
                                     list.sort(java.util.Comparator.comparing(

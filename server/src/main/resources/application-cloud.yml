@@ -8,7 +8,7 @@ spring:
 
   # 云端MySQL数据库
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:3306/voluntary_ai_chat?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false
+    url: jdbc:mysql://${DB_HOST:localhost}:3306/voluntary_ai_chat?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=true&requireSSL=true
     username: ${DB_USER:voluntary_user}
     password: ${DB_PASSWORD:YourStrongPassword123!}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -73,16 +73,16 @@ cors:
   allow-credentials: true
   max-age: 3600
 
-# 云端模式配置
+# 云端模式启用
 cloud:
   mode:
     enabled: true
-    # 仅加载真人聊天相关组件
-    human-chat-only: true
-    # 排除AI本地模块
-    exclude-modules:
-      - ai-local
-      - vector-local
+
+server:
+  port: 8080
+  # 生产环境通过Nginx代理，不直接暴露
+  broadcast:
+    enabled: false
 
 # 图片上传配置（使用对象存储）
 upload:
@@ -97,6 +97,12 @@ upload:
       access-key: ${OSS_ACCESS_KEY:}
       secret-key: ${OSS_SECRET_KEY:}
 
+# 请求限流配置
+rate-limit:
+  enabled: true
+  capacity: 20       # 令牌桶容量（最大突发请求数）
+  refill-rate: 10    # 每秒补充令牌数
+
 # 优化日志级别
 logging:
   level:
@@ -108,10 +114,6 @@ logging:
     max-size: 10MB
     max-history: 7
 
-server:
-  port: 8080
-  # 生产环境通过Nginx代理，不直接暴露
-
 # 安全配置
 security:
   # 强制HTTPS（生产环境启用）
@@ -119,3 +121,9 @@ security:
   # 会话超时
   session:
     timeout: 7200
+  # 安全响应头
+  headers:
+    x-content-type-options: nosniff
+    x-frame-options: DENY
+    x-xss-protection: 1; mode=block
+    strict-transport-security: max-age=31536000; includeSubDomains

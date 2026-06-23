@@ -129,7 +129,7 @@ public class MessageController {
     Long userId = SecurityUtils.getCurrentUserId();
     messageService.markRead(userId, request);
 
-    // 通过 WebSocket 推送已读通知给消息发送者
+    // 通过 WebSocket 推送已读通知给消息发送者（不是读取者自己）
     List<Long> messageIds = request.getMessageIds();
     if (messageIds != null && !messageIds.isEmpty()) {
       Long lastReadMessageId = messageIds.get(messageIds.size() - 1);
@@ -142,7 +142,14 @@ public class MessageController {
               "lastReadMessageId", lastReadMessageId,
               "readTime", LocalDateTime.now().toString()))
           .build();
-      chatWebSocketHandler.sendToUser(userId, readReceipt);
+
+      // 查找消息发送者，将已读回执发给发送者
+      List<Long> senderIds = messageService.findMessageSenders(messageIds);
+      for (Long senderId : senderIds) {
+        if (!senderId.equals(userId)) {
+          chatWebSocketHandler.sendToUser(senderId, readReceipt);
+        }
+      }
     }
 
     return ApiResult.ok(null);

@@ -7,6 +7,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.example.client.util.ServerDiscovery;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -183,10 +184,17 @@ public class ServerConnectionManager {
             case HOTSPOT:
                 // 热点模式：连接局域网测试服务器
                 if (hotspotServerUrl != null && checkServerSync(hotspotServerUrl)) {
-                    LOG.info("热点模式：连接热点服务器 {}", hotspotServerUrl);
+                    LOG.info("热点模式：连接指定热点服务器 {}", hotspotServerUrl);
                     return hotspotServerUrl;
                 } else {
-                    LOG.warn("热点服务器不可用，回退到本地模式");
+                    // 没指定或不可用：自动发现局域网服务器（先监听UDP广播，再扫描）
+                    LOG.info("热点模式：未指定热点服务器或不可用，开始自动发现...");
+                    final String discoveredUrl = ServerDiscovery.autoDiscover();
+                    if (discoveredUrl != null) {
+                        LOG.info("热点模式：自动发现服务器 {}", discoveredUrl);
+                        return discoveredUrl;
+                    }
+                    LOG.warn("热点模式：未发现任何服务器，回退到本地模式");
                     currentMode = ServerMode.LOCAL;
                     return ServerMode.LOCAL.getDefaultBaseUrl();
                 }
@@ -249,7 +257,7 @@ public class ServerConnectionManager {
      * 纯AI聊天（不含群主）可以使用本地模式。
      * </p>
      *
-     * @param hasAi 群聊是否包含AI
+     * @param hasAi           群聊是否包含AI
      * @param hasHumanMembers 群聊是否包含真人成员（除群主外）
      * @return 是否需要云端连接
      */

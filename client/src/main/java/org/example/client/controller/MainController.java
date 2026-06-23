@@ -8,6 +8,7 @@ import javafx.beans.binding.Bindings;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
@@ -40,11 +41,14 @@ import org.slf4j.LoggerFactory;
 /**
  * 主界面控制器
  *
- * <p>负责会话列表展示、会话切换、聊天区域交互、WebSocket 连接状态展示。</p>
+ * <p>
+ * 负责会话列表展示、会话切换、聊天区域交互、WebSocket 连接状态展示。
+ * </p>
  *
  * <p>
  * <b>TODO:⚠️ 类长度超限警告：当前545行，超出Controller限制（300行）</b>
- * <br>请勿在此类中添加新的职责，应拆分为：
+ * <br>
+ * 请勿在此类中添加新的职责，应拆分为：
  * <ul>
  * <li>ConversationListController（会话列表管理）</li>
  * <li>ChatAreaController（聊天区域管理）</li>
@@ -143,18 +147,16 @@ public final class MainController implements Initializable {
 
         // 绑定连接状态
         statusLabel.textProperty().bind(
-                Bindings.createStringBinding(() ->
-                        viewModel.connectedProperty().get() ? "在线" : "离线",
+                Bindings.createStringBinding(() -> viewModel.connectedProperty().get() ? "在线" : "离线",
                         viewModel.connectedProperty()));
 
         statusDot.fillProperty().bind(
-                Bindings.createObjectBinding(() ->
-                        viewModel.connectedProperty().get() ? Color.valueOf("#4CAF50") : Color.valueOf("#9E9E9E"),
+                Bindings.createObjectBinding(
+                        () -> viewModel.connectedProperty().get() ? Color.valueOf("#4CAF50") : Color.valueOf("#9E9E9E"),
                         viewModel.connectedProperty()));
 
         connectionLabel.textProperty().bind(
-                Bindings.createStringBinding(() ->
-                        viewModel.connectedProperty().get() ? "已连接" : "连接中...",
+                Bindings.createStringBinding(() -> viewModel.connectedProperty().get() ? "已连接" : "连接中...",
                         viewModel.connectedProperty()));
 
         // 绑定会话列表
@@ -205,8 +207,7 @@ public final class MainController implements Initializable {
         });
 
         // 监听搜索框文本变化，实时过滤会话列表
-        searchField.textProperty().addListener((obs, oldVal, newVal) ->
-                viewModel.filterConversations(newVal));
+        searchField.textProperty().addListener((obs, oldVal, newVal) -> viewModel.filterConversations(newVal));
 
         // 绑定输入框
         final ChatViewModel chatVm = viewModel.chatViewModelProperty().get();
@@ -232,6 +233,23 @@ public final class MainController implements Initializable {
         viewModel.setOnLogout(e -> {
             Platform.runLater(() -> {
                 org.example.client.App.switchToLogin();
+            });
+        });
+
+        // 设置被踢下线回调：弹窗提示后跳转到登录页
+        viewModel.setOnKickedOut(message -> {
+            Platform.runLater(() -> {
+                final Alert alert = new Alert(Alert.AlertType.WARNING);
+                alert.setTitle("账号被踢下线");
+                alert.setHeaderText("您的账号已在其他设备登录");
+                alert.setContentText(message);
+                alert.getDialogPane().setMinWidth(380);
+                alert.getDialogPane().setMinHeight(180);
+                // 弹窗关闭后跳转到登录页
+                alert.setOnCloseRequest(e -> {
+                    org.example.client.App.switchToLogin();
+                });
+                alert.show();
             });
         });
 
@@ -329,8 +347,7 @@ public final class MainController implements Initializable {
         fileChooser.setTitle("选择图片");
         fileChooser.getExtensionFilters().addAll(
                 new javafx.stage.FileChooser.ExtensionFilter("图片文件", "*.jpg", "*.jpeg", "*.png", "*.gif", "*.webp"),
-                new javafx.stage.FileChooser.ExtensionFilter("所有文件", "*.*")
-        );
+                new javafx.stage.FileChooser.ExtensionFilter("所有文件", "*.*"));
 
         final java.io.File selectedFile = fileChooser.showOpenDialog(plusButton.getScene().getWindow());
         if (selectedFile != null) {
@@ -396,8 +413,7 @@ public final class MainController implements Initializable {
         final javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
         fileChooser.setTitle("选择文件");
         fileChooser.getExtensionFilters().addAll(
-                new javafx.stage.FileChooser.ExtensionFilter("所有文件", "*.*")
-        );
+                new javafx.stage.FileChooser.ExtensionFilter("所有文件", "*.*"));
 
         final java.io.File selectedFile = fileChooser.showOpenDialog(plusButton.getScene().getWindow());
         if (selectedFile != null) {
@@ -662,9 +678,8 @@ public final class MainController implements Initializable {
                             .thenAccept(bytes -> Platform.runLater(() -> {
                                 if (getItem() == currentItem && bytes != null && bytes.length > 0) {
                                     try {
-                                        final javafx.scene.image.Image image =
-                                                new javafx.scene.image.Image(
-                                                        new java.io.ByteArrayInputStream(bytes));
+                                        final javafx.scene.image.Image image = new javafx.scene.image.Image(
+                                                new java.io.ByteArrayInputStream(bytes));
                                         imageView.setImage(image);
                                     } catch (final Exception e) {
                                         LOG.warn("图片解码失败: {}", imageUrl, e);
@@ -698,10 +713,8 @@ public final class MainController implements Initializable {
                 String sizeText = "";
                 if (item.getExtra() != null) {
                     try {
-                        final com.fasterxml.jackson.databind.ObjectMapper mapper =
-                                new com.fasterxml.jackson.databind.ObjectMapper();
-                        final com.fasterxml.jackson.databind.JsonNode extra =
-                                mapper.readTree(item.getExtra());
+                        final com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                        final com.fasterxml.jackson.databind.JsonNode extra = mapper.readTree(item.getExtra());
                         if (extra.has("fileSize")) {
                             final long fileSize = extra.get("fileSize").asLong();
                             if (fileSize >= 1024 * 1024) {
@@ -734,9 +747,13 @@ public final class MainController implements Initializable {
             final Label time = new Label(formatTime(item.getCreateTime()));
             time.getStyleClass().add("message-time");
 
-            // 已读状态标签（仅自己发送的消息显示）
-            if (item.isSentByMe() && item.getMessageId() != null && item.getMessageId() > 0) {
-                final Label readStatus = new Label(item.isRead() ? "已读" : "未读");
+            // 已读状态标签（仅私聊中自己发送的消息显示，群聊不显示）
+            // messageId > 0 → 已确认发送，根据 isRead 显示已读/未读
+            // messageId <= 0 → 待确认发送，默认显示未读（避免空白被误认为已读）
+            final boolean isGroupChat = item.getSessionId() != null && item.getSessionId().startsWith("g_");
+            if (item.isSentByMe() && !isGroupChat) {
+                final boolean isPending = item.getMessageId() == null || item.getMessageId() <= 0;
+                final Label readStatus = new Label(isPending ? "未读" : (item.isRead() ? "已读" : "未读"));
                 readStatus.getStyleClass().add("message-read-status");
                 bubble.getChildren().addAll(time, readStatus);
             } else {

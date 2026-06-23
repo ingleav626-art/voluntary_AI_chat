@@ -2,6 +2,7 @@ package org.example.client.view;
 
 import java.util.function.Consumer;
 
+import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -69,19 +70,20 @@ public final class LoginViewModel {
         final LoginRequest request = new LoginRequest(
                 phone.get(),
                 password.get(),
-                rememberMe.get()
-        );
+                rememberMe.get());
 
         // 发送异步请求
         AuthService.getInstance().login(request)
                 .thenAcceptAsync(response -> {
-                    loading.set(false);
+                    Platform.runLater(() -> {
+                        loading.set(false);
 
-                    if (response != null && response.isSuccess()) {
-                        handleSuccess(response.getData());
-                    } else {
-                        handleFailure(response != null ? response.getMessage() : "登录失败");
-                    }
+                        if (response != null && response.isSuccess()) {
+                            handleSuccess(response.getData());
+                        } else {
+                            handleFailure(response != null ? response.getMessage() : "登录失败");
+                        }
+                    });
                 });
     }
 
@@ -165,4 +167,3 @@ public final class LoginViewModel {
         this.onFailure = callback;
     }
 }
-

@@ -13,7 +13,7 @@ spring:
     enabled: false
 
   datasource:
-    url: jdbc:h2:file:${app.data.dir:./data}/voluntary_ai_chat;AUTO_SERVER=TRUE;MODE=MySQL;NON_KEYWORDS=USER
+    url: jdbc:h2:file:${user.dir}/data/voluntary_ai_chat;AUTO_SERVER=TRUE;MODE=MySQL;NON_KEYWORDS=USER
     username: sa
     password:
     driver-class-name: org.h2.Driver
@@ -46,10 +46,10 @@ spring:
     endpoints:
       enabled-by-default: false
 
-# 应用数据目录（Windows 标准 AppData 位置）
+# 应用数据目录
 app:
   data:
-    dir: ${APPDATA:./data}/Voluntary-AI-Chat/data
+    dir: ./data
 
 # 本地模式配置
 local:

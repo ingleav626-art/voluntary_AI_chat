@@ -36,7 +36,8 @@ import javafx.collections.ObservableList;
  *
  * <p>
  * <b>TODO:⚠️ 类长度超限警告：当前526行，超出Service限制（400行）</b>
- * <br>请勿在此类中添加新的职责，应拆分为：
+ * <br>
+ * 请勿在此类中添加新的职责，应拆分为：
  * <ul>
  * <li>WebSocketMessageHandler（WebSocket消息处理）</li>
  * <li>ConversationManager（会话列表管理）</li>
@@ -81,6 +82,9 @@ public final class MainViewModel {
 
     /** 退出登录回调 */
     private Consumer<Void> onLogout;
+
+    /** 被踢下线回调（参数为原因描述） */
+    private Consumer<String> onKickedOut;
 
     public MainViewModel() {
         // 初始化 WebSocket 消息回调
@@ -169,7 +173,8 @@ public final class MainViewModel {
      * 加载会话列表（带搜索关键词）- 已废弃，改用本地过滤
      *
      * @param keyword 搜索关键词，为空则返回全部
-     * @deprecated 使用 {@link #loadConversations()} + {@link #filterConversations(String)} 替代
+     * @deprecated 使用 {@link #loadConversations()} +
+     *             {@link #filterConversations(String)} 替代
      */
     @Deprecated
     private void loadConversations(final String keyword) {
@@ -232,6 +237,7 @@ public final class MainViewModel {
             case MessageTypes.GROUP_MEMBER_ROLE_CHANGE -> handleGroupMemberRoleChange(wsMessage);
             case MessageTypes.GROUP_INFO_CHANGE -> handleGroupInfoChange(wsMessage);
             case MessageTypes.GROUP_DISMISSED -> handleGroupDismissed(wsMessage);
+            case MessageTypes.FORCE_LOGOUT -> handleForceLogout(wsMessage);
             default -> LOG.debug("未处理的消息类型: {}", wsMessage.getType());
         }
     }
@@ -316,21 +322,49 @@ public final class MainViewModel {
 
         final ChatViewModel chatVm = chatViewModel.get();
         if (chatVm != null && sessionId.equals(chatVm.getSessionId())) {
-            // 更新当前会话中消息的已读状态
-            for (final MessageInfo msg : chatVm.getMessages()) {
+            // 更新当前会话中所有 <= lastReadMessageId 的已发送消息为已读
+            final Long lastReadId = Long.parseLong(lastReadMessageId);
+            final ObservableList<MessageInfo> msgList = chatVm.getMessages();
+            for (int i = 0; i < msgList.size(); i++) {
+                final MessageInfo msg = msgList.get(i);
                 if (msg.isSentByMe() && msg.getMessageId() != null
-                        && lastReadMessageId.equals(String.valueOf(msg.getMessageId()))) {
+                        && msg.getMessageId() <= lastReadId && !msg.isRead()) {
                     msg.setRead(true);
-                    final int index = chatVm.getMessages().indexOf(msg);
-                    if (index >= 0) {
-                        chatVm.getMessages().set(index, msg);
-                    }
-                    break;
+                    // 替换元素触发 ObservableList 更新事件
+                    msgList.set(i, msg);
                 }
             }
         }
 
         LOG.info("收到已读回执: sessionId={}, lastReadMessageId={}", sessionId, lastReadMessageId);
+    }
+
+    /**
+     * 处理强制下线通知（账号在其他设备登录）
+     * 清理数据、停止重连，触发前端弹窗提示并跳转到登录页
+     */
+    @SuppressWarnings("unchecked")
+    private void handleForceLogout(final WebSocketMessage wsMessage) {
+        final java.util.Map<String, Object> data = (java.util.Map<String, Object>) wsMessage.getData();
+        final String reason = data != null && data.get("reason") != null
+                ? String.valueOf(data.get("reason"))
+                : "您的账号在其他设备登录";
+
+        LOG.warn("收到强制下线通知: reason={}", reason);
+
+        // 关闭 WebSocket、清理本地数据
+        WebSocketClient.getInstance().close();
+        currentUser.set(null);
+        conversations.clear();
+        selectedConversation.set(null);
+        chatViewModel.set(null);
+
+        // 触发 UI 弹窗并跳转登录页
+        if (onKickedOut != null) {
+            onKickedOut.accept("您的账户在别处登录，如果不是本人操作，请立即修改密码。");
+        } else if (onLogout != null) {
+            onLogout.accept(null);
+        }
     }
 
     /**
@@ -424,7 +458,7 @@ public final class MainViewModel {
      * 确保群会话在会话列表中可见（不存在则动态添加）
      */
     private void ensureGroupConversation(final Long groupId, final String sessionId,
-                                          final String content, final String avatar) {
+            final String content, final String avatar) {
         // 检查是否已在列表中
         for (final ConversationInfo conv : conversations) {
             if (sessionId.equals(conv.getSessionId())) {
@@ -442,7 +476,7 @@ public final class MainViewModel {
         newConv.setSessionId(sessionId);
         newConv.setTargetId(groupId);
         newConv.setTargetType("GROUP");
-        newConv.setTargetName("群聊");  // 及时显示，名称后续刷新会话列表时更新
+        newConv.setTargetName("群聊"); // 及时显示，名称后续刷新会话列表时更新
         newConv.setTargetAvatar(avatar);
         newConv.setLastMessage(content);
         newConv.setLastMessageType("SYSTEM");
@@ -877,5 +911,14 @@ public final class MainViewModel {
 
     public void setOnLogout(final Consumer<Void> callback) {
         this.onLogout = callback;
+    }
+
+    /**
+     * 设置被踢下线回调
+     *
+     * @param callback 参数为弹窗提示文字
+     */
+    public void setOnKickedOut(final Consumer<String> callback) {
+        this.onKickedOut = callback;
     }
 }
