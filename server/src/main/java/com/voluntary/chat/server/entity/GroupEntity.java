@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
  * @since 1.0.0
  */
 @Data
-@TableName("`group`")
+@TableName("chat_group")
 public class GroupEntity {
 
   @TableId(type = IdType.ASSIGN_ID)

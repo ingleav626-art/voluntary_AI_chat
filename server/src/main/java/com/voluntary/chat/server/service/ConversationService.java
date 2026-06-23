@@ -25,6 +25,13 @@ public class ConversationService {
     private final UserService userService;
     private final GroupMapper groupMapper;
 
+    /** 私聊sessionId分割后的第一个用户ID索引 */
+    private static final int PRIVATE_SESSION_ID1_INDEX = 1;
+    /** 私聊sessionId分割后的第二个用户ID索引 */
+    private static final int PRIVATE_SESSION_ID2_INDEX = 2;
+    /** 群聊sessionId分割后的群ID索引 */
+    private static final int GROUP_SESSION_ID_INDEX = 1;
+
     /**
      * 获取当前用户的会话列表（兼容：无关键词搜索）
      */
@@ -112,8 +119,8 @@ public class ConversationService {
         if (sessionId.startsWith("p_")) {
             // 单聊：对方是 target
             String[] parts = sessionId.split("_");
-            Long user1 = Long.parseLong(parts[1]);
-            Long user2 = Long.parseLong(parts[2]);
+            Long user1 = Long.parseLong(parts[PRIVATE_SESSION_ID1_INDEX]);
+            Long user2 = Long.parseLong(parts[PRIVATE_SESSION_ID2_INDEX]);
             Long targetId = user1.equals(userId) ? user2 : user1;
             User target = userService.findById(targetId);
             builder.targetId(targetId)
@@ -123,7 +130,7 @@ public class ConversationService {
         } else if (sessionId.startsWith("g_")) {
             // 群聊：查询真实群名称和头像
             String[] parts = sessionId.split("_");
-            Long groupId = Long.parseLong(parts[1]);
+            Long groupId = Long.parseLong(parts[GROUP_SESSION_ID_INDEX]);
             GroupEntity group = groupMapper.selectById(groupId);
             if (group != null) {
                 builder.targetId(groupId)

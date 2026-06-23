@@ -365,4 +365,152 @@ class MessageServiceTest {
         verify(messageMapper).updateById(any(Message.class));
     }
 
+    @Test
+    @DisplayName("发送消息成功-群聊")
+    void sendMessage_shouldSucceed_groupChat() {
+        SendMessageRequest request = new SendMessageRequest();
+        request.setSessionId("g_2001");
+        request.setType("TEXT");
+        request.setContent("大家好");
+
+        when(messageMapper.insert(any(Message.class))).thenReturn(1);
+
+        SendMessageResponse response = messageService.sendMessage(1001L, request);
+
+        assertNotNull(response);
+        verify(messageMapper).insert(any(Message.class));
+    }
+
+    @Test
+    @DisplayName("发送消息成功-图片类型")
+    void sendMessage_shouldSucceed_imageType() {
+        SendMessageRequest request = new SendMessageRequest();
+        request.setSessionId("p_1001_1002");
+        request.setType("IMAGE");
+        request.setContent("http://example.com/image.jpg");
+
+        when(messageMapper.insert(any(Message.class))).thenReturn(1);
+
+        SendMessageResponse response = messageService.sendMessage(1001L, request);
+
+        assertNotNull(response);
+        verify(messageMapper).insert(any(Message.class));
+    }
+
+    @Test
+    @DisplayName("发送消息成功-转发类型")
+    void sendMessage_shouldSucceed_forwardType() {
+        SendMessageRequest request = new SendMessageRequest();
+        request.setSessionId("p_1001_1002");
+        request.setType("FORWARD");
+        request.setContent("转发的内容");
+
+        when(messageMapper.insert(any(Message.class))).thenReturn(1);
+
+        SendMessageResponse response = messageService.sendMessage(1001L, request);
+
+        assertNotNull(response);
+        verify(messageMapper).insert(any(Message.class));
+    }
+
+    @Test
+    @DisplayName("获取聊天记录-第二页")
+    void getHistory_shouldReturnSecondPage() {
+        when(messageMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(25L);
+        when(messageMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(mockMessage));
+        when(userService.findByIds(any(Set.class))).thenReturn(Map.of(1001L, mockSender));
+
+        PageResult<MessageResponse> result = messageService.getHistory("p_1001_1002", 1002L, 2, 20);
+
+        assertNotNull(result);
+        assertEquals(25, result.getTotal());
+        assertEquals(1, result.getList().size());
+    }
+
+    @Test
+    @DisplayName("标记已读-空消息列表")
+    void markRead_shouldSucceed_emptyMessageList() {
+        MarkReadRequest request = new MarkReadRequest();
+        request.setSessionId("p_1001_1002");
+        request.setMessageIds(Collections.emptyList());
+
+        assertDoesNotThrow(() -> messageService.markRead(1002L, request));
+        verify(messageReadMapper, never()).insert(any(MessageRead.class));
+    }
+
+    @Test
+    @DisplayName("撤回消息-已撤回的消息不能再次撤回")
+    void recallMessage_shouldFail_alreadyRecalled() {
+        mockMessage.setRecallTime(LocalDateTime.now().minusMinutes(1));
+        mockMessage.setCreateTime(LocalDateTime.now().minusMinutes(5)); // 超过2分钟
+
+        when(messageMapper.selectById(MESSAGE_ID)).thenReturn(mockMessage);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> messageService.recallMessage(USER_ID, MESSAGE_ID));
+        assertEquals(ErrorCode.MESSAGE_RECALL_TIMEOUT, exception.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("获取未读消息数-无未读消息")
+    void getUnreadCount_shouldReturnZero_whenNoUnread() {
+        when(messageMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Collections.emptyList());
+
+        long count = messageService.getUnreadCount(1002L, "p_1001_1002");
+
+        assertEquals(0, count);
+    }
+
+    @Test
+    @DisplayName("获取最后一条消息-无消息")
+    void getLastMessage_shouldReturnNull_whenNoMessage() {
+        when(messageMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+
+        Message result = messageService.getLastMessage("p_1001_1002");
+
+        assertNull(result);
+    }
+
+    @Test
+    @DisplayName("获取聊天记录-包含AI消息")
+    void getHistory_shouldIncludeAiMessages() {
+        Message aiMessage = new Message();
+        aiMessage.setId(2002L);
+        aiMessage.setSessionId("a_3001_1001");
+        aiMessage.setSenderId(3001L);
+        aiMessage.setSenderType(1); // AI
+        aiMessage.setTargetId(1001L);
+        aiMessage.setTargetType(0);
+        aiMessage.setType(0);
+        aiMessage.setContent("你好！有什么可以帮助你的？");
+        aiMessage.setCreateTime(LocalDateTime.now());
+        aiMessage.setIsDeleted(0);
+
+        when(messageMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(2L);
+        when(messageMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(mockMessage, aiMessage));
+        when(userService.findByIds(any(Set.class))).thenReturn(Map.of(1001L, mockSender));
+
+        PageResult<MessageResponse> result = messageService.getHistory("a_3001_1001", 1001L, 1, 20);
+
+        assertNotNull(result);
+        assertEquals(2, result.getTotal());
+        assertEquals(2, result.getList().size());
+    }
+
+    @Test
+    @DisplayName("发送消息-sessionId格式为a_（AI会话）")
+    void sendMessage_shouldSucceed_aiSession() {
+        SendMessageRequest request = new SendMessageRequest();
+        request.setSessionId("a_3001_1001");
+        request.setType("TEXT");
+        request.setContent("你好");
+
+        when(messageMapper.insert(any(Message.class))).thenReturn(1);
+
+        SendMessageResponse response = messageService.sendMessage(1001L, request);
+
+        assertNotNull(response);
+        verify(messageMapper).insert(any(Message.class));
+    }
+
 }

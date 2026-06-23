@@ -5,6 +5,10 @@ target/
 !**/src/test/**/target/
 .kotlin
 
+#other
+AGENTS.md
+tools/
+
 # Java
 *.class
 *.jar
