@@ -355,11 +355,29 @@ public class GroupService {
             }
         }
 
+        // 获取被移除用户的信息
+        User targetUser = userService.findById(targetUserId);
+        if (targetUser == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
+        }
+
         // 移除成员
         LambdaQueryWrapper<GroupMember> deleteWrapper = new LambdaQueryWrapper<>();
         deleteWrapper.eq(GroupMember::getGroupId, groupId)
                 .eq(GroupMember::getUserId, targetUserId);
         groupMemberMapper.delete(deleteWrapper);
+
+        // 创建系统消息：XXX 已被移出群聊
+        final String groupSessionId = "g_" + groupId;
+        Message sysMsg = new Message();
+        sysMsg.setSessionId(groupSessionId);
+        sysMsg.setSenderId(targetUserId);
+        sysMsg.setSenderType(SenderType.SYSTEM.ordinal());
+        sysMsg.setTargetId(groupId);
+        sysMsg.setTargetType(1); // GROUP
+        sysMsg.setType(MessageType.SYSTEM.ordinal());
+        sysMsg.setContent(targetUser.getUsername() + " 已被移出群聊");
+        messageMapper.insert(sysMsg);
 
         log.info("成员已移除: groupId={}, targetUserId={}, operatorId={}",
                 groupId, targetUserId, userId);
@@ -382,11 +400,29 @@ public class GroupService {
             throw new BusinessException(ErrorCode.NO_PERMISSION, "群主不可退出群组，请先转让群主");
         }
 
+        // 获取退出用户的信息
+        User leaveUser = userService.findById(userId);
+        if (leaveUser == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
+        }
+
         // 删除成员记录
         LambdaQueryWrapper<GroupMember> deleteWrapper = new LambdaQueryWrapper<>();
         deleteWrapper.eq(GroupMember::getGroupId, groupId)
                 .eq(GroupMember::getUserId, userId);
         groupMemberMapper.delete(deleteWrapper);
+
+        // 创建系统消息：XXX 已退出群聊
+        final String groupSessionId = "g_" + groupId;
+        Message sysMsg = new Message();
+        sysMsg.setSessionId(groupSessionId);
+        sysMsg.setSenderId(userId);
+        sysMsg.setSenderType(SenderType.SYSTEM.ordinal());
+        sysMsg.setTargetId(groupId);
+        sysMsg.setTargetType(1); // GROUP
+        sysMsg.setType(MessageType.SYSTEM.ordinal());
+        sysMsg.setContent(leaveUser.getUsername() + " 已退出群聊");
+        messageMapper.insert(sysMsg);
 
         log.info("用户退出群组: groupId={}, userId={}", groupId, userId);
     }

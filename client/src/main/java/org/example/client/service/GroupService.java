@@ -222,16 +222,21 @@ public final class GroupService extends BaseHttpService {
      * @param name         群名称
      * @param announcement 群公告
      * @param announcementPinned 公告是否置顶
+     * @param avatar       群头像URL（可选）
      * @return 异步结果
      */
     public CompletableFuture<ApiResponse<Void>> updateGroup(
             final Long groupId, final String name,
-            final String announcement, final boolean announcementPinned) {
+            final String announcement, final boolean announcementPinned,
+            final String avatar) {
         final String path = GROUP_PATH + "/" + groupId;
         final Map<String, Object> body = new HashMap<>();
         body.put("name", name);
         body.put("announcement", announcement);
         body.put("announcementPinned", announcementPinned);
+        if (avatar != null && !avatar.isEmpty()) {
+            body.put("avatar", avatar);
+        }
         final HttpRequest httpRequest = buildPutRequest(path, body).build();
 
         LOG.info("修改群信息: groupId={}, name={}", groupId, name);

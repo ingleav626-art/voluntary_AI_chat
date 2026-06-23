@@ -64,6 +64,16 @@ public final class NotificationDialog {
     }
 
     /**
+     * 显示错误通知弹窗
+     *
+     * @param title   标题
+     * @param message 消息内容
+     */
+    public static void showError(final String title, final String message) {
+        show(title, message, Type.ERROR);
+    }
+
+    /**
      * 显示通知弹窗
      *
      * @param title   标题
@@ -136,7 +146,8 @@ public final class NotificationDialog {
     private enum Type {
         SUCCESS("#4CAF50", "\u2714"),
         INFO("#2196F3", "\u2139"),
-        WARNING("#FF9800", "\u26A0");
+        WARNING("#FF9800", "\u26A0"),
+        ERROR("#F44336", "\u2716");
 
         private final String color;
         private final String icon;

@@ -23,7 +23,7 @@ class TargetTypeTest {
     @Test
     @DisplayName("枚举数量")
     void enumCount() {
-        assertEquals(2, TargetType.values().length);
+        assertEquals(3, TargetType.values().length);
     }
 
     @Test
@@ -31,5 +31,6 @@ class TargetTypeTest {
     void valueOf() {
         assertEquals(TargetType.USER, TargetType.valueOf("USER"));
         assertEquals(TargetType.GROUP, TargetType.valueOf("GROUP"));
+        assertEquals(TargetType.AI, TargetType.valueOf("AI"));
     }
 }

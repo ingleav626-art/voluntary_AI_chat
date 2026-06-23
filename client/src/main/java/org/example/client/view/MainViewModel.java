@@ -8,6 +8,8 @@ import org.example.client.model.ConversationInfo;
 import org.example.client.model.LoginResponse;
 import org.example.client.model.MessageInfo;
 import org.example.client.model.UserInfo;
+import org.example.client.util.CredentialStorage;
+import org.example.client.util.TokenStorage;
 import org.example.client.service.ChatService;
 import org.example.client.service.WebSocketClient;
 import org.slf4j.Logger;
@@ -16,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import com.voluntary.chat.common.constant.MessageTypes;
 import com.voluntary.chat.common.model.WebSocketMessage;
 
+import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ListProperty;
 import javafx.beans.property.ObjectProperty;
@@ -208,6 +211,8 @@ public final class MainViewModel {
             return;
         }
 
+        LOG.debug("[WS-RECV] 收到WebSocket消息: type={}", wsMessage.getType());
+
         switch (wsMessage.getType()) {
             case MessageTypes.RECEIVE_MESSAGE -> handleReceiveMessage(wsMessage);
             case MessageTypes.GROUP_MESSAGE -> handleGroupMessage(wsMessage);
@@ -222,6 +227,8 @@ public final class MainViewModel {
             case MessageTypes.GROUP_MEMBER_ROLE_CHANGE -> handleGroupMemberRoleChange(wsMessage);
             case MessageTypes.GROUP_INFO_CHANGE -> handleGroupInfoChange(wsMessage);
             case MessageTypes.GROUP_DISMISSED -> handleGroupDismissed(wsMessage);
+            // AI 流式输出
+            case MessageTypes.AI_STREAM -> handleAiStream(wsMessage);
             default -> LOG.debug("未处理的消息类型: {}", wsMessage.getType());
         }
     }
@@ -432,7 +439,7 @@ public final class MainViewModel {
         newConv.setSessionId(sessionId);
         newConv.setTargetId(groupId);
         newConv.setTargetType("GROUP");
-        newConv.setTargetName("群聊");  // 及时显示，名称后续刷新会话列表时更新
+        newConv.setTargetName("群聊");  // 临时占位，立即刷新获取真实名称
         newConv.setTargetAvatar(avatar);
         newConv.setLastMessage(content);
         newConv.setLastMessageType("SYSTEM");
@@ -440,7 +447,9 @@ public final class MainViewModel {
         newConv.setUnreadCount(1);
         // 插入到列表最前面
         conversations.add(0, newConv);
-        LOG.info("动态添加群会话: groupId={}, sessionId={}", groupId, sessionId);
+        LOG.info("动态添加群会话: groupId={}, sessionId={}，正在刷新获取群名称...", groupId, sessionId);
+        // 立即刷新会话列表以获取正确的群名称
+        Platform.runLater(this::loadConversations);
     }
 
     /**
@@ -454,8 +463,54 @@ public final class MainViewModel {
         }
         final Long groupId = toLong(data.get("groupId"));
         final Long userId = toLong(data.get("userId"));
-        LOG.info("群成员离开: groupId={}, userId={}", groupId, userId);
-        // 通知群组面板刷新成员列表（踢人后实时更新）
+        final String username = (String) data.get("username");
+        final String reason = (String) data.get("reason");
+        LOG.info("群成员离开: groupId={}, userId={}, username={}, reason={}", groupId, userId, username, reason);
+
+        // 根据离开原因构造不同的系统消息
+        final String sessionId = "g_" + groupId;
+        final String content;
+        if ("KICKED".equals(reason)) {
+            content = (username != null ? username : "未知用户") + " 已被移出群聊";
+        } else {
+            content = (username != null ? username : "未知用户") + " 已退出群聊";
+        }
+        final MessageInfo sysMsg = new MessageInfo();
+        sysMsg.setMessageId(-System.currentTimeMillis());
+        sysMsg.setSessionId(sessionId);
+        sysMsg.setSenderId(-1L);
+        sysMsg.setSenderName("");
+        sysMsg.setSenderAvatar("");
+        sysMsg.setSenderType("SYSTEM");
+        sysMsg.setType("SYSTEM");
+        sysMsg.setContent(content);
+        sysMsg.setCreateTime(java.time.LocalDateTime.now());
+        sysMsg.setSentByMe(false);
+
+        // 追加到聊天区（如果正在查看）或加入待注入队列
+        final ChatViewModel chatVm = chatViewModel.get();
+        if (chatVm != null && sessionId.equals(chatVm.getSessionId())) {
+            chatVm.appendMessage(sysMsg);
+        } else {
+            // 用户未查看该群时，进入待注入队列，待下次打开群聊时自动注入
+            ChatViewModel.addPendingSystemMessage(sessionId, sysMsg);
+        }
+
+        // 更新会话列表中的最后一条消息
+        for (final ConversationInfo conv : conversations) {
+            if (sessionId.equals(conv.getSessionId())) {
+                conv.setLastMessage(content);
+                conv.setLastMessageTime(java.time.LocalDateTime.now());
+                conv.setLastMessageType("SYSTEM");
+                final int index = conversations.indexOf(conv);
+                if (index >= 0) {
+                    conversations.set(index, conv);
+                }
+                break;
+            }
+        }
+
+        // 通知群组面板刷新成员列表
         GroupListViewModel.notifyMemberChanged(groupId);
     }
 
@@ -511,6 +566,34 @@ public final class MainViewModel {
         if (chatVm != null && sessionId.equals(chatVm.getSessionId())) {
             chatViewModel.set(null);
         }
+    }
+
+    /**
+     * 处理 AI 流式输出
+     * 将 AI 增量内容追加到当前聊天区的消息中
+     */
+    @SuppressWarnings("unchecked")
+    private void handleAiStream(final WebSocketMessage wsMessage) {
+        final java.util.Map<String, Object> data = (java.util.Map<String, Object>) wsMessage.getData();
+        if (data == null) {
+            return;
+        }
+
+        final String messageId = String.valueOf(data.get("messageId"));
+        final String content = (String) data.get("content");
+        final boolean done = Boolean.TRUE.equals(data.get("done"));
+        final Object aiMessageIdObj = data.get("aiMessageId");
+
+        LOG.debug("[AI-STREAM] 收到AI流式消息: messageId={}, done={}, contentLen={}",
+                messageId, done, content != null ? content.length() : 0);
+
+        final ChatViewModel chatVm = chatViewModel.get();
+        if (chatVm == null) {
+            LOG.debug("[AI-STREAM] 当前无活跃聊天，忽略AI流式消息");
+            return;
+        }
+
+        chatVm.handleAiStream(messageId, content, done, aiMessageIdObj != null ? toLong(aiMessageIdObj) : null);
     }
 
     /**
@@ -746,6 +829,7 @@ public final class MainViewModel {
      */
     public void logout() {
         WebSocketClient.getInstance().close();
+        TokenStorage.clear();
         currentUser.set(null);
         conversations.clear();
         selectedConversation.set(null);
@@ -799,6 +883,18 @@ public final class MainViewModel {
     // Property getters
     public ObjectProperty<UserInfo> currentUserProperty() {
         return currentUser;
+    }
+
+    /**
+     * 更新当前用户信息
+     *
+     * @param user 新的用户信息
+     */
+    public void updateCurrentUser(final UserInfo user) {
+        if (user != null) {
+            currentUser.set(user);
+            LOG.info("用户信息已更新: userId={}", user.getUserId());
+        }
     }
 
     public ListProperty<ConversationInfo> conversationsProperty() {

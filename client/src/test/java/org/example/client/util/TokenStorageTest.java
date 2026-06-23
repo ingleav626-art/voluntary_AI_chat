@@ -190,13 +190,16 @@ class TokenStorageTest {
     @Test
     @DisplayName("load 文件存在且无内存缓存时从文件加载")
     void testLoadFromFileWithoutMemoryCache() throws Exception {
-        // 先清除所有缓存
-        TokenStorage.clear();
+        // 先通过 save 持久化创建文件
+        LoginResponse saved = new LoginResponse();
+        saved.setAccessToken("file-load-token");
+        saved.setRefreshToken("file-load-refresh");
+        TokenStorage.save(saved, true);
 
-        // 直接写入文件
-        String fileData = Base64.getEncoder().encodeToString("file-load-token|file-load-refresh".getBytes());
-        Path tokenFile = tempDir.resolve("token.dat");
-        Files.writeString(tokenFile, fileData);
+        // 通过反射清除内存缓存，但保留文件
+        java.lang.reflect.Field cachedField = TokenStorage.class.getDeclaredField("cachedToken");
+        cachedField.setAccessible(true);
+        cachedField.set(null, (LoginResponse) null);
 
         // 无内存缓存时应从文件加载
         LoginResponse loaded = TokenStorage.load();
@@ -263,16 +266,23 @@ class TokenStorageTest {
     void testLoadCachesToMemory() throws Exception {
         TokenStorage.clear();
 
-        // 写入一个文件
-        String fileData = Base64.getEncoder().encodeToString("cache-token|cache-refresh".getBytes());
-        Path tokenFile = tempDir.resolve("token.dat");
-        Files.writeString(tokenFile, fileData);
+        // 通过 save 持久化创建文件
+        LoginResponse saved = new LoginResponse();
+        saved.setAccessToken("cache-token");
+        saved.setRefreshToken("cache-refresh");
+        TokenStorage.save(saved, true);
+
+        // 通过反射清除内存缓存，但保留文件
+        java.lang.reflect.Field cachedField = TokenStorage.class.getDeclaredField("cachedToken");
+        cachedField.setAccessible(true);
+        cachedField.set(null, (LoginResponse) null);
 
         // 第一次 load 从文件
         LoginResponse first = TokenStorage.load();
         assertNotNull(first);
 
         // 删除文件
+        Path tokenFile = tempDir.resolve("token.dat");
         Files.deleteIfExists(tokenFile);
 
         // 第二次 load 应该从内存缓存（文件已删）

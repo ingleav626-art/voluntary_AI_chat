@@ -15,6 +15,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import org.example.client.model.LoginResponse;
+import org.example.client.util.CredentialStorage;
 import org.example.client.view.LoginViewModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,7 +68,34 @@ public final class LoginController implements Initializable {
         viewModel.setOnSuccess(this::handleLoginSuccess);
         viewModel.setOnFailure(this::handleLoginFailure);
 
+        // 预填已保存的账号密码（勾选"记住我"后的效果）
+        prefillCredentials();
+
         LOG.info("登录控制器初始化完成");
+    }
+
+    /**
+     * 预填上次保存的账号密码
+     *
+     * <p>如果之前登录勾选了"记住我"，则自动填充手机号和密码，用户只需点击登录即可。</p>
+     */
+    private void prefillCredentials() {
+        LOG.info("[记住我-预填] 开始尝试预填凭证...");
+        final String[] credentials = CredentialStorage.load();
+        if (credentials == null || credentials.length != 2) {
+            LOG.info("[记住我-预填] 没有已保存的凭证，跳过");
+            return;
+        }
+
+        final String savedPhone = credentials[0];
+        final String savedPassword = credentials[1];
+
+        LOG.info("[记住我-预填] 发现已保存的凭证，预填手机号: {}", savedPhone);
+        phoneField.setText(savedPhone);
+        passwordField.setText(savedPassword);
+        rememberMeCheckBox.setSelected(true);
+        LOG.info("[记住我-预填] 预填完成: phoneField.text={}, rememberMe={}",
+                phoneField.getText(), rememberMeCheckBox.isSelected());
     }
 
     @FXML

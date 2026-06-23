@@ -10,6 +10,7 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import org.example.client.config.ClientConfig;
 import org.example.client.controller.MainController;
+import org.example.client.model.ConversationInfo;
 import org.example.client.model.LoginResponse;
 import org.example.client.util.ServerDiscovery;
 import org.slf4j.Logger;
@@ -64,11 +65,17 @@ public class App extends Application {
     /** 群组面板 FXML */
     private static final String GROUP_FXML = "/fxml/group_panel.fxml";
 
+    /** AI 助手面板 FXML */
+    private static final String AI_FXML = "/fxml/ai_panel.fxml";
+
     /** 主舞台引用，用于页面切换 */
     private static Stage primaryStage;
 
     /** 当前登录响应，用于界面间切换保持登录态 */
     private static LoginResponse currentLoginResponse;
+
+    /** 待跳转的 AI 会话（从 AI 面板跳转到聊天时使用） */
+    private static ConversationInfo pendingAiConversation;
 
     @Override
     public void init() {
@@ -197,6 +204,12 @@ public class App extends Application {
             final MainController controller = loader.getController();
             if (controller != null) {
                 controller.initData(loginResponse);
+                // 如果有待跳转的 AI 会话，自动选中
+                if (pendingAiConversation != null) {
+                    final ConversationInfo conv = pendingAiConversation;
+                    pendingAiConversation = null;
+                    javafx.application.Platform.runLater(() -> controller.selectAiConversation(conv));
+                }
             }
 
             final Scene scene = createScene(root, MAIN_WINDOW_WIDTH, MAIN_WINDOW_HEIGHT);
@@ -271,6 +284,61 @@ public class App extends Application {
      * 从群组面板返回主聊天界面
      */
     public static void switchToMainFromGroup() {
+        if (currentLoginResponse != null) {
+            switchToMain(currentLoginResponse);
+        } else {
+            switchToLogin();
+        }
+    }
+
+    /**
+     * 切换到 AI 助手面板
+     */
+    public static void switchToAi() {
+        try {
+            final FXMLLoader loader = new FXMLLoader(App.class.getResource(AI_FXML));
+            final Parent root = loader.load();
+
+            final Scene scene = createScene(root, MAIN_WINDOW_WIDTH, MAIN_WINDOW_HEIGHT);
+            primaryStage.setTitle("AI 聊天 - AI 助手");
+            primaryStage.setScene(scene);
+            primaryStage.setWidth(MAIN_WINDOW_WIDTH);
+            primaryStage.setHeight(MAIN_WINDOW_HEIGHT);
+            primaryStage.setResizable(true);
+            primaryStage.centerOnScreen();
+            LOG.info("已切换到AI助手面板");
+        } catch (final Exception e) {
+            LOG.error("加载AI助手面板失败", e);
+        }
+    }
+
+    /**
+     * 从 AI 助手面板跳转到与指定 AI 的聊天界面
+     *
+     * @param aiId   AI 角色ID
+     * @param aiName AI 名称
+     * @param avatar AI 头像URL
+     */
+    public static void switchToMainWithAiConversation(final Long aiId, final String aiName, final String avatar) {
+        if (currentLoginResponse == null) {
+            LOG.warn("未登录，无法跳转到AI聊天");
+            switchToLogin();
+            return;
+        }
+        final ConversationInfo conv = new ConversationInfo();
+        conv.setSessionId("a_" + aiId);
+        conv.setTargetId(aiId);
+        conv.setTargetType("AI");
+        conv.setTargetName(aiName != null ? aiName : "AI助手");
+        conv.setTargetAvatar(avatar);
+        pendingAiConversation = conv;
+        switchToMain(currentLoginResponse);
+    }
+
+    /**
+     * 从 AI 助手面板返回主聊天界面（不选中特定会话）
+     */
+    public static void switchToMainFromAi() {
         if (currentLoginResponse != null) {
             switchToMain(currentLoginResponse);
         } else {

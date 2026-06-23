@@ -74,7 +74,8 @@ public final class TokenStorage {
         try {
             Files.createDirectories(tokenFile.getParent());
 
-            final String data = response.getAccessToken() + "|" + response.getRefreshToken();
+            // 保存完整的 LoginResponse（包括用户信息）
+            final String data = JsonUtils.toJson(response);
             final String encrypted = Base64.getEncoder().encodeToString(data.getBytes());
 
             Files.writeString(tokenFile, encrypted);
@@ -107,15 +108,13 @@ public final class TokenStorage {
             final String encrypted = Files.readString(tokenFile);
             final String data = new String(Base64.getDecoder().decode(encrypted));
 
-            final String[] parts = data.split("\\|");
-            if (parts.length != TOKEN_PARTS_COUNT) {
+            // 解析完整的 LoginResponse
+            final LoginResponse response = JsonUtils.fromJson(data, LoginResponse.class);
+            if (response == null || response.getAccessToken() == null || response.getRefreshToken() == null) {
                 LOG.warn("Token 文件格式错误");
                 return null;
             }
 
-            final LoginResponse response = new LoginResponse();
-            response.setAccessToken(parts[0]);
-            response.setRefreshToken(parts[1]);
             // 缓存到内存，避免重复读取文件
             cachedToken = response;
             return response;

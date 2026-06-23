@@ -1,0 +1,31 @@
+package org.example.client.model;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * AI 记忆模型
+ *
+ * <p>对应后端 AiMemoryResponse，用于 AI 记忆展示。</p>
+ */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class AiMemory {
+
+    /** 记忆ID */
+    private Long memoryId;
+
+    /** 摘要内容 */
+    private String summary;
+
+    /** 关键词（逗号分隔） */
+    private String keywords;
+
+    /** 重要度评分（0-1） */
+    private Double importance;
+
+    /** 创建时间 */
+    private String createTime;
+}

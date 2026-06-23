@@ -1,6 +1,8 @@
 package com.voluntary.chat.server.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.voluntary.chat.common.enums.SenderType;
+import com.voluntary.chat.common.enums.TargetType;
 import com.voluntary.chat.server.client.OpenAiClient;
 import com.voluntary.chat.server.config.AiConfig;
 import com.voluntary.chat.server.entity.AiProfile;
@@ -52,6 +54,9 @@ public class AiChatService {
         final AiProfile profile = aiService.getAiProfileById(aiId);
         final String apiKey = aiService.decryptApiKey(profile);
         final String baseUrl = openAiClient.getBaseUrl(profile.getModelProvider());
+
+        // 保存用户消息到数据库（关键：让会话列表能查询到 AI 会话）
+        saveUserMessage(userId, sessionId, content, aiId);
 
         // 构建对话上下文
         final List<Map<String, String>> messages = buildContext(profile, userId, sessionId, content);
@@ -149,15 +154,34 @@ public class AiChatService {
     }
 
     /**
+     * 保存用户消息
+     */
+    private void saveUserMessage(final Long userId, final String sessionId,
+                                   final String content, final Long aiId) {
+        final Message message = new Message();
+        message.setSessionId(sessionId);
+        message.setSenderId(userId);
+        message.setSenderType(SenderType.USER.ordinal());
+        message.setTargetId(aiId);
+        message.setTargetType(TargetType.AI.ordinal());
+        message.setType(0); // TEXT
+        message.setContent(content);
+        message.setIsDeleted(0);
+
+        messageMapper.insert(message);
+        log.debug("用户AI消息已保存: userId={}, aiId={}, sessionId={}", userId, aiId, sessionId);
+    }
+
+    /**
      * 保存 AI 消息
      */
     private Long saveAiMessage(final Long aiId, final String sessionId, final String content, final Long userId) {
         final Message message = new Message();
         message.setSessionId(sessionId);
         message.setSenderId(aiId);
-        message.setSenderType(1); // AI
+        message.setSenderType(SenderType.AI.ordinal());
         message.setTargetId(userId);
-        message.setTargetType(0); // User
+        message.setTargetType(TargetType.USER.ordinal());
         message.setType(0); // TEXT
         message.setContent(content);
         message.setIsDeleted(0);

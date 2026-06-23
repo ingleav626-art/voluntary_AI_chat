@@ -34,6 +34,7 @@ class GroupInfoControllerTest extends JavaFxTestBase {
         final TextField groupNameField = new TextField();
         final TextArea announcementArea = new TextArea();
         final CheckBox pinnedCheckBox = new CheckBox();
+        final TextField avatarField = new TextField();
         final Label errorLabel = new Label();
         final Button confirmButton = new Button();
         final Button cancelButton = new Button();
@@ -41,6 +42,7 @@ class GroupInfoControllerTest extends JavaFxTestBase {
         setField(controller, "groupNameField", groupNameField);
         setField(controller, "announcementArea", announcementArea);
         setField(controller, "pinnedCheckBox", pinnedCheckBox);
+        setField(controller, "avatarField", avatarField);
         setField(controller, "errorLabel", errorLabel);
         setField(controller, "confirmButton", confirmButton);
         setField(controller, "cancelButton", cancelButton);
@@ -58,13 +60,13 @@ class GroupInfoControllerTest extends JavaFxTestBase {
     @Test
     @DisplayName("initData - 设置群组数据不抛异常")
     void initData_shouldNotThrow() throws Exception {
-        assertDoesNotThrow(() -> controller.initData(1L, new GroupListViewModel(), "测试群", "公告", true));
+        assertDoesNotThrow(() -> controller.initData(1L, new GroupListViewModel(), "测试群", "公告", true, null));
     }
 
     @Test
     @DisplayName("initData - 设置后 groupNameField 正确")
     void initData_shouldSetGroupName() throws Exception {
-        controller.initData(1L, new GroupListViewModel(), "测试群", "公告内容", true);
+        controller.initData(1L, new GroupListViewModel(), "测试群", "公告内容", true, null);
 
         final TextField groupNameField = (TextField) getField(controller, "groupNameField");
         assertEquals("测试群", groupNameField.getText());
@@ -73,7 +75,7 @@ class GroupInfoControllerTest extends JavaFxTestBase {
     @Test
     @DisplayName("initData - 设置后 announcementArea 正确")
     void initData_shouldSetAnnouncement() throws Exception {
-        controller.initData(1L, new GroupListViewModel(), "测试群", "公告内容", true);
+        controller.initData(1L, new GroupListViewModel(), "测试群", "公告内容", true, null);
 
         final TextArea announcementArea = (TextArea) getField(controller, "announcementArea");
         assertEquals("公告内容", announcementArea.getText());
@@ -82,7 +84,7 @@ class GroupInfoControllerTest extends JavaFxTestBase {
     @Test
     @DisplayName("initData - 设置后 pinnedCheckBox 正确")
     void initData_shouldSetPinned() throws Exception {
-        controller.initData(1L, new GroupListViewModel(), "测试群", "公告", true);
+        controller.initData(1L, new GroupListViewModel(), "测试群", "公告", true, null);
 
         final CheckBox pinnedCheckBox = (CheckBox) getField(controller, "pinnedCheckBox");
         assertTrue(pinnedCheckBox.isSelected());
@@ -91,7 +93,7 @@ class GroupInfoControllerTest extends JavaFxTestBase {
     @Test
     @DisplayName("initData - null 名称不崩溃")
     void initData_nullName_shouldNotCrash() throws Exception {
-        assertDoesNotThrow(() -> controller.initData(1L, new GroupListViewModel(), null, null, false));
+        assertDoesNotThrow(() -> controller.initData(1L, new GroupListViewModel(), null, null, false, null));
     }
 
     @Test
@@ -133,7 +135,7 @@ class GroupInfoControllerTest extends JavaFxTestBase {
     @Test
     @DisplayName("handleConfirm - 有效名称不显示错误")
     void handleConfirm_validName_shouldProceed() throws Exception {
-        controller.initData(1L, new GroupListViewModel(), "测试群", "公告", false);
+        controller.initData(1L, new GroupListViewModel(), "测试群", "公告", false, null);
 
         final TextField groupNameField = (TextField) getField(controller, "groupNameField");
         final Label errorLabel = (Label) getField(controller, "errorLabel");
@@ -152,7 +154,7 @@ class GroupInfoControllerTest extends JavaFxTestBase {
     @Test
     @DisplayName("handleConfirm - confirmButton 被禁用")
     void handleConfirm_validName_disablesConfirm() throws Exception {
-        controller.initData(1L, new GroupListViewModel(), "测试群", "公告", false);
+        controller.initData(1L, new GroupListViewModel(), "测试群", "公告", false, null);
 
         final TextField groupNameField = (TextField) getField(controller, "groupNameField");
         final Button confirmButton = (Button) getField(controller, "confirmButton");

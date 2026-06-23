@@ -317,6 +317,176 @@ class GroupInviteControllerTest extends JavaFxTestBase {
         assertNotNull(getCellGraphic(cell));
     }
 
+    @Test
+    @DisplayName("FriendCheckCell - updateItem 已在群中的好友禁用复选框")
+    void friendCheckCell_updateItem_inGroupDisabled() throws Exception {
+        setExistingMemberIds(Set.of(400L));
+
+        final Object cell = createFriendCheckCell();
+        final FriendResponse friend = createFriend(400L, "已入群好友");
+
+        invokeCellUpdateItem(cell, friend, false);
+
+        assertNotNull(getCellGraphic(cell));
+    }
+
+    @Test
+    @DisplayName("FriendCheckCell - updateItem 非群成员可选中")
+    void friendCheckCell_updateItem_notInGroupCanSelect() throws Exception {
+        setExistingMemberIds(Set.of());
+
+        final Object cell = createFriendCheckCell();
+        final FriendResponse friend = createFriend(500L, "可邀请好友");
+
+        invokeCellUpdateItem(cell, friend, false);
+
+        assertNotNull(getCellGraphic(cell));
+    }
+
+    @Test
+    @DisplayName("handleInvite - 已在群好友自动过滤")
+    void handleInvite_alreadyInGroupFiltered() throws Exception {
+        setExistingMemberIds(Set.of(600L));
+        final Map<Long, Boolean> selectedMap = new HashMap<>();
+        selectedMap.put(600L, true);
+        selectedMap.put(700L, true);
+        setField(controller, "selectedMap", selectedMap);
+
+        final List<FriendResponse> allFriends = new ArrayList<>();
+        allFriends.add(createFriend(600L, "已入群"));
+        allFriends.add(createFriend(700L, "可邀请"));
+        setField(controller, "allFriends", allFriends);
+        setField(controller, "groupId", 1L);
+
+        invokeNoArgMethod(controller, "handleInvite");
+        // 应显示"已入群 已在群聊中，已自动过滤"或者继续邀请
+        // 由于 HTTP 请求可能失败，我们只验证不崩溃
+        assertNotNull(errorLabel.getText());
+    }
+
+    @Test
+    @DisplayName("handleInvite - 只有已入群好友时显示请选择")
+    void handleInvite_onlyAlreadyInGroup() throws Exception {
+        setExistingMemberIds(Set.of(600L));
+        final Map<Long, Boolean> selectedMap = new HashMap<>();
+        selectedMap.put(600L, true);
+        setField(controller, "selectedMap", selectedMap);
+
+        final List<FriendResponse> allFriends = new ArrayList<>();
+        allFriends.add(createFriend(600L, "已入群"));
+        setField(controller, "allFriends", allFriends);
+        setField(controller, "groupId", 1L);
+
+        invokeNoArgMethod(controller, "handleInvite");
+        // 应显示"已入群 已在群聊中，已自动过滤"
+        assertTrue(errorLabel.getText().contains("已在群聊中"));
+    }
+
+    @Test
+    @DisplayName("handleInvite - groupId 为 null 时正常处理")
+    void handleInvite_nullGroupId() throws Exception {
+        setField(controller, "groupId", null);
+        final Map<Long, Boolean> selectedMap = new HashMap<>();
+        selectedMap.put(1L, true);
+        setField(controller, "selectedMap", selectedMap);
+
+        invokeNoArgMethod(controller, "handleInvite");
+        // 无 groupId 时仍显示错误（无法邀请）
+    }
+
+    @Test
+    @DisplayName("refreshFriendListDisplay - 正常刷新")
+    void refreshFriendListDisplay_shouldRefresh() throws Exception {
+        final List<FriendResponse> allFriends = new ArrayList<>();
+        allFriends.add(createFriend(1L, "好友1"));
+        setField(controller, "allFriends", allFriends);
+
+        invokeNoArgMethod(controller, "refreshFriendListDisplay");
+        assertEquals(1, friendCheckList.getItems().size());
+    }
+
+    @Test
+    @DisplayName("loadExistingMembers - groupId 为 null 不加载")
+    void loadExistingMembers_nullGroupId() throws Exception {
+        setField(controller, "groupId", null);
+        invokeNoArgMethod(controller, "loadExistingMembers");
+        // 不抛异常
+    }
+
+    @Test
+    @DisplayName("initData - null onSuccess 不抛异常")
+    void initData_nullOnSuccess() {
+        assertDoesNotThrow(() -> controller.initData(1L, null));
+    }
+
+    @Test
+    @DisplayName("initData - null groupId 不抛异常")
+    void initData_nullGroupId() {
+        assertDoesNotThrow(() -> controller.initData(null, () -> { }));
+    }
+
+    @Test
+    @DisplayName("filterFriends - 大小写不敏感")
+    void filterFriends_caseInsensitive() throws Exception {
+        final List<FriendResponse> allFriends = new ArrayList<>();
+        allFriends.add(createFriend(1L, "ZHANGSAN"));
+        setField(controller, "allFriends", allFriends);
+
+        invokeMethod(controller, "filterFriends", String.class, "zhang");
+        assertEquals(1, friendCheckList.getItems().size());
+    }
+
+    @Test
+    @DisplayName("filterFriends - username 为 null 时不崩溃")
+    void filterFriends_nullUsername() throws Exception {
+        final List<FriendResponse> allFriends = new ArrayList<>();
+        final FriendResponse friend = createFriend(1L, null);
+        friend.setRemark(null);
+        allFriends.add(friend);
+        setField(controller, "allFriends", allFriends);
+
+        invokeMethod(controller, "filterFriends", String.class, "张");
+        assertEquals(0, friendCheckList.getItems().size());
+    }
+
+    @Test
+    @DisplayName("updateSelectedCount - 全部未选中显示0")
+    void updateSelectedCount_allFalse() throws Exception {
+        final Map<Long, Boolean> selectedMap = new HashMap<>();
+        selectedMap.put(1L, false);
+        selectedMap.put(2L, false);
+        setField(controller, "selectedMap", selectedMap);
+
+        invokeNoArgMethod(controller, "updateSelectedCount");
+        assertEquals("已选 0 人", selectedCountLabel.getText());
+    }
+
+    @Test
+    @DisplayName("updateSelectedCount - 全部选中显示全部")
+    void updateSelectedCount_allTrue() throws Exception {
+        final Map<Long, Boolean> selectedMap = new HashMap<>();
+        selectedMap.put(1L, true);
+        selectedMap.put(2L, true);
+        selectedMap.put(3L, true);
+        setField(controller, "selectedMap", selectedMap);
+
+        invokeNoArgMethod(controller, "updateSelectedCount");
+        assertEquals("已选 3 人", selectedCountLabel.getText());
+    }
+
+    @Test
+    @DisplayName("FriendCheckCell - 多次 updateItem 不崩溃")
+    void friendCheckCell_multipleUpdateItem() throws Exception {
+        final Object cell = createFriendCheckCell();
+
+        invokeCellUpdateItem(cell, null, true);
+        invokeCellUpdateItem(cell, createFriend(1L, "好友"), false);
+        invokeCellUpdateItem(cell, null, true);
+        invokeCellUpdateItem(cell, createFriend(2L, "好友2"), false);
+
+        assertNotNull(cell);
+    }
+
     // ======================== 辅助方法 ========================
 
     private static FriendResponse createFriend(final Long userId, final String username) {

@@ -182,6 +182,110 @@ class GroupCreateControllerTest extends JavaFxTestBase {
         // 不应抛异常
     }
 
+    // ============ FriendCheckCell 测试 ============
+
+    @Test
+    @DisplayName("FriendCheckCell - updateItem 空项")
+    void friendCheckCell_updateItem_empty() throws Exception {
+        final Class<?> cellClass = Class.forName("org.example.client.controller.GroupCreateController$FriendCheckCell");
+        final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(GroupCreateController.class);
+        constructor.setAccessible(true);
+        final javafx.scene.control.ListCell<FriendResponse> cell =
+                (javafx.scene.control.ListCell<FriendResponse>) constructor.newInstance(controller);
+
+        callUpdateItem(cell, null, true);
+        assertNull(cell.getGraphic());
+        assertNull(cell.getText());
+    }
+
+    @Test
+    @DisplayName("FriendCheckCell - updateItem 正常好友")
+    void friendCheckCell_updateItem_normal() throws Exception {
+        final Class<?> cellClass = Class.forName("org.example.client.controller.GroupCreateController$FriendCheckCell");
+        final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(GroupCreateController.class);
+        constructor.setAccessible(true);
+        final javafx.scene.control.ListCell<FriendResponse> cell =
+                (javafx.scene.control.ListCell<FriendResponse>) constructor.newInstance(controller);
+
+        final FriendResponse friend = new FriendResponse();
+        friend.setUserId(1001L);
+        friend.setUsername("张三");
+        friend.setRemark("备注张三");
+
+        // 初始化选中状态
+        final Map<Long, Boolean> selectedMap = (Map<Long, Boolean>) getField(controller, "selectedMap");
+        selectedMap.put(1001L, false);
+
+        callUpdateItem(cell, friend, false);
+        assertNotNull(cell.getGraphic());
+        assertNull(cell.getText());
+    }
+
+    @Test
+    @DisplayName("FriendCheckCell - updateItem 已选中好友")
+    void friendCheckCell_updateItem_selected() throws Exception {
+        final Class<?> cellClass = Class.forName("org.example.client.controller.GroupCreateController$FriendCheckCell");
+        final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(GroupCreateController.class);
+        constructor.setAccessible(true);
+        final javafx.scene.control.ListCell<FriendResponse> cell =
+                (javafx.scene.control.ListCell<FriendResponse>) constructor.newInstance(controller);
+
+        final FriendResponse friend = new FriendResponse();
+        friend.setUserId(1002L);
+        friend.setUsername("李四");
+        friend.setRemark(null);
+
+        // 初始化选中状态为已选中
+        final Map<Long, Boolean> selectedMap = (Map<Long, Boolean>) getField(controller, "selectedMap");
+        selectedMap.put(1002L, true);
+
+        callUpdateItem(cell, friend, false);
+        assertNotNull(cell.getGraphic());
+        assertNull(cell.getText());
+    }
+
+    @Test
+    @DisplayName("FriendCheckCell - updateItem 无用户名好友")
+    void friendCheckCell_updateItem_noUsername() throws Exception {
+        final Class<?> cellClass = Class.forName("org.example.client.controller.GroupCreateController$FriendCheckCell");
+        final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(GroupCreateController.class);
+        constructor.setAccessible(true);
+        final javafx.scene.control.ListCell<FriendResponse> cell =
+                (javafx.scene.control.ListCell<FriendResponse>) constructor.newInstance(controller);
+
+        final FriendResponse friend = new FriendResponse();
+        friend.setUserId(1003L);
+        friend.setUsername(null);
+        friend.setRemark(null);
+
+        final Map<Long, Boolean> selectedMap = (Map<Long, Boolean>) getField(controller, "selectedMap");
+        selectedMap.put(1003L, false);
+
+        callUpdateItem(cell, friend, false);
+        assertNotNull(cell.getGraphic());
+        assertNull(cell.getText());
+    }
+
+    @Test
+    @DisplayName("FriendCheckCell - updateItem 无选中状态好友")
+    void friendCheckCell_updateItem_noSelectedState() throws Exception {
+        final Class<?> cellClass = Class.forName("org.example.client.controller.GroupCreateController$FriendCheckCell");
+        final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(GroupCreateController.class);
+        constructor.setAccessible(true);
+        final javafx.scene.control.ListCell<FriendResponse> cell =
+                (javafx.scene.control.ListCell<FriendResponse>) constructor.newInstance(controller);
+
+        final FriendResponse friend = new FriendResponse();
+        friend.setUserId(1004L);
+        friend.setUsername("王五");
+        friend.setRemark("备注");
+
+        // 不设置选中状态（selectedMap 中没有该用户）
+        callUpdateItem(cell, friend, false);
+        assertNotNull(cell.getGraphic());
+        assertNull(cell.getText());
+    }
+
     // ============ 辅助方法 ============
 
     private static void setField(final Object obj, final String name, final Object value) throws Exception {
@@ -208,5 +312,17 @@ class GroupCreateControllerTest extends JavaFxTestBase {
         final Method method = obj.getClass().getDeclaredMethod(name, paramType);
         method.setAccessible(true);
         method.invoke(obj, paramValue);
+    }
+
+    /**
+     * 通过反射调用 Cell 的 protected updateItem 方法
+     * 使用 Cell 类而不是 ListCell 类，因为 updateItem 定义在 Cell 类中
+     */
+    private static void callUpdateItem(final javafx.scene.control.Cell<?> cell,
+            final Object item, final boolean empty) throws Exception {
+        final Method method = javafx.scene.control.Cell.class.getDeclaredMethod(
+                "updateItem", Object.class, boolean.class);
+        method.setAccessible(true);
+        method.invoke(cell, item, empty);
     }
 }

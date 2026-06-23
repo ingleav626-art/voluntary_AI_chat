@@ -196,7 +196,13 @@ public final class ChatViewModel {
         data.put("msgType", MSG_TYPE_TEXT);
         data.put("content", text.trim());
 
-        WebSocketClient.getInstance().send(MessageTypes.SEND_MESSAGE, data);
+        if ("AI".equals(conversation.getTargetType())) {
+            // AI 对话使用 AI_CHAT 消息类型
+            data.put("aiId", conversation.getTargetId());
+            WebSocketClient.getInstance().send(MessageTypes.AI_CHAT, data);
+        } else {
+            WebSocketClient.getInstance().send(MessageTypes.SEND_MESSAGE, data);
+        }
 
         // 清空输入框
         inputText.set("");
@@ -684,6 +690,67 @@ public final class ChatViewModel {
         if (pending != null && !pending.isEmpty()) {
             messages.addAll(pending);
             LOG.info("注入系统消息: sessionId={}, count={}", sessionId, pending.size());
+        }
+    }
+
+    /** AI 流式输出缓存：clientId -> MessageInfo（用于增量追加） */
+    private static final Map<String, MessageInfo> aiStreamCache = new ConcurrentHashMap<>();
+
+    /**
+     * 处理 AI 流式输出
+     * 首次收到时创建 AI 消息占位，后续追加内容，完成时设置最终 messageId
+     *
+     * @param streamMessageId 流式消息ID（客户端发送时的ID）
+     * @param content         增量内容（done=false）或完整内容（done=true）
+     * @param done            是否完成
+     * @param aiMessageId     AI 消息的服务端ID（仅 done=true 时有值）
+     */
+    public void handleAiStream(final String streamMessageId, final String content,
+                                 final boolean done, final Long aiMessageId) {
+        if (content == null) {
+            return;
+        }
+
+        MessageInfo aiMsg = aiStreamCache.get(streamMessageId);
+
+        if (aiMsg == null) {
+            // 首次收到流式消息，创建 AI 消息占位
+            aiMsg = new MessageInfo();
+            aiMsg.setMessageId(-System.currentTimeMillis());
+            aiMsg.setSessionId(conversation.getSessionId());
+            aiMsg.setSenderId(conversation.getTargetId());
+            aiMsg.setSenderName(conversation.getTargetName());
+            aiMsg.setSenderType("AI");
+            aiMsg.setType("TEXT");
+            aiMsg.setContent(content);
+            aiMsg.setCreateTime(java.time.LocalDateTime.now());
+            aiMsg.setSentByMe(false);
+
+            messages.add(aiMsg);
+            aiStreamCache.put(streamMessageId, aiMsg);
+            LOG.debug("[AI-STREAM] 创建AI消息占位: streamId={}", streamMessageId);
+        } else {
+            // 增量追加内容
+            aiMsg.setContent(aiMsg.getContent() + content);
+            // 触发列表更新
+            final int index = messages.indexOf(aiMsg);
+            if (index >= 0) {
+                messages.set(index, aiMsg);
+            }
+        }
+
+        if (done) {
+            // 流式输出完成
+            if (aiMessageId != null) {
+                aiMsg.setMessageId(aiMessageId);
+            }
+            aiStreamCache.remove(streamMessageId);
+            // 最终刷新一次列表
+            final int index = messages.indexOf(aiMsg);
+            if (index >= 0) {
+                messages.set(index, aiMsg);
+            }
+            LOG.info("[AI-STREAM] AI流式输出完成: streamId={}, aiMessageId={}", streamMessageId, aiMessageId);
         }
     }
 }

@@ -378,9 +378,12 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
       try {
         String payload = objectMapper.writeValueAsString(message);
         session.sendMessage(new TextMessage(payload));
+        log.info("[WS-SEND] 消息已推送: userId={}, type={}", userId, message.getType());
       } catch (IOException e) {
-        log.error("WebSocket 消息推送失败: userId={}", userId, e);
+        log.error("[WS-SEND] WebSocket 消息推送失败: userId={}, type={}", userId, message.getType(), e);
       }
+    } else {
+      log.info("[WS-SEND] 用户不在线，跳过推送: userId={}, type={}", userId, message.getType());
     }
   }
 
@@ -453,16 +456,20 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
    * @param groupId  群组ID
    * @param userId   离开的用户ID
    * @param username 用户名
+   * @param reason   离开原因：KICKED-被踢出，LEAVE-主动退出
    */
-  public void broadcastMemberLeave(Long groupId, Long userId, String username) {
+  public void broadcastMemberLeave(Long groupId, Long userId, String username, String reason) {
     WebSocketMessage message = WebSocketMessage.builder()
         .id(String.valueOf(System.currentTimeMillis()))
         .type(MessageTypes.GROUP_MEMBER_LEAVE)
         .data(Map.of(
             "groupId", groupId,
             "userId", userId,
-            "username", username))
+            "username", username,
+            "reason", reason != null ? reason : "LEAVE"))
         .build();
+    log.info("[WS-LEAVE] 准备广播离开通知: groupId={}, userId={}, username={}, reason={}, sessionId=g_{}",
+        groupId, userId, username, reason, groupId);
     broadcastToGroup("g_" + groupId, message);
   }
 
@@ -533,6 +540,8 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     }
     Long groupId = Long.parseLong(sessionId.split("_")[1]);
     List<Long> memberIds = groupMemberMapper.selectGroupMemberUserIds(groupId);
+    log.info("[WS-BROADCAST] 开始广播到群: groupId={}, type={}, 在线成员数={}, memberIds={}",
+        groupId, message.getType(), memberIds.size(), memberIds);
     for (Long memberId : memberIds) {
       sendToUser(memberId, message);
     }

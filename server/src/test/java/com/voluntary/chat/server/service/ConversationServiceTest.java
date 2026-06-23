@@ -4,9 +4,11 @@ import com.voluntary.chat.common.dto.PageResult;
 import com.voluntary.chat.common.enums.MessageType;
 import com.voluntary.chat.common.enums.TargetType;
 import com.voluntary.chat.server.dto.response.ConversationResponse;
+import com.voluntary.chat.server.entity.AiProfile;
 import com.voluntary.chat.server.entity.GroupEntity;
 import com.voluntary.chat.server.entity.Message;
 import com.voluntary.chat.server.entity.User;
+import com.voluntary.chat.server.mapper.AiProfileMapper;
 import com.voluntary.chat.server.mapper.GroupMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -38,6 +40,9 @@ class ConversationServiceTest {
 
     @Mock
     private GroupMapper groupMapper;
+
+    @Mock
+    private AiProfileMapper aiProfileMapper;
 
     @InjectMocks
     private ConversationService conversationService;
@@ -159,6 +164,12 @@ class ConversationServiceTest {
         when(messageService.getLastMessage("a_3001_1001")).thenReturn(aiMessage);
         when(messageService.getUnreadCount(1001L, "a_3001_1001")).thenReturn(0L);
 
+        AiProfile mockAi = new AiProfile();
+        mockAi.setId(3001L);
+        mockAi.setName("小助手");
+        mockAi.setAvatar("http://example.com/ai.png");
+        when(aiProfileMapper.selectById(3001L)).thenReturn(mockAi);
+
         PageResult<ConversationResponse> result = conversationService.getConversations(1001L, 1, 20);
 
         assertNotNull(result);
@@ -167,8 +178,9 @@ class ConversationServiceTest {
         ConversationResponse conv = result.getList().get(0);
         assertEquals("a_3001_1001", conv.getSessionId());
         assertEquals(3001L, conv.getTargetId());
-        assertEquals(TargetType.USER.name(), conv.getTargetType());
-        assertEquals("AI助手", conv.getTargetName());
+        assertEquals(TargetType.AI.name(), conv.getTargetType());
+        assertEquals("小助手", conv.getTargetName());
+        assertEquals("http://example.com/ai.png", conv.getTargetAvatar());
     }
 
     @Test

@@ -290,12 +290,13 @@ public final class GroupController implements Initializable {
                     viewModel,
                     selected.getName(),
                     null,  // 当前公告（API 暂不返回，可后续扩展）
-                    false  // 当前置顶状态
+                    false,  // 当前置顶状态
+                    selected.getAvatar()  // 当前头像URL
             );
 
             final Stage dialog = new Stage();
             dialog.setTitle("修改群信息");
-            dialog.setScene(new Scene(root, 440, 420));
+            dialog.setScene(new Scene(root, 440, 480));
             dialog.initModality(Modality.APPLICATION_MODAL);
             dialog.initOwner(editGroupButton.getScene().getWindow());
             final java.net.URL cssUrl = getClass().getResource("/css/default.css");
@@ -401,40 +402,50 @@ public final class GroupController implements Initializable {
      */
     private final class GroupCell extends ListCell<GroupInfo> {
 
-        @Override
-        protected void updateItem(final GroupInfo item, final boolean empty) {
-            super.updateItem(item, empty);
+            @Override
+            protected void updateItem(final GroupInfo item, final boolean empty) {
+                super.updateItem(item, empty);
 
-            if (empty || item == null) {
+                if (empty || item == null) {
+                    setText(null);
+                    setGraphic(null);
+                    return;
+                }
+
+                final HBox cell = new HBox(10);
+                cell.getStyleClass().add("group-cell");
+                cell.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+                // 头像
+                final javafx.scene.shape.Circle avatarCircle = new javafx.scene.shape.Circle(18);
+                avatarCircle.setFill(javafx.scene.paint.Color.valueOf("#E76F51"));
+                final Label avatarText = new Label(
+                        item.getName() != null && !item.getName().isEmpty()
+                                ? String.valueOf(item.getName().charAt(0)) : "群");
+                avatarText.setStyle("-fx-text-fill: white; -fx-font-size: 13; -fx-font-weight: bold;");
+                final javafx.scene.layout.StackPane avatarPane = new javafx.scene.layout.StackPane(
+                        avatarCircle, avatarText);
+
+                final VBox info = new VBox(2);
+                info.getStyleClass().add("group-info");
+
+                final Label name = new Label(item.getName() != null ? item.getName() : "未知群组");
+                name.getStyleClass().add("group-name");
+
+                final Label meta = new Label(
+                        (item.getMemberCount() != null ? item.getMemberCount() + "人" : "未知人数"));
+                meta.getStyleClass().add("group-meta");
+
+                info.getChildren().addAll(name, meta);
+
+                final Region spacer = new Region();
+                HBox.setHgrow(spacer, Priority.ALWAYS);
+
+                cell.getChildren().addAll(avatarPane, info, spacer);
+                setGraphic(cell);
                 setText(null);
-                setGraphic(null);
-                return;
             }
-
-            final HBox cell = new HBox(10);
-            cell.getStyleClass().add("group-cell");
-            cell.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-
-            final VBox info = new VBox(2);
-            info.getStyleClass().add("group-info");
-
-            final Label name = new Label(item.getName() != null ? item.getName() : "未知群组");
-            name.getStyleClass().add("group-name");
-
-            final Label meta = new Label(
-                    (item.getMemberCount() != null ? item.getMemberCount() + "人" : "未知人数"));
-            meta.getStyleClass().add("group-meta");
-
-            info.getChildren().addAll(name, meta);
-
-            final Region spacer = new Region();
-            HBox.setHgrow(spacer, Priority.ALWAYS);
-
-            cell.getChildren().addAll(info, spacer);
-            setGraphic(cell);
-            setText(null);
         }
-    }
 
     /**
      * 群成员列表 Cell

@@ -15,7 +15,7 @@ import javafx.application.Platform;
  * @author voluntary-ai-chat
  * @since 1.0.0
  */
-abstract class JavaFxTestBase {
+public abstract class JavaFxTestBase {
 
     private static boolean toolkitInitialized = false;
 

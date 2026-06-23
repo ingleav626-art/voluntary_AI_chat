@@ -77,13 +77,13 @@ public final class MainController implements Initializable {
     private ListView<ConversationInfo> conversationList;
 
     @FXML
-    private Button refreshButton;
-
-    @FXML
     private Button friendButton;
 
     @FXML
     private Button groupButton;
+
+    @FXML
+    private Button aiButton;
 
     @FXML
     private Button logoutButton;
@@ -96,6 +96,9 @@ public final class MainController implements Initializable {
 
     @FXML
     private ListView<MessageInfo> messageList;
+
+    @FXML
+    private VBox inputAreaContainer;
 
     @FXML
     private TextArea inputArea;
@@ -210,10 +213,26 @@ public final class MainController implements Initializable {
             }
             if (newVm != null) {
                 inputArea.textProperty().bindBidirectional(newVm.inputTextProperty());
+                // 显示输入区域
+                inputAreaContainer.setVisible(true);
+                inputAreaContainer.setManaged(true);
             } else {
                 inputArea.clear();
+                // 隐藏输入区域
+                inputAreaContainer.setVisible(false);
+                inputAreaContainer.setManaged(false);
             }
         });
+
+        // 初始状态：未选择会话时隐藏输入区域
+        final ChatViewModel initialChatVm = viewModel.chatViewModelProperty().get();
+        if (initialChatVm == null) {
+            inputAreaContainer.setVisible(false);
+            inputAreaContainer.setManaged(false);
+        } else {
+            inputAreaContainer.setVisible(true);
+            inputAreaContainer.setManaged(true);
+        }
 
         // 绑定错误消息
         errorLabel.textProperty().bind(viewModel.errorMessageProperty());
@@ -244,6 +263,31 @@ public final class MainController implements Initializable {
      */
     public void initData(final LoginResponse loginResponse) {
         viewModel.initialize(loginResponse);
+    }
+
+    /**
+     * 选中 AI 会话（从 AI 面板跳转时调用）
+     *
+     * @param conv AI 会话信息
+     */
+    public void selectAiConversation(final org.example.client.model.ConversationInfo conv) {
+        if (conv == null) {
+            return;
+        }
+        // 先在会话列表中添加（如果不存在）
+        boolean found = false;
+        for (final org.example.client.model.ConversationInfo existing : viewModel.conversationsProperty()) {
+            if (conv.getSessionId().equals(existing.getSessionId())) {
+                viewModel.selectConversation(existing);
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            // 会话列表中可能还没有 AI 会话，直接选中
+            viewModel.selectConversation(conv);
+        }
+        LOG.info("已选中AI会话: sessionId={}, name={}", conv.getSessionId(), conv.getTargetName());
     }
 
     /**
@@ -402,21 +446,42 @@ public final class MainController implements Initializable {
     }
 
     /**
-     * 处理刷新
-     */
-    @FXML
-    private void handleRefresh() {
-        LOG.info("刷新会话列表");
-        viewModel.loadConversations();
-    }
-
-    /**
      * 处理设置
      */
     @FXML
     private void handleSettings() {
         LOG.info("点击设置");
-        // TODO: 打开设置面板
+        try {
+            // 加载 FXML
+            final javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(
+                    getClass().getResource("/fxml/profile_dialog.fxml"));
+            final javafx.scene.Parent root = loader.load();
+
+            // 获取控制器
+            final ProfileController controller = loader.getController();
+            controller.setMainViewModel(viewModel);
+
+            // 创建 Stage
+            final javafx.stage.Stage dialogStage = new javafx.stage.Stage();
+            dialogStage.setTitle("个人设置");
+            dialogStage.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+            dialogStage.initOwner(settingsButton.getScene().getWindow());
+
+            // 设置 Scene
+            final javafx.scene.Scene scene = new javafx.scene.Scene(root);
+            scene.getStylesheets().add(getClass().getResource("/css/main.css").toExternalForm());
+            dialogStage.setScene(scene);
+
+            // 设置控制器中的 Stage
+            controller.setDialogStage(dialogStage);
+
+            // 显示对话框
+            dialogStage.showAndWait();
+
+        } catch (final java.io.IOException e) {
+            LOG.error("加载个人设置对话框失败", e);
+            NotificationDialog.showWarning("无法打开设置面板", "请稍后重试");
+        }
     }
 
     /**
@@ -438,6 +503,15 @@ public final class MainController implements Initializable {
     }
 
     /**
+     * 处理 AI 助手
+     */
+    @FXML
+    private void handleAi() {
+        LOG.info("切换到AI助手面板");
+        org.example.client.App.switchToAi();
+    }
+
+    /**
      * 处理退出登录
      */
     @FXML
@@ -450,7 +524,11 @@ public final class MainController implements Initializable {
      * 会话列表 Cell
      */
     private static final class ConversationCell extends ListCell<ConversationInfo> {
-        private final VBox cell;
+        private final HBox cell;
+        private final javafx.scene.shape.Circle avatarCircle;
+        private final Label avatarText;
+        private final javafx.scene.layout.StackPane avatarPane;
+        private final VBox infoBox;
         private final Label name;
         private final Label time;
         private final Label lastMsg;
@@ -458,8 +536,20 @@ public final class MainController implements Initializable {
         private final HBox bottomBox;
 
         ConversationCell() {
-            cell = new VBox(4);
+            cell = new HBox(10);
             cell.getStyleClass().add("conversation-cell");
+            cell.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+            // 头像
+            avatarCircle = new javafx.scene.shape.Circle(18);
+            avatarCircle.setFill(javafx.scene.paint.Color.valueOf("#42A5F5"));
+            avatarText = new Label("?");
+            avatarText.setStyle("-fx-text-fill: white; -fx-font-size: 13; -fx-font-weight: bold;");
+            avatarPane = new javafx.scene.layout.StackPane(avatarCircle, avatarText);
+            avatarPane.setMouseTransparent(true);
+
+            infoBox = new VBox(4);
+            HBox.setHgrow(infoBox, Priority.ALWAYS);
 
             final HBox topBox = new HBox(8);
             topBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
@@ -485,7 +575,9 @@ public final class MainController implements Initializable {
             badge = new Label();
             badge.getStyleClass().add("unread-badge");
 
-            cell.getChildren().addAll(topBox, bottomBox);
+            infoBox.getChildren().addAll(topBox, bottomBox);
+
+            cell.getChildren().addAll(avatarPane, infoBox);
         }
 
         @Override
@@ -498,7 +590,19 @@ public final class MainController implements Initializable {
                 return;
             }
 
-            name.setText(item.getTargetName() != null ? item.getTargetName() : "未知");
+            // 头像颜色：AI用橙红，群组用深暖棕，单聊用蓝色
+            final String displayName = item.getTargetName() != null ? item.getTargetName() : "?";
+            if ("AI".equals(item.getTargetType())) {
+                avatarCircle.setFill(javafx.scene.paint.Color.valueOf("#E76F51"));
+            } else if ("GROUP".equals(item.getTargetType())) {
+                avatarCircle.setFill(javafx.scene.paint.Color.valueOf("#4A3426"));
+            } else {
+                avatarCircle.setFill(javafx.scene.paint.Color.valueOf("#42A5F5"));
+            }
+            avatarText.setText(!displayName.isEmpty() ? String.valueOf(displayName.charAt(0)) : "?");
+            avatarPane.setMouseTransparent(true);
+
+            name.setText(displayName);
             time.setText(formatTime(item.getLastMessageTime()));
             lastMsg.setText(item.getLastMessage() != null ? item.getLastMessage() : "");
 

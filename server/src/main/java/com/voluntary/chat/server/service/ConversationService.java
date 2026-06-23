@@ -4,9 +4,11 @@ import com.voluntary.chat.common.dto.PageResult;
 import com.voluntary.chat.common.enums.MessageType;
 import com.voluntary.chat.common.enums.TargetType;
 import com.voluntary.chat.server.dto.response.ConversationResponse;
+import com.voluntary.chat.server.entity.AiProfile;
 import com.voluntary.chat.server.entity.GroupEntity;
 import com.voluntary.chat.server.entity.Message;
 import com.voluntary.chat.server.entity.User;
+import com.voluntary.chat.server.mapper.AiProfileMapper;
 import com.voluntary.chat.server.mapper.GroupMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +26,7 @@ public class ConversationService {
     private final MessageService messageService;
     private final UserService userService;
     private final GroupMapper groupMapper;
+    private final AiProfileMapper aiProfileMapper;
 
     /** 私聊sessionId分割后的第一个用户ID索引 */
     private static final int PRIVATE_SESSION_ID1_INDEX = 1;
@@ -144,13 +147,21 @@ public class ConversationService {
                         .targetAvatar(null);
             }
         } else if (sessionId.startsWith("a_")) {
-            // AI单聊
+            // AI单聊：查询 AI 角色名称和头像
             String[] parts = sessionId.split("_");
             Long aiId = Long.parseLong(parts[1]);
-            builder.targetId(aiId)
-                    .targetType(TargetType.USER.name())
-                    .targetName("AI助手")
-                    .targetAvatar(null);
+            AiProfile aiProfile = aiProfileMapper.selectById(aiId);
+            if (aiProfile != null) {
+                builder.targetId(aiId)
+                        .targetType(TargetType.AI.name())
+                        .targetName(aiProfile.getName())
+                        .targetAvatar(aiProfile.getAvatar());
+            } else {
+                builder.targetId(aiId)
+                        .targetType(TargetType.AI.name())
+                        .targetName("AI助手")
+                        .targetAvatar(null);
+            }
         }
 
         return builder.build();

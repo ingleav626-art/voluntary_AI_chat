@@ -106,6 +106,8 @@
 
 .conversation-cell {
     -fx-padding: 0;
+    -fx-spacing: 10;
+    -fx-alignment: CENTER_LEFT;
 }
 
 .conv-name {

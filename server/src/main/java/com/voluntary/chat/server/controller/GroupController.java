@@ -137,6 +137,7 @@ public class GroupController {
 
     /**
      * 移除成员
+     * 移除成功后广播群成员离开通知（被踢出）
      */
     @DeleteMapping("/{groupId}/members/{targetUserId}")
     public ApiResult<Void> removeMember(
@@ -144,16 +145,33 @@ public class GroupController {
             @PathVariable Long targetUserId) {
         Long userId = SecurityUtils.getCurrentUserId();
         groupService.removeMember(userId, groupId, targetUserId);
+
+        // 事务提交后广播被踢出通知
+        User targetUser = userService.findById(targetUserId);
+        if (targetUser != null) {
+            webSocketHandler.broadcastMemberLeave(groupId, targetUserId,
+                    targetUser.getUsername(), "KICKED");
+        }
+
         return ApiResult.ok("已移除", null);
     }
 
     /**
      * 退出群组
+     * 退出成功后广播群成员离开通知（主动退出）
      */
     @PostMapping("/{groupId}/leave")
     public ApiResult<Void> leaveGroup(@PathVariable Long groupId) {
         Long userId = SecurityUtils.getCurrentUserId();
         groupService.leaveGroup(userId, groupId);
+
+        // 事务提交后广播主动退出通知
+        User leaveUser = userService.findById(userId);
+        if (leaveUser != null) {
+            webSocketHandler.broadcastMemberLeave(groupId, userId,
+                    leaveUser.getUsername(), "LEAVE");
+        }
+
         return ApiResult.ok("已退出", null);
     }
 

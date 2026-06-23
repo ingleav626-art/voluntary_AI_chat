@@ -3,6 +3,8 @@ package org.example.client.controller;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
+import org.example.client.model.FriendApplyResponse;
+import org.example.client.model.FriendResponse;
 import org.example.client.view.FriendListViewModel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -146,6 +148,221 @@ class FriendControllerTest extends JavaFxTestBase {
         assertDoesNotThrow(() -> invokeNoArgMethod(controller, "handleSendApply"));
     }
 
+    // ============ FriendCell 测试 ============
+
+    @Test
+    @DisplayName("FriendCell - updateItem 空项")
+    void friendCell_updateItem_empty() throws Exception {
+        final Class<?> cellClass = Class.forName("org.example.client.controller.FriendController$FriendCell");
+        final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(FriendController.class);
+        constructor.setAccessible(true);
+        final javafx.scene.control.ListCell<FriendResponse> cell =
+                (javafx.scene.control.ListCell<FriendResponse>) constructor.newInstance(controller);
+
+        callUpdateItem(cell, null, true);
+        assertNull(cell.getGraphic());
+        assertNull(cell.getText());
+    }
+
+    @Test
+    @DisplayName("FriendCell - updateItem 正常好友")
+    void friendCell_updateItem_normal() throws Exception {
+        final Class<?> cellClass = Class.forName("org.example.client.controller.FriendController$FriendCell");
+        final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(FriendController.class);
+        constructor.setAccessible(true);
+        final javafx.scene.control.ListCell<FriendResponse> cell =
+                (javafx.scene.control.ListCell<FriendResponse>) constructor.newInstance(controller);
+
+        final FriendResponse friend = new FriendResponse();
+        friend.setUserId(1001L);
+        friend.setUsername("张三");
+        friend.setRemark("备注张三");
+
+        callUpdateItem(cell, friend, false);
+        assertNotNull(cell.getGraphic());
+        assertNull(cell.getText());
+    }
+
+    @Test
+    @DisplayName("FriendCell - updateItem 无备注好友")
+    void friendCell_updateItem_noRemark() throws Exception {
+        final Class<?> cellClass = Class.forName("org.example.client.controller.FriendController$FriendCell");
+        final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(FriendController.class);
+        constructor.setAccessible(true);
+        final javafx.scene.control.ListCell<FriendResponse> cell =
+                (javafx.scene.control.ListCell<FriendResponse>) constructor.newInstance(controller);
+
+        final FriendResponse friend = new FriendResponse();
+        friend.setUserId(1002L);
+        friend.setUsername("李四");
+        friend.setRemark(null);
+
+        callUpdateItem(cell, friend, false);
+        assertNotNull(cell.getGraphic());
+        assertNull(cell.getText());
+    }
+
+    @Test
+    @DisplayName("FriendCell - updateItem 无用户名好友")
+    void friendCell_updateItem_noUsername() throws Exception {
+        final Class<?> cellClass = Class.forName("org.example.client.controller.FriendController$FriendCell");
+        final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(FriendController.class);
+        constructor.setAccessible(true);
+        final javafx.scene.control.ListCell<FriendResponse> cell =
+                (javafx.scene.control.ListCell<FriendResponse>) constructor.newInstance(controller);
+
+        final FriendResponse friend = new FriendResponse();
+        friend.setUserId(1003L);
+        friend.setUsername(null);
+        friend.setRemark(null);
+
+        callUpdateItem(cell, friend, false);
+        assertNotNull(cell.getGraphic());
+        assertNull(cell.getText());
+    }
+
+    // ============ ApplyCell 测试 ============
+
+    @Test
+    @DisplayName("ApplyCell - updateItem 空项")
+    void applyCell_updateItem_empty() throws Exception {
+        final Class<?> cellClass = Class.forName("org.example.client.controller.FriendController$ApplyCell");
+        final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(FriendController.class);
+        constructor.setAccessible(true);
+        final javafx.scene.control.ListCell<FriendApplyResponse> cell =
+                (javafx.scene.control.ListCell<FriendApplyResponse>) constructor.newInstance(controller);
+
+        callUpdateItem(cell, null, true);
+        assertNull(cell.getGraphic());
+        assertNull(cell.getText());
+    }
+
+    @Test
+    @DisplayName("ApplyCell - updateItem 待处理申请")
+    void applyCell_updateItem_pending() throws Exception {
+        final Class<?> cellClass = Class.forName("org.example.client.controller.FriendController$ApplyCell");
+        final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(FriendController.class);
+        constructor.setAccessible(true);
+        final javafx.scene.control.ListCell<FriendApplyResponse> cell =
+                (javafx.scene.control.ListCell<FriendApplyResponse>) constructor.newInstance(controller);
+
+        final FriendApplyResponse apply = new FriendApplyResponse();
+        apply.setApplyId(1L);
+        apply.setUserId(1001L);
+        apply.setUsername("王五");
+        apply.setMessage("你好，我想加你为好友");
+        apply.setStatus("PENDING");
+
+        callUpdateItem(cell, apply, false);
+        assertNotNull(cell.getGraphic());
+        assertNull(cell.getText());
+    }
+
+    @Test
+    @DisplayName("ApplyCell - updateItem 已同意申请")
+    void applyCell_updateItem_accepted() throws Exception {
+        final Class<?> cellClass = Class.forName("org.example.client.controller.FriendController$ApplyCell");
+        final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(FriendController.class);
+        constructor.setAccessible(true);
+        final javafx.scene.control.ListCell<FriendApplyResponse> cell =
+                (javafx.scene.control.ListCell<FriendApplyResponse>) constructor.newInstance(controller);
+
+        final FriendApplyResponse apply = new FriendApplyResponse();
+        apply.setApplyId(2L);
+        apply.setUserId(1002L);
+        apply.setUsername("赵六");
+        apply.setMessage("我是赵六");
+        apply.setStatus("ACCEPTED");
+
+        callUpdateItem(cell, apply, false);
+        assertNotNull(cell.getGraphic());
+        assertNull(cell.getText());
+    }
+
+    @Test
+    @DisplayName("ApplyCell - updateItem 已拒绝申请")
+    void applyCell_updateItem_rejected() throws Exception {
+        final Class<?> cellClass = Class.forName("org.example.client.controller.FriendController$ApplyCell");
+        final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(FriendController.class);
+        constructor.setAccessible(true);
+        final javafx.scene.control.ListCell<FriendApplyResponse> cell =
+                (javafx.scene.control.ListCell<FriendApplyResponse>) constructor.newInstance(controller);
+
+        final FriendApplyResponse apply = new FriendApplyResponse();
+        apply.setApplyId(3L);
+        apply.setUserId(1003L);
+        apply.setUsername("钱七");
+        apply.setMessage("加好友");
+        apply.setStatus("REJECTED");
+
+        callUpdateItem(cell, apply, false);
+        assertNotNull(cell.getGraphic());
+        assertNull(cell.getText());
+    }
+
+    @Test
+    @DisplayName("ApplyCell - updateItem 无用户名申请")
+    void applyCell_updateItem_noUsername() throws Exception {
+        final Class<?> cellClass = Class.forName("org.example.client.controller.FriendController$ApplyCell");
+        final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(FriendController.class);
+        constructor.setAccessible(true);
+        final javafx.scene.control.ListCell<FriendApplyResponse> cell =
+                (javafx.scene.control.ListCell<FriendApplyResponse>) constructor.newInstance(controller);
+
+        final FriendApplyResponse apply = new FriendApplyResponse();
+        apply.setApplyId(4L);
+        apply.setUserId(1004L);
+        apply.setUsername(null);
+        apply.setMessage(null);
+        apply.setStatus("PENDING");
+
+        callUpdateItem(cell, apply, false);
+        assertNotNull(cell.getGraphic());
+        assertNull(cell.getText());
+    }
+
+    @Test
+    @DisplayName("ApplyCell - updateItem 无状态申请")
+    void applyCell_updateItem_noStatus() throws Exception {
+        final Class<?> cellClass = Class.forName("org.example.client.controller.FriendController$ApplyCell");
+        final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(FriendController.class);
+        constructor.setAccessible(true);
+        final javafx.scene.control.ListCell<FriendApplyResponse> cell =
+                (javafx.scene.control.ListCell<FriendApplyResponse>) constructor.newInstance(controller);
+
+        final FriendApplyResponse apply = new FriendApplyResponse();
+        apply.setApplyId(5L);
+        apply.setUserId(1005L);
+        apply.setUsername("孙八");
+        apply.setMessage("你好");
+        apply.setStatus(null);
+
+        callUpdateItem(cell, apply, false);
+        assertNotNull(cell.getGraphic());
+        assertNull(cell.getText());
+    }
+
+    @Test
+    @DisplayName("ApplyCell - updateItem 其他状态申请")
+    void applyCell_updateItem_otherStatus() throws Exception {
+        final Class<?> cellClass = Class.forName("org.example.client.controller.FriendController$ApplyCell");
+        final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(FriendController.class);
+        constructor.setAccessible(true);
+        final javafx.scene.control.ListCell<FriendApplyResponse> cell =
+                (javafx.scene.control.ListCell<FriendApplyResponse>) constructor.newInstance(controller);
+
+        final FriendApplyResponse apply = new FriendApplyResponse();
+        apply.setApplyId(6L);
+        apply.setUserId(1006L);
+        apply.setUsername("周九");
+        apply.setMessage("申请");
+        apply.setStatus("UNKNOWN");
+
+        callUpdateItem(cell, apply, false);
+        assertNotNull(cell.getGraphic());
+        assertNull(cell.getText());
+    }
+
     // ============ 辅助方法 ============
 
     private static void setField(final Object obj, final String name, final Object value) throws Exception {
@@ -164,5 +381,17 @@ class FriendControllerTest extends JavaFxTestBase {
         final Method method = obj.getClass().getDeclaredMethod(name);
         method.setAccessible(true);
         method.invoke(obj);
+    }
+
+    /**
+     * 通过反射调用 Cell 的 protected updateItem 方法
+     * 使用 Cell 类而不是 ListCell 类，因为 updateItem 定义在 Cell 类中
+     */
+    private static void callUpdateItem(final javafx.scene.control.Cell<?> cell,
+            final Object item, final boolean empty) throws Exception {
+        final Method method = javafx.scene.control.Cell.class.getDeclaredMethod(
+                "updateItem", Object.class, boolean.class);
+        method.setAccessible(true);
+        method.invoke(cell, item, empty);
     }
 }

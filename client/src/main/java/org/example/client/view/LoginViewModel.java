@@ -9,6 +9,7 @@ import javafx.beans.property.StringProperty;
 import org.example.client.model.LoginRequest;
 import org.example.client.model.LoginResponse;
 import org.example.client.service.AuthService;
+import org.example.client.util.CredentialStorage;
 import org.example.client.util.TokenStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,11 +114,21 @@ public final class LoginViewModel {
     }
 
     private void handleSuccess(final LoginResponse response) {
-        LOG.info("登录成功");
+        LOG.info("[记住我-登录成功] 登录成功, rememberMe={}, phone={}", rememberMe.get(), phone.get());
 
         // 无论是否勾选"记住我"，都保存 Token 到内存
-        // 只有勾选"记住我"时才持久化到文件
+        // 只有勾选"记住我"时才持久化 Token 和凭证到文件
         TokenStorage.save(response, rememberMe.get());
+
+        // 勾选"记住我"时，保存账号密码用于下次预填表单
+        if (rememberMe.get()) {
+            LOG.info("[记住我-登录成功] 勾选了记住我，开始保存凭证...");
+            CredentialStorage.save(phone.get(), password.get());
+        } else {
+            // 未勾选时清除旧凭证，防止残留
+            LOG.info("[记住我-登录成功] 未勾选记住我，清除旧凭证");
+            CredentialStorage.clear();
+        }
 
         // 调用成功回调
         if (onSuccess != null) {

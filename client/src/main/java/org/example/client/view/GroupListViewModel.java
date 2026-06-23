@@ -279,9 +279,11 @@ public final class GroupListViewModel {
      * @param name         新群名称
      * @param announcement 新群公告
      * @param announcementPinned 是否置顶公告
+     * @param avatar       群头像URL
      */
     public void updateGroupInfo(final Long groupId, final String name,
-                                 final String announcement, final boolean announcementPinned) {
+                                 final String announcement, final boolean announcementPinned,
+                                 final String avatar) {
         if (groupId == null) {
             return;
         }
@@ -289,7 +291,7 @@ public final class GroupListViewModel {
         loading.set(true);
         errorMessage.set("");
 
-        GroupService.getInstance().updateGroup(groupId, name, announcement, announcementPinned)
+        GroupService.getInstance().updateGroup(groupId, name, announcement, announcementPinned, avatar)
                 .thenAccept(response -> Platform.runLater(() -> {
                     loading.set(false);
 

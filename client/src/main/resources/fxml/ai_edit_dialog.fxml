@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox fx:id="rootPane" prefHeight="520.0" prefWidth="480.0"
+      spacing="10.0" styleClass="ai-dialog-root"
+      xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="org.example.client.controller.AiEditController">
+
+    <Label fx:id="dialogTitle" styleClass="ai-dialog-title" text="创建 AI 角色"/>
+
+    <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS">
+        <VBox spacing="10.0" styleClass="ai-dialog-form">
+
+            <!-- 名称 -->
+            <VBox spacing="4.0">
+                <Label text="AI 名称 *" styleClass="ai-form-label"/>
+                <TextField fx:id="nameField" promptText="例如：小助手" styleClass="ai-form-input"/>
+            </VBox>
+
+            <!-- 模型提供商 -->
+            <VBox spacing="4.0">
+                <Label text="模型提供商 *" styleClass="ai-form-label"/>
+                <ComboBox fx:id="providerCombo" promptText="选择提供商"
+                          styleClass="ai-form-combo" maxWidth="Infinity"/>
+            </VBox>
+
+            <!-- 模型名称 -->
+            <VBox spacing="4.0">
+                <Label text="模型名称 *" styleClass="ai-form-label"/>
+                <TextField fx:id="modelField" promptText="例如：gpt-4o-mini" styleClass="ai-form-input"/>
+            </VBox>
+
+            <!-- API Key -->
+            <VBox spacing="4.0">
+                <Label text="API Key *" styleClass="ai-form-label"/>
+                <PasswordField fx:id="apiKeyField" promptText="输入 API Key"
+                               styleClass="ai-form-input"/>
+            </VBox>
+
+            <!-- 头像URL -->
+            <VBox spacing="4.0">
+                <Label text="头像URL" styleClass="ai-form-label"/>
+                <TextField fx:id="avatarField" promptText="输入头像图片URL（可选）"
+                           styleClass="ai-form-input"/>
+            </VBox>
+
+            <!-- 开场白 -->
+            <VBox spacing="4.0">
+                <Label text="开场白" styleClass="ai-form-label"/>
+                <TextArea fx:id="openingMessageField" promptText="创建成功后自动发送的首条消息（可选）"
+                          styleClass="ai-form-textarea" wrapText="true" prefRowCount="2"/>
+            </VBox>
+
+            <!-- 人设 -->
+            <VBox spacing="4.0">
+                <Label text="AI 人设" styleClass="ai-form-label"/>
+                <TextArea fx:id="personaField" promptText="描述 AI 的性格和角色（可选）"
+                          styleClass="ai-form-textarea" wrapText="true" prefRowCount="3"/>
+            </VBox>
+
+            <!-- 系统提示词 -->
+            <VBox spacing="4.0">
+                <Label text="系统提示词" styleClass="ai-form-label"/>
+                <TextArea fx:id="systemPromptField" promptText="自定义系统提示词（可选，优先级高于人设）"
+                          styleClass="ai-form-textarea" wrapText="true" prefRowCount="3"/>
+            </VBox>
+
+            <!-- 温度 + 最大 Token -->
+            <HBox spacing="15.0">
+                <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                    <Label text="温度 (0.0-2.0)" styleClass="ai-form-label"/>
+                    <TextField fx:id="temperatureField" promptText="0.7"
+                               styleClass="ai-form-input"/>
+                </VBox>
+                <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                    <Label text="最大 Token" styleClass="ai-form-label"/>
+                    <TextField fx:id="maxTokensField" promptText="2048"
+                               styleClass="ai-form-input"/>
+                </VBox>
+            </HBox>
+
+            <!-- 群聊开关 -->
+            <HBox spacing="10.0" alignment="CENTER_LEFT">
+                <CheckBox fx:id="isGroupCheck" text="允许在群聊中使用"/>
+            </HBox>
+
+        </VBox>
+    </ScrollPane>
+
+    <!-- 底部按钮 -->
+    <HBox alignment="CENTER_RIGHT" spacing="10.0" styleClass="ai-dialog-footer">
+        <Label fx:id="errorLabel" styleClass="error-message" text=""/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button fx:id="cancelButton" mnemonicParsing="false"
+                onAction="#handleCancel" styleClass="btn-icon" text="取消"/>
+        <Button fx:id="saveButton" mnemonicParsing="false"
+                onAction="#handleSave" styleClass="btn-primary" text="保存"/>
+    </HBox>
+</VBox>
