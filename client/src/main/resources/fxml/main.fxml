@@ -13,7 +13,7 @@
 
     <!-- 左侧：用户信息 + 会话列表 -->
     <left>
-        <VBox prefWidth="280.0" styleClass="sidebar">
+        <VBox prefWidth="280.0" minWidth="280.0" maxWidth="280.0" styleClass="sidebar">
             <!-- 用户信息卡片 -->
             <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="user-card">
                 <Circle fx:id="avatarCircle" fill="#42A5F5" radius="20.0"/>
@@ -93,7 +93,8 @@
                 <!-- 输入框 -->
                 <TextArea fx:id="inputArea" promptText="输入消息... (Enter 发送, Shift+Enter 换行)"
                           styleClass="input-textarea" wrapText="true"
-                          prefRowCount="3"/>
+                          prefRowCount="3" maxWidth="Infinity"
+                          onKeyPressed="#handleInputKeyPress"/>
                 <!-- 底部：错误提示 + 发送按钮 -->
                 <HBox alignment="CENTER_RIGHT" spacing="10.0" styleClass="input-footer">
                     <Label fx:id="errorLabel" styleClass="error-message" text=""/>

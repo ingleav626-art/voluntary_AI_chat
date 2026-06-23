@@ -178,6 +178,15 @@ public final class MainController implements Initializable {
         // 设置消息列表 Cell
         messageList.setCellFactory(param -> new MessageCell());
 
+        // 防止聊天区域内容溢出覆盖侧边栏：裁剪 center 到自身实际边界
+        final javafx.scene.Node centerNode = rootPane.getCenter();
+        final javafx.scene.shape.Rectangle centerClip = new javafx.scene.shape.Rectangle();
+        centerNode.setClip(centerClip);
+        centerNode.layoutBoundsProperty().addListener((obs, oldVal, newVal) -> {
+            centerClip.setWidth(newVal.getWidth());
+            centerClip.setHeight(newVal.getHeight());
+        });
+
         // 监听消息列表滚动，滚动到顶部时加载更多历史消息
         messageList.skinProperty().addListener((obs, oldSkin, newSkin) -> {
             if (newSkin != null) {
@@ -441,50 +450,67 @@ public final class MainController implements Initializable {
      * 会话列表 Cell
      */
     private static final class ConversationCell extends ListCell<ConversationInfo> {
+        private final VBox cell;
+        private final Label name;
+        private final Label time;
+        private final Label lastMsg;
+        private final Label badge;
+        private final HBox bottomBox;
+
+        ConversationCell() {
+            cell = new VBox(4);
+            cell.getStyleClass().add("conversation-cell");
+
+            final HBox topBox = new HBox(8);
+            topBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+            name = new Label();
+            name.getStyleClass().add("conv-name");
+
+            final Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+
+            time = new Label();
+            time.getStyleClass().add("conv-time");
+
+            topBox.getChildren().addAll(name, spacer, time);
+
+            bottomBox = new HBox(8);
+            bottomBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+            lastMsg = new Label();
+            lastMsg.getStyleClass().add("conv-last-msg");
+            HBox.setHgrow(lastMsg, Priority.ALWAYS);
+
+            badge = new Label();
+            badge.getStyleClass().add("unread-badge");
+
+            cell.getChildren().addAll(topBox, bottomBox);
+        }
 
         @Override
         protected void updateItem(final ConversationInfo item, final boolean empty) {
             super.updateItem(item, empty);
 
             if (empty || item == null) {
-                setText(null);
                 setGraphic(null);
+                setText(null);
                 return;
             }
 
-            final VBox cell = new VBox(4);
-            cell.getStyleClass().add("conversation-cell");
+            name.setText(item.getTargetName() != null ? item.getTargetName() : "未知");
+            time.setText(formatTime(item.getLastMessageTime()));
+            lastMsg.setText(item.getLastMessage() != null ? item.getLastMessage() : "");
 
-            final HBox topBox = new HBox(8);
-            topBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-
-            final Label name = new Label(item.getTargetName() != null ? item.getTargetName() : "未知");
-            name.getStyleClass().add("conv-name");
-
-            final Region spacer = new Region();
-            HBox.setHgrow(spacer, Priority.ALWAYS);
-
-            final Label time = new Label(formatTime(item.getLastMessageTime()));
-            time.getStyleClass().add("conv-time");
-
-            topBox.getChildren().addAll(name, spacer, time);
-
-            final HBox bottomBox = new HBox(8);
-            bottomBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-
-            final Label lastMsg = new Label(item.getLastMessage() != null ? item.getLastMessage() : "");
-            lastMsg.getStyleClass().add("conv-last-msg");
-            HBox.setHgrow(lastMsg, Priority.ALWAYS);
-
+            // 更新未读徽章
+            bottomBox.getChildren().clear();
             if (item.getUnreadCount() > 0) {
-                final Label badge = new Label(String.valueOf(item.getUnreadCount()));
-                badge.getStyleClass().add("unread-badge");
+                badge.setText(String.valueOf(item.getUnreadCount()));
                 bottomBox.getChildren().addAll(lastMsg, badge);
             } else {
                 bottomBox.getChildren().add(lastMsg);
             }
 
-            cell.getChildren().addAll(topBox, bottomBox);
             setGraphic(cell);
             setText(null);
         }
@@ -604,6 +630,20 @@ public final class MainController implements Initializable {
                 setGraphic(alignBox);
                 setText(null);
 
+                // 为图片消息添加右键菜单（撤回）
+                if (item.isSentByMe() && item.getMessageId() != null) {
+                    final ContextMenu imageContextMenu = new ContextMenu();
+                    final boolean canRecall = isRecallable(item);
+                    if (canRecall) {
+                        final MenuItem recallItem = new MenuItem("撤回");
+                        recallItem.setOnAction(e -> handleRecallMessage(item));
+                        imageContextMenu.getItems().add(recallItem);
+                    }
+                    if (!imageContextMenu.getItems().isEmpty()) {
+                        setContextMenu(imageContextMenu);
+                    }
+                }
+
                 // 异步加载图片（携带认证 Token）
                 if (imageUrl != null && !imageUrl.isEmpty()) {
                     final MessageInfo currentItem = item;
@@ -710,10 +750,21 @@ public final class MainController implements Initializable {
             // 为自己发送且未撤回的消息添加右键菜单
             if (item.isSentByMe() && item.getMessageId() != null) {
                 final ContextMenu contextMenu = new ContextMenu();
-                final MenuItem recallItem = new MenuItem("撤回");
-                recallItem.setOnAction(e -> handleRecallMessage(item));
-                contextMenu.getItems().add(recallItem);
-                setContextMenu(contextMenu);
+
+                // 判断是否可撤回：AI会话可随时撤回，普通会话2分钟内可撤回
+                final boolean canRecall = isRecallable(item);
+                if (canRecall) {
+                    final MenuItem recallItem = new MenuItem("撤回");
+                    recallItem.setOnAction(e -> handleRecallMessage(item));
+                    contextMenu.getItems().add(recallItem);
+                }
+
+                // 只有菜单有内容时才设置
+                if (!contextMenu.getItems().isEmpty()) {
+                    setContextMenu(contextMenu);
+                } else {
+                    setContextMenu(null);
+                }
             } else {
                 setContextMenu(null);
             }
@@ -746,6 +797,28 @@ public final class MainController implements Initializable {
             if (chatVm != null) {
                 chatVm.recallMessage(message);
             }
+        }
+
+        /**
+         * 判断消息是否可撤回
+         * AI会话可随时撤回，普通会话2分钟内可撤回
+         *
+         * @param message 消息
+         * @return 是否可撤回
+         */
+        private boolean isRecallable(final MessageInfo message) {
+            // AI会话可随时撤回
+            final String sessionId = message.getSessionId();
+            if (sessionId != null && sessionId.startsWith("a_")) {
+                return true;
+            }
+            // 普通会话：2分钟内可撤回
+            if (message.getCreateTime() == null) {
+                return false;
+            }
+            final java.time.Duration duration = java.time.Duration.between(
+                    message.getCreateTime(), java.time.LocalDateTime.now());
+            return duration.toMinutes() < 2;
         }
 
         /**

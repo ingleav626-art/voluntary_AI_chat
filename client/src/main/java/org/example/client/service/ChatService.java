@@ -202,15 +202,35 @@ public final class ChatService extends BaseHttpService {
                         final String boundary = "----Boundary" + System.currentTimeMillis();
                         final String url = ClientConfig.getInstance().getBaseUrl() + MESSAGE_UPLOAD_IMAGE_PATH;
 
-                        // 构建 multipart/form-data 请求体
+                        // 探测文件 MIME 类型，无法探测时默认 image/png
+                        String contentType = Files.probeContentType(filePath);
+                        if (contentType == null || contentType.isEmpty()) {
+                                final String fileName = filePath.getFileName().toString().toLowerCase();
+                                if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")) {
+                                        contentType = "image/jpeg";
+                                } else if (fileName.endsWith(".gif")) {
+                                        contentType = "image/gif";
+                                } else if (fileName.endsWith(".webp")) {
+                                        contentType = "image/webp";
+                                } else {
+                                        contentType = "image/png";
+                                }
+                        }
+
+                        // 对文件名进行 URL 编码，避免中文文件名导致 multipart 解析失败
+                        final String encodedFileName = java.net.URLEncoder.encode(
+                                        filePath.getFileName().toString(), java.nio.charset.StandardCharsets.UTF_8);
+
+                        // 构建 multipart/form-data 请求体（使用 UTF-8 编码）
                         final StringBuilder sb = new StringBuilder();
                         sb.append("--").append(boundary).append("\r\n");
                         sb.append("Content-Disposition: form-data; name=\"file\"; filename=\"")
-                                        .append(filePath.getFileName().toString()).append("\"\r\n");
-                        sb.append("Content-Type: ").append(Files.probeContentType(filePath)).append("\r\n\r\n");
+                                        .append(encodedFileName).append("\"\r\n");
+                        sb.append("Content-Type: ").append(contentType).append("\r\n\r\n");
 
-                        final byte[] header = sb.toString().getBytes();
-                        final byte[] footer = ("\r\n--" + boundary + "--\r\n").getBytes();
+                        final byte[] header = sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                        final byte[] footer = ("\r\n--" + boundary + "--\r\n")
+                                        .getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
                         final java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
                         bos.write(header);
@@ -234,7 +254,8 @@ public final class ChatService extends BaseHttpService {
                         }
 
                         final HttpRequest request = builder.build();
-                        LOG.info("上传图片: fileName={}", filePath.getFileName());
+                        LOG.info("上传图片: fileName={}, contentType={}, size={}", filePath.getFileName(),
+                                        contentType, fileBytes.length);
 
                         return sendRequest(request, getTypeFactory().constructParametricType(
                                         ApiResponse.class, ImageUploadResponse.class));

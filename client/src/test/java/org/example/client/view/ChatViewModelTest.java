@@ -535,4 +535,321 @@ class ChatViewModelTest {
         chatViewModel.getMessages().get(0).setRead(true);
         assertTrue(chatViewModel.getMessages().get(0).isRead());
     }
+
+    // ==================== updateMessageAck 扩展测试 ====================
+
+    @Test
+    @DisplayName("updateMessageAck - null clientId 不崩溃")
+    void updateMessageAck_nullClientId_shouldNotCrash() {
+        chatViewModel.inputTextProperty().set("测试");
+        chatViewModel.sendMessage();
+        chatViewModel.updateMessageAck(null, 100L,
+                java.time.LocalDateTime.of(2024, 1, 1, 10, 0));
+        assertEquals(1, chatViewModel.getMessages().size());
+    }
+
+    @Test
+    @DisplayName("updateMessageAck - 未知 clientId 不崩溃")
+    void updateMessageAck_unknownClientId_shouldNotCrash() {
+        chatViewModel.updateMessageAck("non-existent-id", 100L,
+                java.time.LocalDateTime.of(2024, 1, 1, 10, 0));
+        assertTrue(chatViewModel.getMessages().isEmpty());
+    }
+
+    @Test
+    @DisplayName("updateMessageAck - pending 不在消息列表不崩溃")
+    void updateMessageAck_pendingNotInMessages_shouldNotCrash() {
+        final String clientId = "orphan-pending-id";
+        final MessageInfo orphan = new MessageInfo();
+        orphan.setMessageId(-1L);
+        orphan.setSessionId("p_1001_1002");
+        orphan.setContent("孤立消息");
+        setPendingMessage(clientId, orphan);
+
+        chatViewModel.updateMessageAck(clientId, 100L,
+                java.time.LocalDateTime.of(2024, 1, 1, 10, 0));
+        assertEquals(100L, orphan.getMessageId());
+    }
+
+    // ==================== sendFile 测试 ====================
+
+    @Test
+    @DisplayName("sendFile - 会話为 null 设置错误")
+    void sendFile_nullConversation_shouldSetError() {
+        final ChatViewModel vm = new ChatViewModel(currentUser, null);
+        vm.sendFile(java.nio.file.Paths.get("test.txt"));
+        assertEquals("未选择会话", vm.errorMessageProperty().get());
+    }
+
+    @Test
+    @DisplayName("sendFile - 文件不存在设置错误")
+    void sendFile_nonExistentFile_shouldSetError() {
+        chatViewModel.sendFile(java.nio.file.Paths.get("/nonexistent/file.txt"));
+        assertEquals("文件不存在", chatViewModel.errorMessageProperty().get());
+    }
+
+    @Test
+    @DisplayName("sendFile - 有效文件发送乐观消息")
+    void sendFile_validFile_shouldSendOptimisticMessage() throws Exception {
+        final java.nio.file.Path tempFile = java.nio.file.Files.createTempFile("test", ".txt");
+        try {
+            java.nio.file.Files.write(tempFile, "test content".getBytes());
+            chatViewModel.sendFile(tempFile);
+
+            assertEquals(1, chatViewModel.getMessages().size());
+            final MessageInfo msg = chatViewModel.getMessages().get(0);
+            assertEquals("FILE", msg.getType());
+            assertTrue(msg.getContent().endsWith(".txt"));
+            assertTrue(msg.isSentByMe());
+            assertNotNull(msg.getExtra());
+            assertTrue(msg.getExtra().contains("fileSize"));
+        } finally {
+            java.nio.file.Files.deleteIfExists(tempFile);
+        }
+    }
+
+    // ==================== loadHistory 测试 ====================
+
+    @Test
+    @DisplayName("loadHistory - 会話 null 跳过加载")
+    void loadHistory_nullConversation_shouldSkip() {
+        final ChatViewModel vm = new ChatViewModel(currentUser, null);
+        vm.loadHistory();
+        assertFalse(vm.loadingProperty().get());
+        assertTrue(vm.getMessages().isEmpty());
+    }
+
+    // ==================== loadMoreHistory 扩展测试 ====================
+
+    @Test
+    @DisplayName("loadMoreHistory - hasMoreHistory false 不执行")
+    void loadMoreHistory_noMoreHistory_shouldNotExecute() throws Exception {
+        final java.lang.reflect.Field field = ChatViewModel.class.getDeclaredField("hasMoreHistory");
+        field.setAccessible(true);
+        field.setBoolean(chatViewModel, false);
+
+        chatViewModel.loadMoreHistory();
+        assertFalse(chatViewModel.loadingProperty().get());
+    }
+
+    // ==================== pendingSystemMessages 测试 ====================
+
+    @Test
+    @DisplayName("addPendingSystemMessage - 添加并取出系统消息")
+    void addPendingSystemMessage_shouldAddAndDrain() throws Exception {
+        final MessageInfo sysMsg = new MessageInfo();
+        sysMsg.setMessageId(999L);
+        sysMsg.setContent("系统消息：用户加入群组");
+        sysMsg.setSessionId("p_1001_1002");
+        sysMsg.setSentByMe(false);
+
+        ChatViewModel.addPendingSystemMessage("p_1001_1002", sysMsg);
+
+        final java.lang.reflect.Method drainMethod = ChatViewModel.class.getDeclaredMethod(
+                "drainPendingSystemMessages", String.class);
+        drainMethod.setAccessible(true);
+        drainMethod.invoke(chatViewModel, "p_1001_1002");
+
+        assertEquals(1, chatViewModel.getMessages().size());
+        assertEquals("系统消息：用户加入群组", chatViewModel.getMessages().get(0).getContent());
+    }
+
+    @Test
+    @DisplayName("addPendingSystemMessage - 不同 sessionId 不注入")
+    void addPendingSystemMessage_differentSessionId_shouldNotInject() throws Exception {
+        final MessageInfo sysMsg = new MessageInfo();
+        sysMsg.setMessageId(999L);
+        sysMsg.setContent("系统消息");
+        sysMsg.setSessionId("p_1001_1002");
+        sysMsg.setSentByMe(false);
+
+        ChatViewModel.addPendingSystemMessage("p_1001_9999", sysMsg);
+
+        final java.lang.reflect.Method drainMethod = ChatViewModel.class.getDeclaredMethod(
+                "drainPendingSystemMessages", String.class);
+        drainMethod.setAccessible(true);
+        drainMethod.invoke(chatViewModel, "p_1001_1002");
+
+        assertTrue(chatViewModel.getMessages().isEmpty());
+    }
+
+    @Test
+    @DisplayName("addPendingSystemMessage - 多条消息按序注入")
+    void addPendingSystemMessage_multipleMessages_shouldInjectInOrder() throws Exception {
+        final MessageInfo msg1 = new MessageInfo();
+        msg1.setMessageId(998L);
+        msg1.setContent("消息1");
+        msg1.setSessionId("p_1001_1002");
+        msg1.setSentByMe(false);
+
+        final MessageInfo msg2 = new MessageInfo();
+        msg2.setMessageId(999L);
+        msg2.setContent("消息2");
+        msg2.setSessionId("p_1001_1002");
+        msg2.setSentByMe(false);
+
+        ChatViewModel.addPendingSystemMessage("p_1001_1002", msg1);
+        ChatViewModel.addPendingSystemMessage("p_1001_1002", msg2);
+
+        final java.lang.reflect.Method drainMethod = ChatViewModel.class.getDeclaredMethod(
+                "drainPendingSystemMessages", String.class);
+        drainMethod.setAccessible(true);
+        drainMethod.invoke(chatViewModel, "p_1001_1002");
+
+        assertEquals(2, chatViewModel.getMessages().size());
+        assertEquals("消息1", chatViewModel.getMessages().get(0).getContent());
+        assertEquals("消息2", chatViewModel.getMessages().get(1).getContent());
+    }
+
+    @Test
+    @DisplayName("addPendingSystemMessage - 重复 drain 不重复注入")
+    void addPendingSystemMessage_doubleDrain_shouldNotDuplicate() throws Exception {
+        final MessageInfo sysMsg = new MessageInfo();
+        sysMsg.setMessageId(999L);
+        sysMsg.setContent("系统消息");
+        sysMsg.setSessionId("p_1001_1002");
+        sysMsg.setSentByMe(false);
+
+        ChatViewModel.addPendingSystemMessage("p_1001_1002", sysMsg);
+
+        final java.lang.reflect.Method drainMethod = ChatViewModel.class.getDeclaredMethod(
+                "drainPendingSystemMessages", String.class);
+        drainMethod.setAccessible(true);
+
+        drainMethod.invoke(chatViewModel, "p_1001_1002");
+        drainMethod.invoke(chatViewModel, "p_1001_1002");
+
+        assertEquals(1, chatViewModel.getMessages().size());
+    }
+
+    // ==================== recallMessage 扩展测试 ====================
+
+    @Test
+    @DisplayName("recallMessage - 已确认消息正常执行")
+    void recallMessage_confirmedMessage_shouldExecuteAsync() {
+        final MessageInfo confirmedMsg = new MessageInfo();
+        confirmedMsg.setMessageId(500L);
+        confirmedMsg.setSessionId("p_1001_1002");
+        confirmedMsg.setContent("已确认的消息");
+        confirmedMsg.setSentByMe(true);
+        chatViewModel.appendMessage(confirmedMsg);
+
+        chatViewModel.recallMessage(confirmedMsg);
+
+        assertFalse(confirmedMsg.isRecalled());
+    }
+
+    @Test
+    @DisplayName("recallMessage - 孤儿乐观消息找不到 clientId")
+    void recallMessage_orphanOptimisticMessage_shouldNotFindClientId() {
+        final MessageInfo orphanMsg = new MessageInfo();
+        orphanMsg.setMessageId(-99L);
+        orphanMsg.setSessionId("p_1001_1002");
+        orphanMsg.setContent("无主消息");
+        orphanMsg.setSentByMe(true);
+        chatViewModel.getMessages().add(orphanMsg);
+
+        chatViewModel.recallMessage(orphanMsg);
+
+        assertFalse(orphanMsg.isRecalled());
+    }
+
+    // ==================== sendMessage 扩展测试 ====================
+
+    @Test
+    @DisplayName("sendMessage - 会話 null 设置错误")
+    void sendMessage_nullConversation_shouldSetError() {
+        final ChatViewModel vm = new ChatViewModel(currentUser, null);
+        vm.inputTextProperty().set("测试消息");
+        vm.sendMessage();
+
+        assertEquals("请先选择会话", vm.errorMessageProperty().get());
+    }
+
+    @Test
+    @DisplayName("sendMessage - 连续发送多条消息")
+    void sendMessage_multipleMessages_shouldAllAppear() {
+        chatViewModel.inputTextProperty().set("消息1");
+        chatViewModel.sendMessage();
+        chatViewModel.inputTextProperty().set("消息2");
+        chatViewModel.sendMessage();
+        chatViewModel.inputTextProperty().set("消息3");
+        chatViewModel.sendMessage();
+
+        assertEquals(3, chatViewModel.getMessages().size());
+        assertEquals("消息1", chatViewModel.getMessages().get(0).getContent());
+        assertEquals("消息2", chatViewModel.getMessages().get(1).getContent());
+        assertEquals("消息3", chatViewModel.getMessages().get(2).getContent());
+    }
+
+    // ==================== checkAndExecutePendingRecalls 测试 ====================
+
+    @Test
+    @DisplayName("checkAndExecutePendingRecalls - 空列表不执行")
+    void checkAndExecutePendingRecalls_emptyPending_shouldNotExecute() throws Exception {
+        final java.lang.reflect.Method method = ChatViewModel.class.getDeclaredMethod(
+                "checkAndExecutePendingRecalls", java.util.List.class);
+        method.setAccessible(true);
+
+        final java.util.List<MessageInfo> loadedMessages = java.util.List.of();
+        method.invoke(chatViewModel, loadedMessages);
+
+        assertTrue(chatViewModel.getMessages().isEmpty());
+    }
+
+    @Test
+    @DisplayName("checkAndExecutePendingRecalls - null 不崩溃")
+    void checkAndExecutePendingRecalls_nullList_shouldNotCrash() throws Exception {
+        final java.lang.reflect.Method method = ChatViewModel.class.getDeclaredMethod(
+                "checkAndExecutePendingRecalls", java.util.List.class);
+        method.setAccessible(true);
+
+        method.invoke(chatViewModel, (java.util.List<MessageInfo>) null);
+
+        assertTrue(chatViewModel.getMessages().isEmpty());
+    }
+
+    // ==================== reportRead 扩展测试 ====================
+
+    @Test
+    @DisplayName("reportRead - 会話 null 跳过")
+    void reportRead_nullConversation_shouldSkip() {
+        final ChatViewModel vm = new ChatViewModel(currentUser, null);
+        final MessageInfo msg = new MessageInfo();
+        msg.setMessageId(1L);
+        msg.setSentByMe(false);
+        vm.getMessages().add(msg);
+
+        vm.reportRead();
+        assertFalse(vm.getMessages().isEmpty());
+    }
+
+    // ==================== 图片缩略图和尺寸测试 ====================
+
+    @Test
+    @DisplayName("图片消息应有缩略图和尺寸")
+    void imageMessage_shouldHaveThumbnailAndDimensions() {
+        final MessageInfo imgMsg = new MessageInfo();
+        imgMsg.setMessageId(200L);
+        imgMsg.setType("IMAGE");
+        imgMsg.setContent("http://example.com/image.png");
+        imgMsg.setThumbnailUrl("http://example.com/thumb.png");
+        imgMsg.setWidth(800);
+        imgMsg.setHeight(600);
+        imgMsg.setSentByMe(true);
+
+        chatViewModel.appendMessage(imgMsg);
+
+        assertEquals("http://example.com/thumb.png",
+                chatViewModel.getMessages().get(0).getThumbnailUrl());
+        assertEquals(800, chatViewModel.getMessages().get(0).getWidth());
+        assertEquals(600, chatViewModel.getMessages().get(0).getHeight());
+    }
+
+    @Test
+    @DisplayName("getConversationName - 会話 null 返回空串")
+    void getConversationName_nullConversation_shouldReturnEmpty() {
+        final ChatViewModel vm = new ChatViewModel(currentUser, null);
+        assertEquals("", vm.getConversationName());
+    }
 }

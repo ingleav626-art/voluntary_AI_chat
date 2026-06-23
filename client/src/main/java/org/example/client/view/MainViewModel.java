@@ -116,23 +116,21 @@ public final class MainViewModel {
     }
 
     /**
-     * 按关键词搜索会话
+     * 按关键词搜索会话（本地过滤，不请求服务端）
      */
     public void searchConversations(final String keyword) {
         searchKeyword.set(keyword != null ? keyword : "");
-        loadConversations(keyword);
+        filterConversations(keyword);
     }
 
     /**
-     * 加载会话列表（带搜索关键词）
-     *
-     * @param keyword 搜索关键词，为空则返回全部
+     * 加载会话列表（从服务端获取全部数据）
      */
-    private void loadConversations(final String keyword) {
+    private void fetchConversationsFromServer() {
         loading.set(true);
         errorMessage.set("");
 
-        ChatService.getInstance().getConversations(keyword)
+        ChatService.getInstance().getConversations()
                 .thenAccept(response -> {
                     loading.set(false);
 
@@ -141,7 +139,13 @@ public final class MainViewModel {
                                 ? response.getData().getList()
                                 : new ArrayList<>();
                         allConversations.setAll(list);
-                        conversations.setAll(list);
+                        // 如果有搜索关键词，应用过滤；否则显示全部
+                        final String kw = searchKeyword.get();
+                        if (kw != null && !kw.trim().isEmpty()) {
+                            filterConversations(kw);
+                        } else {
+                            conversations.setAll(list);
+                        }
                         LOG.info("会话列表加载成功: count={}", list.size());
                     } else {
                         final String msg = response != null ? response.getMessage() : "加载会话列表失败";
@@ -149,6 +153,17 @@ public final class MainViewModel {
                         LOG.warn("会话列表加载失败: {}", msg);
                     }
                 });
+    }
+
+    /**
+     * 加载会话列表（带搜索关键词）- 已废弃，改用本地过滤
+     *
+     * @param keyword 搜索关键词，为空则返回全部
+     * @deprecated 使用 {@link #loadConversations()} + {@link #filterConversations(String)} 替代
+     */
+    @Deprecated
+    private void loadConversations(final String keyword) {
+        fetchConversationsFromServer();
     }
 
     /**
@@ -361,6 +376,7 @@ public final class MainViewModel {
         final Long groupId = toLong(data.get("groupId"));
         final Long userId = toLong(data.get("userId"));
         final String username = (String) data.get("username");
+        final String avatar = (String) data.get("avatar");
         LOG.info("群成员加入: groupId={}, userId={}, username={}", groupId, userId, username);
 
         // 构造系统消息
@@ -386,10 +402,45 @@ public final class MainViewModel {
             // 用户未查看该群时，进入待注入队列，待下次打开群聊时自动注入
             ChatViewModel.addPendingSystemMessage(sessionId, sysMsg);
         }
-        updateConversationLastMessage(sessionId, content);
+
+        // 确保群会话出现在会话列表中
+        ensureGroupConversation(groupId, sessionId, content, avatar);
 
         // 通知群组面板刷新成员列表
         GroupListViewModel.notifyMemberChanged(groupId);
+    }
+
+    /**
+     * 确保群会话在会话列表中可见（不存在则动态添加）
+     */
+    private void ensureGroupConversation(final Long groupId, final String sessionId,
+                                          final String content, final String avatar) {
+        // 检查是否已在列表中
+        for (final ConversationInfo conv : conversations) {
+            if (sessionId.equals(conv.getSessionId())) {
+                conv.setLastMessage(content);
+                conv.setLastMessageTime(java.time.LocalDateTime.now());
+                final int index = conversations.indexOf(conv);
+                if (index >= 0) {
+                    conversations.set(index, conv);
+                }
+                return;
+            }
+        }
+        // 不存在则动态添加群会话
+        final ConversationInfo newConv = new ConversationInfo();
+        newConv.setSessionId(sessionId);
+        newConv.setTargetId(groupId);
+        newConv.setTargetType("GROUP");
+        newConv.setTargetName("群聊");  // 及时显示，名称后续刷新会话列表时更新
+        newConv.setTargetAvatar(avatar);
+        newConv.setLastMessage(content);
+        newConv.setLastMessageType("SYSTEM");
+        newConv.setLastMessageTime(java.time.LocalDateTime.now());
+        newConv.setUnreadCount(1);
+        // 插入到列表最前面
+        conversations.add(0, newConv);
+        LOG.info("动态添加群会话: groupId={}, sessionId={}", groupId, sessionId);
     }
 
     /**

@@ -1,0 +1,6 @@
+17:08:59.938 [JavaFX Application Thread] INFO org.example.client.view.ChatViewModel -- 消息已发送: sessionId=p_2068293530052964354_2068353587729887234
+17:09:06.467 [JavaFX Application Thread] INFO org.example.client.view.ChatViewModel -- 乐观消息已标记撤回，等待 ACK 后执行 REST 撤回: clientId=01fb0fd4-875f-48f6-989a-9a2eae84aebd       
+17:09:12.027 [JavaFX Application Thread] INFO org.example.client.service.ChatService -- 获取聊天记录: sessionId=p_2068293530052964354_2068353587729887234, page=1, size=20
+17:09:12.028 [JavaFX Application Thread] INFO org.example.client.view.MainViewModel -- 选中会话: sessionId=p_2068293530052964354_2068353587729887234, name=1234567
+17:09:12.044 [JavaFX Application Thread] INFO org.example.client.view.ChatViewModel -- 历史消息加载成功: count=20
+17:09:16.717 [JavaFX Application Thread] INFO org.example.client.view.ChatViewModel -- 消息撤回成功: messageId=2068984586435092482

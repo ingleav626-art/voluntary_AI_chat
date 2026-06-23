@@ -8,7 +8,8 @@ import lombok.Getter;
 public enum SenderType {
 
     USER("用户"),
-    AI("AI");
+    AI("AI"),
+    SYSTEM("系统");
 
     private final String description;
 }

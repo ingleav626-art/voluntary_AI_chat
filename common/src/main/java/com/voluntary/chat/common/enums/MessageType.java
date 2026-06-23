@@ -11,7 +11,8 @@ public enum MessageType {
     IMAGE("图片"),
     AI("AI"),
     RECALL("撤回"),
-    FORWARD("转发");
+    FORWARD("转发"),
+    SYSTEM("系统消息");
 
     private final String description;
 }

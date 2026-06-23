@@ -1,6 +1,8 @@
 package org.example.client.view;
 
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.example.client.model.GroupInfo;
 import org.example.client.model.GroupMemberInfo;
@@ -26,12 +28,15 @@ class GroupListViewModelTest {
     private GroupListViewModel viewModel;
 
     @BeforeAll
-    static void initJavaFX() {
-        // 初始化 JavaFX 工具包（如果尚未初始化）
+    static void initJavaFX() throws InterruptedException {
         try {
-            javafx.application.Platform.startup(() -> {});
+            final CountDownLatch latch = new CountDownLatch(1);
+            javafx.application.Platform.startup(latch::countDown);
+            latch.await(5, TimeUnit.SECONDS);
+            javafx.application.Platform.setImplicitExit(false);
         } catch (final IllegalStateException e) {
-            // JavaFX 已经初始化，忽略
+            // JavaFX 已经初始化，确保隐式退出关闭
+            javafx.application.Platform.setImplicitExit(false);
         }
     }
 
@@ -257,9 +262,179 @@ class GroupListViewModelTest {
     private void waitForAsync() {
         try {
             // 等待足够时间让异步操作完成
-            Thread.sleep(200);
+            Thread.sleep(500);
         } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    // ==================== 更多方法测试 ====================
+
+    @Test
+    @DisplayName("loadMembers null groupId 不执行")
+    void testLoadMembersNullGroupId() {
+        viewModel.loadMembers(null);
+        assertFalse(viewModel.loadingProperty().get());
+    }
+
+    @Test
+    @DisplayName("leaveGroup null groupId 不执行")
+    void testLeaveGroupNullGroupId() {
+        viewModel.leaveGroup(null);
+        assertFalse(viewModel.loadingProperty().get());
+    }
+
+    @Test
+    @DisplayName("dismissGroup null groupId 不执行")
+    void testDismissGroupNullGroupId() {
+        viewModel.dismissGroup(null);
+        assertFalse(viewModel.loadingProperty().get());
+    }
+
+    @Test
+    @DisplayName("updateGroupInfo null groupId 不执行")
+    void testUpdateGroupInfoNullGroupId() {
+        viewModel.updateGroupInfo(null, "新名称", "公告", false);
+        assertFalse(viewModel.loadingProperty().get());
+    }
+
+    @Test
+    @DisplayName("removeMember null groupId 不执行")
+    void testRemoveMemberNullGroupId() {
+        viewModel.removeMember(null, 1002L);
+        assertFalse(viewModel.loadingProperty().get());
+    }
+
+    @Test
+    @DisplayName("removeMember null targetUserId 不执行")
+    void testRemoveMemberNullTargetUserId() {
+        viewModel.removeMember(1L, null);
+        assertFalse(viewModel.loadingProperty().get());
+    }
+
+    @Test
+    @DisplayName("setAdmin null groupId 不执行")
+    void testSetAdminNullGroupId() {
+        viewModel.setAdmin(null, 1002L, "SET");
+        assertFalse(viewModel.loadingProperty().get());
+    }
+
+    @Test
+    @DisplayName("setAdmin null targetUserId 不执行")
+    void testSetAdminNullTargetUserId() {
+        viewModel.setAdmin(1L, null, "SET");
+        assertFalse(viewModel.loadingProperty().get());
+    }
+
+    @Test
+    @DisplayName("transferOwner null groupId 不执行")
+    void testTransferOwnerNullGroupId() {
+        viewModel.transferOwner(null, 1002L);
+        assertFalse(viewModel.loadingProperty().get());
+    }
+
+    @Test
+    @DisplayName("transferOwner null targetUserId 不执行")
+    void testTransferOwnerNullTargetUserId() {
+        viewModel.transferOwner(1L, null);
+        assertFalse(viewModel.loadingProperty().get());
+    }
+
+    @Test
+    @DisplayName("setNickname null groupId 不执行")
+    void testSetNicknameNullGroupId() {
+        viewModel.setNickname(null, "新昵称");
+        assertFalse(viewModel.loadingProperty().get());
+    }
+
+    @Test
+    @DisplayName("isAdminOrOwnerOfSelectedGroup - 非管理员和非群主返回 false")
+    void testIsAdminOrOwnerOfSelectedGroupMember() {
+        // 未加载成员时，currentUserRole 为 null，应返回 false
+        assertFalse(viewModel.isAdminOrOwnerOfSelectedGroup());
+    }
+
+    @Test
+    @DisplayName("getCurrentUserRole 默认返回 null")
+    void testGetCurrentUserRoleDefault() {
+        assertNull(viewModel.getCurrentUserRole());
+    }
+
+    @Test
+    @DisplayName("setGroupEventListener 和 notifyMemberChanged")
+    void testGroupEventListener() {
+        final boolean[] called = {false};
+        final Long[] groupId = {null};
+
+        GroupListViewModel.setGroupEventListener(g -> {
+            called[0] = true;
+            groupId[0] = g;
+        });
+
+        GroupListViewModel.notifyMemberChanged(42L);
+
+        assertTrue(called[0]);
+        assertEquals(Long.valueOf(42L), groupId[0]);
+    }
+
+    @Test
+    @DisplayName("notifyMemberChanged - listener 为 null 不崩溃")
+    void testNotifyMemberChangedNullListener() {
+        GroupListViewModel.setGroupEventListener(null);
+        assertDoesNotThrow(() -> GroupListViewModel.notifyMemberChanged(1L));
+    }
+
+    // ==================== 接口方法调用测试（异步方法验证不崩溃） ====================
+
+    @Test
+    @DisplayName("loadGroups 调用不崩溃（未登录）")
+    void testLoadGroupsNotLoggedIn_edgeCase() {
+        TokenStorage.clear();
+        final GroupListViewModel vm = new GroupListViewModel();
+        vm.loadGroups();
+        waitForAsync();
+        assertEquals("请先登录", vm.errorMessageProperty().get());
+    }
+
+    @Test
+    @DisplayName("leaveGroup 调用不崩溃")
+    void testLeaveGroup_shouldNotCrash() {
+        assertDoesNotThrow(() -> viewModel.leaveGroup(1L));
+    }
+
+    @Test
+    @DisplayName("dismissGroup 调用不崩溃")
+    void testDismissGroup_shouldNotCrash() {
+        assertDoesNotThrow(() -> viewModel.dismissGroup(1L));
+    }
+
+    @Test
+    @DisplayName("setAdmin SET 调用不崩溃")
+    void testSetAdminSet_shouldNotCrash() {
+        assertDoesNotThrow(() -> viewModel.setAdmin(1L, 1002L, "SET"));
+    }
+
+    @Test
+    @DisplayName("setAdmin REMOVE 调用不崩溃")
+    void testSetAdminRemove_shouldNotCrash() {
+        assertDoesNotThrow(() -> viewModel.setAdmin(1L, 1002L, "REMOVE"));
+    }
+
+    @Test
+    @DisplayName("transferOwner 调用不崩溃")
+    void testTransferOwner_shouldNotCrash() {
+        assertDoesNotThrow(() -> viewModel.transferOwner(1L, 1002L));
+    }
+
+    @Test
+    @DisplayName("setNickname 调用不崩溃")
+    void testSetNickname_shouldNotCrash() {
+        assertDoesNotThrow(() -> viewModel.setNickname(1L, "测试昵称"));
+    }
+
+    @Test
+    @DisplayName("loadMembers 调用不崩溃")
+    void testLoadMembers_shouldNotCrash() {
+        assertDoesNotThrow(() -> viewModel.loadMembers(1L));
     }
 }

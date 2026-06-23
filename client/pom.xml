@@ -16,6 +16,21 @@
 
     <build>
         <plugins>
+            <!-- Maven Compiler Plugin - 确保 Lombok 注解处理器正确配置 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.14.1</version>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
             <!-- JavaFX 运行插件 -->
             <plugin>
                 <groupId>org.openjfx</groupId>

@@ -20,6 +20,7 @@ import com.voluntary.chat.common.model.WebSocketMessage;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -708,5 +709,339 @@ class MainViewModelTest {
 
         assertEquals(1, chatVm.getMessages().size());
         assertTrue(chatVm.getMessages().get(0).isSentByMe());
+    }
+
+    // ==================== handleMessageRecall 测试 ====================
+
+    private void invokeHandleMessageRecall(final WebSocketMessage wsMessage) throws Exception {
+        final Method method = MainViewModel.class.getDeclaredMethod(
+                "handleMessageRecall", WebSocketMessage.class);
+        method.setAccessible(true);
+        method.invoke(viewModel, wsMessage);
+    }
+
+    @Test
+    @DisplayName("handleMessageRecall - 当前会话标记已撤回")
+    void handleMessageRecall_shouldMarkRecalledInCurrentSession() throws Exception {
+        viewModel.selectConversation(conversation1);
+        final ChatViewModel chatVm = viewModel.getChatViewModel();
+        assertNotNull(chatVm);
+
+        final MessageInfo msg = new MessageInfo();
+        msg.setMessageId(500L);
+        msg.setSessionId("p_1001_1002");
+        msg.setContent("待撤回消息");
+        msg.setSentByMe(true);
+        chatVm.appendMessage(msg);
+
+        final WebSocketMessage wsMessage = WebSocketMessage.builder()
+                .id("recall-1")
+                .type(MessageTypes.MESSAGE_RECALL)
+                .data(Map.of("messageId", 500L, "sessionId", "p_1001_1002"))
+                .build();
+
+        invokeHandleMessageRecall(wsMessage);
+
+        assertTrue(chatVm.getMessages().get(0).isRecalled());
+    }
+
+    @Test
+    @DisplayName("handleMessageRecall - data 为 null 不崩溃")
+    void handleMessageRecall_nullData_shouldNotCrash() throws Exception {
+        final WebSocketMessage wsMessage = WebSocketMessage.builder()
+                .id("recall-2")
+                .type(MessageTypes.MESSAGE_RECALL)
+                .data(null)
+                .build();
+        invokeHandleMessageRecall(wsMessage);
+    }
+
+    @Test
+    @DisplayName("handleMessageRecall - 缺少 messageId 不崩溃")
+    void handleMessageRecall_missingMessageId_shouldNotCrash() throws Exception {
+        final WebSocketMessage wsMessage = WebSocketMessage.builder()
+                .id("recall-3")
+                .type(MessageTypes.MESSAGE_RECALL)
+                .data(Map.of("sessionId", "p_1001_1002"))
+                .build();
+        invokeHandleMessageRecall(wsMessage);
+    }
+
+    @Test
+    @DisplayName("handleMessageRecall - 非当前会话不处理")
+    void handleMessageRecall_nonCurrentSession_shouldNotAffectChatVm() throws Exception {
+        viewModel.selectConversation(conversation1);
+        final ChatViewModel chatVm = viewModel.getChatViewModel();
+        assertNotNull(chatVm);
+
+        final MessageInfo msg = new MessageInfo();
+        msg.setMessageId(600L);
+        msg.setContent("其他会话消息");
+        chatVm.appendMessage(msg);
+
+        final WebSocketMessage wsMessage = WebSocketMessage.builder()
+                .id("recall-4")
+                .type(MessageTypes.MESSAGE_RECALL)
+                .data(Map.of("messageId", 600L, "sessionId", "p_1001_9999"))
+                .build();
+
+        invokeHandleMessageRecall(wsMessage);
+
+        assertFalse(chatVm.getMessages().get(0).isRecalled());
+    }
+
+    // ==================== handleAck 测试 ====================
+
+    private void invokeHandleAck(final WebSocketMessage wsMessage) throws Exception {
+        final Method method = MainViewModel.class.getDeclaredMethod(
+                "handleAck", WebSocketMessage.class);
+        method.setAccessible(true);
+        method.invoke(viewModel, wsMessage);
+    }
+
+    @Test
+    @DisplayName("handleAck - 正常处理")
+    void handleAck_normalCase_shouldNotCrash() throws Exception {
+        viewModel.selectConversation(conversation1);
+        final WebSocketMessage wsMessage = WebSocketMessage.builder()
+                .id("ack-1")
+                .type(MessageTypes.MESSAGE_ACK)
+                .data(Map.of("clientId", "test-client", "messageId", 100L,
+                        "createTime", "2024-01-01T10:00:00"))
+                .build();
+        invokeHandleAck(wsMessage);
+    }
+
+    @Test
+    @DisplayName("handleAck - data 为 null 不崩溃")
+    void handleAck_nullData_shouldNotCrash() throws Exception {
+        final WebSocketMessage wsMessage = WebSocketMessage.builder()
+                .id("ack-2")
+                .type(MessageTypes.MESSAGE_ACK)
+                .data(null)
+                .build();
+        invokeHandleAck(wsMessage);
+    }
+
+    @Test
+    @DisplayName("handleAck - ChatViewModel 为 null 不崩溃")
+    void handleAck_chatViewModelNull_shouldNotCrash() throws Exception {
+        // 不选择任何会话
+        final WebSocketMessage wsMessage = WebSocketMessage.builder()
+                .id("ack-3")
+                .type(MessageTypes.MESSAGE_ACK)
+                .data(Map.of("clientId", "test", "messageId", 200L, "createTime", "2024-01-01T10:00:00"))
+                .build();
+        invokeHandleAck(wsMessage);
+    }
+
+    // ==================== handleStatusChange 测试 ====================
+
+    private void invokeHandleStatusChange(final WebSocketMessage wsMessage) throws Exception {
+        final Method method = MainViewModel.class.getDeclaredMethod(
+                "handleStatusChange", WebSocketMessage.class);
+        method.setAccessible(true);
+        method.invoke(viewModel, wsMessage);
+    }
+
+    @Test
+    @DisplayName("handleStatusChange - 正常处理")
+    void handleStatusChange_normalCase_shouldNotCrash() throws Exception {
+        final WebSocketMessage wsMessage = WebSocketMessage.builder()
+                .id("status-1")
+                .type(MessageTypes.STATUS_CHANGE)
+                .data(Map.of("userId", 1002L, "online", true))
+                .build();
+        invokeHandleStatusChange(wsMessage);
+    }
+
+    // ==================== handleConnectionChange 测试 ====================
+
+    @Test
+    @DisplayName("handleConnectionChange - 连接状态变更")
+    void handleConnectionChange_shouldUpdateConnectedProperty() throws Exception {
+        final Method method = MainViewModel.class.getDeclaredMethod(
+                "handleConnectionChange", boolean.class);
+        method.setAccessible(true);
+
+        method.invoke(viewModel, true);
+        assertTrue(viewModel.connectedProperty().get());
+
+        method.invoke(viewModel, false);
+        assertFalse(viewModel.connectedProperty().get());
+    }
+
+    // ==================== 群组事件处理测试 ====================
+
+    private void invokeHandler(final String methodName, final WebSocketMessage wsMessage) throws Exception {
+        final Method method = MainViewModel.class.getDeclaredMethod(methodName, WebSocketMessage.class);
+        method.setAccessible(true);
+        method.invoke(viewModel, wsMessage);
+    }
+
+    @Test
+    @DisplayName("handleGroupMemberJoin - 正常处理不崩溃")
+    void handleGroupMemberJoin_shouldNotCrash() throws Exception {
+        final WebSocketMessage wsMessage = WebSocketMessage.builder()
+                .id("gmj-1")
+                .type(MessageTypes.GROUP_MEMBER_JOIN)
+                .data(Map.of("groupId", 1L, "userId", 1002L, "username", "新成员"))
+                .build();
+        invokeHandler("handleGroupMemberJoin", wsMessage);
+    }
+
+    @Test
+    @DisplayName("handleGroupMemberLeave - 正常处理不崩溃")
+    void handleGroupMemberLeave_shouldNotCrash() throws Exception {
+        final WebSocketMessage wsMessage = WebSocketMessage.builder()
+                .id("gml-1")
+                .type(MessageTypes.GROUP_MEMBER_LEAVE)
+                .data(Map.of("groupId", 1L, "userId", 1002L))
+                .build();
+        invokeHandler("handleGroupMemberLeave", wsMessage);
+    }
+
+    @Test
+    @DisplayName("handleGroupMemberRoleChange - 正常处理不崩溃")
+    void handleGroupMemberRoleChange_shouldNotCrash() throws Exception {
+        final WebSocketMessage wsMessage = WebSocketMessage.builder()
+                .id("gmrc-1")
+                .type(MessageTypes.GROUP_MEMBER_ROLE_CHANGE)
+                .data(Map.of("groupId", 1L, "userId", 1002L, "newRole", "ADMIN"))
+                .build();
+        invokeHandler("handleGroupMemberRoleChange", wsMessage);
+    }
+
+    @Test
+    @DisplayName("handleGroupInfoChange - 正常处理不崩溃")
+    void handleGroupInfoChange_shouldNotCrash() throws Exception {
+        final WebSocketMessage wsMessage = WebSocketMessage.builder()
+                .id("gic-1")
+                .type(MessageTypes.GROUP_INFO_CHANGE)
+                .data(Map.of("groupId", 1L))
+                .build();
+        invokeHandler("handleGroupInfoChange", wsMessage);
+    }
+
+    @Test
+    @DisplayName("handleGroupDismissed - 移除群会话")
+    void handleGroupDismissed_shouldRemoveGroupConversation() throws Exception {
+        final ConversationInfo groupConv = new ConversationInfo();
+        groupConv.setSessionId("g_2001");
+        groupConv.setTargetId(2001L);
+        groupConv.setTargetName("测试群");
+        viewModel.getConversations().add(groupConv);
+        setAllConversations(viewModel.getConversations());
+        assertEquals(3, viewModel.getConversations().size());
+
+        final WebSocketMessage wsMessage = WebSocketMessage.builder()
+                .id("gd-1")
+                .type(MessageTypes.GROUP_DISMISSED)
+                .data(Map.of("groupId", 2001L))
+                .build();
+        invokeHandler("handleGroupDismissed", wsMessage);
+
+        assertEquals(2, viewModel.getConversations().size());
+    }
+
+    @Test
+    @DisplayName("handleGroupDismissed - 当前正在查看该群则清空")
+    void handleGroupDismissed_currentlyViewing_shouldClearChatVm() throws Exception {
+        final ConversationInfo groupConv = new ConversationInfo();
+        groupConv.setSessionId("g_2001");
+        groupConv.setTargetId(2001L);
+        groupConv.setTargetName("测试群");
+        viewModel.getConversations().add(groupConv);
+        setAllConversations(viewModel.getConversations());
+        viewModel.selectConversation(groupConv);
+        assertNotNull(viewModel.getChatViewModel());
+
+        final WebSocketMessage wsMessage = WebSocketMessage.builder()
+                .id("gd-2")
+                .type(MessageTypes.GROUP_DISMISSED)
+                .data(Map.of("groupId", 2001L))
+                .build();
+        invokeHandler("handleGroupDismissed", wsMessage);
+
+        // chatViewModel 被清空
+        assertNull(viewModel.getChatViewModel());
+    }
+
+    // ==================== 消息数据类型测试 (Long/String 兼容) ====================
+
+    @Test
+    @DisplayName("handleReceiveMessage - messageId 为 Long 类型")
+    void handleReceiveMessage_longTypeMessageId_shouldParse() throws Exception {
+        final Map<String, Object> data = new HashMap<>();
+        data.put("sessionId", "p_1001_1002");
+        data.put("messageId", 300L);
+        data.put("senderId", 1002L);
+        data.put("senderName", "李四");
+        data.put("senderType", "USER");
+        data.put("msgType", "TEXT");
+        data.put("content", "Long类型测试");
+        data.put("createTime", "2024-01-01T10:00:00");
+
+        final WebSocketMessage wsMessage = WebSocketMessage.builder()
+                .id("type-1")
+                .type(MessageTypes.RECEIVE_MESSAGE)
+                .data(data)
+                .build();
+
+        invokeHandleReceiveMessage(wsMessage);
+        assertEquals(1, conversation1.getUnreadCount());
+    }
+
+    @Test
+    @DisplayName("handleReceiveMessage - messageId 为 String 类型")
+    void handleReceiveMessage_stringTypeMessageId_shouldParse() throws Exception {
+        final Map<String, Object> data = new HashMap<>();
+        data.put("sessionId", "p_1001_1002");
+        data.put("messageId", "301");
+        data.put("senderId", 1002L);
+        data.put("senderName", "李四");
+        data.put("senderType", "USER");
+        data.put("msgType", "TEXT");
+        data.put("content", "String类型测试");
+        data.put("createTime", "2024-01-01T10:00:00");
+
+        final WebSocketMessage wsMessage = WebSocketMessage.builder()
+                .id("type-2")
+                .type(MessageTypes.RECEIVE_MESSAGE)
+                .data(data)
+                .build();
+
+        invokeHandleReceiveMessage(wsMessage);
+        assertEquals(1, conversation1.getUnreadCount());
+    }
+
+    // ==================== handleWebSocketMessage 分发测试 ====================
+
+    private void invokeHandleWebSocketMessage(final WebSocketMessage wsMessage) throws Exception {
+        final Method method = MainViewModel.class.getDeclaredMethod(
+                "handleWebSocketMessage", WebSocketMessage.class);
+        method.setAccessible(true);
+        method.invoke(viewModel, wsMessage);
+    }
+
+    @Test
+    @DisplayName("handleWebSocketMessage - null 消息不崩溃")
+    void handleWebSocketMessage_nullMessage_shouldNotCrash() throws Exception {
+        invokeHandleWebSocketMessage(null);
+    }
+
+    @Test
+    @DisplayName("handleWebSocketMessage - null type 不崩溃")
+    void handleWebSocketMessage_nullType_shouldNotCrash() throws Exception {
+        final WebSocketMessage wsMessage = WebSocketMessage.builder().id("id").type(null).data(Map.of()).build();
+        invokeHandleWebSocketMessage(wsMessage);
+    }
+
+    @Test
+    @DisplayName("handleWebSocketMessage - 未知类型不崩溃")
+    void handleWebSocketMessage_unknownType_shouldNotCrash() throws Exception {
+        final WebSocketMessage wsMessage = WebSocketMessage.builder()
+                .id("id").type("UNKNOWN_TYPE").data(Map.of()).build();
+        invokeHandleWebSocketMessage(wsMessage);
     }
 }

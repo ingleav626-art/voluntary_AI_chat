@@ -227,4 +227,97 @@ class ChatServiceTest {
         assertNotNull(future, "uploadImage 大文件应返回非空 Future");
         // 注意：实际响应会在服务端校验失败，但客户端方法本身不抛异常
     }
+
+    // ==================== 更多边界测试 ====================
+
+    @Test
+    @DisplayName("getHistory 负页码应不抛异常")
+    void testGetHistoryNegativePage() {
+        final ChatService chatService = ChatService.getInstance();
+        assertDoesNotThrow(() -> chatService.getHistory("p_1001_1002", -1, 20));
+    }
+
+    @Test
+    @DisplayName("getHistory 零大小应不抛异常")
+    void testGetHistoryZeroSize() {
+        final ChatService chatService = ChatService.getInstance();
+        assertDoesNotThrow(() -> chatService.getHistory("p_1001_1002", 1, 0));
+    }
+
+    @Test
+    @DisplayName("sendMessage null sessionId 不抛异常")
+    void testSendMessageNullSessionId() {
+        final ChatService chatService = ChatService.getInstance();
+        final SendMessageRequest request = new SendMessageRequest(null, "TEXT", "你好");
+        final CompletableFuture<ApiResponse<SendMessageResponse>> future =
+                chatService.sendMessage(request);
+        assertNotNull(future);
+    }
+
+    @Test
+    @DisplayName("sendMessage null msgType 不抛异常")
+    void testSendMessageNullMsgType() {
+        final ChatService chatService = ChatService.getInstance();
+        final SendMessageRequest request = new SendMessageRequest("p_1001_1002", null, "你好");
+        final CompletableFuture<ApiResponse<SendMessageResponse>> future =
+                chatService.sendMessage(request);
+        assertNotNull(future);
+    }
+
+    @Test
+    @DisplayName("sendMessage null content 不抛异常")
+    void testSendMessageNullContent() {
+        final ChatService chatService = ChatService.getInstance();
+        final SendMessageRequest request = new SendMessageRequest("p_1001_1002", "TEXT", null);
+        final CompletableFuture<ApiResponse<SendMessageResponse>> future =
+                chatService.sendMessage(request);
+        assertNotNull(future);
+    }
+
+    @Test
+    @DisplayName("markRead null sessionId 不抛异常")
+    void testMarkReadNullSessionId() {
+        final ChatService chatService = ChatService.getInstance();
+        final MarkReadRequest request = new MarkReadRequest(null, Arrays.asList(1L));
+        final CompletableFuture<ApiResponse<Void>> future = chatService.markRead(request);
+        assertNotNull(future);
+    }
+
+    @Test
+    @DisplayName("markRead 空消息列表不抛异常")
+    void testMarkReadEmptyMessageIds() {
+        final ChatService chatService = ChatService.getInstance();
+        final MarkReadRequest request = new MarkReadRequest("p_1001_1002", Arrays.asList());
+        assertDoesNotThrow(() -> chatService.markRead(request));
+    }
+
+    @Test
+    @DisplayName("getConversations 负页码不抛异常")
+    void testGetConversationsNegativePage() {
+        final ChatService chatService = ChatService.getInstance();
+        assertDoesNotThrow(() -> chatService.getConversations(-1, 20));
+    }
+
+    @Test
+    @DisplayName("getConversations 零大小不抛异常")
+    void testGetConversationsZeroSize() {
+        final ChatService chatService = ChatService.getInstance();
+        assertDoesNotThrow(() -> chatService.getConversations(1, 0));
+    }
+
+    @Test
+    @DisplayName("uploadImage BMP 文件不抛异常")
+    void testUploadImageBmpFile() throws Exception {
+        final ChatService chatService = ChatService.getInstance();
+        final Path imagePath = tempDir.resolve("test.bmp");
+        Files.write(imagePath, new byte[]{0x42, 0x4D}); // BMP 文件头
+        assertDoesNotThrow(() -> chatService.uploadImage(imagePath));
+    }
+
+    @Test
+    @DisplayName("recallMessage 零 ID 不抛异常")
+    void testRecallMessageZeroId() {
+        final ChatService chatService = ChatService.getInstance();
+        assertDoesNotThrow(() -> chatService.recallMessage(0L));
+    }
 }

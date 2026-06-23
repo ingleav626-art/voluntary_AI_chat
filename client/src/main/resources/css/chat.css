@@ -4,6 +4,8 @@
 .chat-area {
     -fx-background-color: #FFF8F0;
     -fx-spacing: 0;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
 }
 
 /* 聊天标题栏 - 暖白 */
@@ -30,11 +32,19 @@
 .message-list {
     -fx-background-color: #FFF8F0;
     -fx-padding: 10;
+    -fx-border-color: transparent;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
 }
 
 .message-list .list-cell {
     -fx-background-color: transparent;
     -fx-padding: 5 15;
+}
+
+/* 去掉消息单元格焦点边框，防止点击时布局偏移 */
+.message-list .list-cell:focused {
+    -fx-background-color: transparent;
 }
 
 /* 消息气泡 - 发送（温暖珊瑚渐变） */
@@ -127,7 +137,6 @@
     -fx-border-radius: 8;
     -fx-font-size: 14;
     -fx-padding: 8;
-    -fx-pref-width: 999;
 }
 
 .input-textarea:focused {

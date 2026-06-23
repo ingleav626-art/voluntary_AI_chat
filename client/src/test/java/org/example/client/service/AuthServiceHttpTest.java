@@ -4,6 +4,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.example.client.config.ClientConfig;
 import org.example.client.model.*;
+import org.example.client.util.TokenStorage;
 import org.junit.jupiter.api.*;
 
 import java.io.OutputStream;
@@ -80,6 +81,22 @@ class AuthServiceHttpTest {
                 sendJson(exchange, 500, "{\"code\":500,\"message\":\"ERR\",\"data\":null}");
             } else {
                 sendJson(exchange, 200, "{\"code\":400,\"message\":\"BAD_REQ\",\"data\":null}");
+            }
+        });
+
+        // 忘记密码
+        mockServer.createContext("/api/auth/forgot-password", exchange -> {
+            String body = readBody(exchange);
+            if (body.contains("\"code\":\"123456\"")) {
+                sendJson(exchange, 200, "{\"code\":200,\"message\":\"密码重置成功\",\"data\":null}");
+            } else if (body.contains("\"code\":\"expired\"")) {
+                sendJson(exchange, 200, "{\"code\":1002,\"message\":\"CODE_EXPIRED\",\"data\":null}");
+            } else if (body.contains("\"code\":\"http400\"")) {
+                sendJson(exchange, 400, "{\"code\":400,\"message\":\"BAD_REQ\",\"data\":null}");
+            } else if (body.contains("\"code\":\"http500\"")) {
+                sendJson(exchange, 500, "{\"code\":500,\"message\":\"ERR\",\"data\":null}");
+            } else {
+                sendJson(exchange, 200, "{\"code\":400,\"message\":\"UNKNOWN\",\"data\":null}");
             }
         });
 
@@ -243,5 +260,58 @@ class AuthServiceHttpTest {
     void sendSms_http500() throws Exception {
         var resp = AuthService.getInstance().sendSmsCode(new SmsSendRequest("500-test")).get(5, TimeUnit.SECONDS);
         assertEquals(500, resp.getCode());
+    }
+
+    // ============ 忘记密码 ============
+
+    @Test
+    @DisplayName("忘记密码 - 成功")
+    void forgotPassword_success() throws Exception {
+        var resp = AuthService.getInstance().forgotPassword(
+                new ForgotPasswordRequest("13800138000", "123456", "newpass", "newpass")).get(5, TimeUnit.SECONDS);
+        assertTrue(resp.isSuccess());
+    }
+
+    @Test
+    @DisplayName("忘记密码 - 验证码过期 1002")
+    void forgotPassword_codeExpired() throws Exception {
+        var resp = AuthService.getInstance().forgotPassword(
+                new ForgotPasswordRequest("13800138000", "expired", "newpass", "newpass")).get(5, TimeUnit.SECONDS);
+        assertEquals(1002, resp.getCode());
+    }
+
+    @Test
+    @DisplayName("忘记密码 - HTTP 400")
+    void forgotPassword_http400() throws Exception {
+        var resp = AuthService.getInstance().forgotPassword(
+                new ForgotPasswordRequest("13800138000", "http400", "newpass", "newpass")).get(5, TimeUnit.SECONDS);
+        assertEquals(400, resp.getCode());
+    }
+
+    @Test
+    @DisplayName("忘记密码 - HTTP 500")
+    void forgotPassword_http500() throws Exception {
+        var resp = AuthService.getInstance().forgotPassword(
+                new ForgotPasswordRequest("13800138000", "http500", "newpass", "newpass")).get(5, TimeUnit.SECONDS);
+        assertEquals(500, resp.getCode());
+    }
+
+    // ============ isLoggedIn ============
+
+    @Test
+    @DisplayName("isLoggedIn - 已登录")
+    void isLoggedIn_true() {
+        LoginResponse login = new LoginResponse();
+        login.setAccessToken("test-token");
+        TokenStorage.save(login, false);
+        assertTrue(AuthService.getInstance().isLoggedIn());
+        TokenStorage.clear();
+    }
+
+    @Test
+    @DisplayName("isLoggedIn - 未登录")
+    void isLoggedIn_false() {
+        TokenStorage.clear();
+        assertFalse(AuthService.getInstance().isLoggedIn());
     }
 }
