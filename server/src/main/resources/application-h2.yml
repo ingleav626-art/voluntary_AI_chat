@@ -3,6 +3,7 @@
 spring:
   main:
     lazy-initialization: true
+    banner-mode: off
 
   jmx:
     enabled: false
@@ -15,6 +16,10 @@ spring:
     hikari:
       maximum-pool-size: 5
       minimum-idle: 1
+      # 延迟初始化连接池
+      initialization-fail-timeout: -1
+      # 连接超时时间（毫秒）
+      connection-timeout: 5000
 
   h2:
     console:
@@ -31,7 +36,23 @@ spring:
     redis:
       enabled: false
 
+  # 优化 Jackson 序列化
+  jackson:
+    default-property-inclusion: non_null
+
+  # 禁用不必要的端点
+  management:
+    endpoints:
+      enabled-by-default: false
+
 # 应用数据目录（Windows 标准 AppData 位置，回退到 ./data）
 app:
   data:
     dir: ${APPDATA:./data}/Voluntary-AI-Chat/data
+
+# 优化日志级别
+logging:
+  level:
+    root: WARN
+    com.voluntary.chat: INFO
+    org.springframework.boot.autoconfigure: WARN

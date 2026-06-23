@@ -11,12 +11,55 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
 import org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration;
 import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
+import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
+import org.springframework.boot.autoconfigure.jmx.JmxAutoConfiguration;
+import org.springframework.boot.autoconfigure.web.servlet.HttpEncodingAutoConfiguration;
+import org.springframework.boot.autoconfigure.websocket.servlet.WebSocketServletAutoConfiguration;
+import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
+import org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfiguration;
+import org.springframework.boot.autoconfigure.cache.CacheAutoConfiguration;
+import org.springframework.boot.autoconfigure.dao.PersistenceExceptionTranslationAutoConfiguration;
+import org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration;
+import org.springframework.boot.autoconfigure.liquibase.LiquibaseAutoConfiguration;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 
+/**
+ * 内嵌后端启动器（优化启动速度）
+ *
+ * <p>
+ * 通过排除不必要的自动配置，减少启动时间：
+ * <ul>
+ * <li>JPA/Hibernate（使用MyBatis-Plus）</li>
+ * <li>数据库迁移工具（Flyway/Liquibase）</li>
+ * <li>缓存自动配置（未使用）</li>
+ * <li>JMX（已禁用）</li>
+ * <li>任务调度（未使用）</li>
+ * </ul>
+ * </p>
+ */
 @Configuration
-@EnableAutoConfiguration
+@EnableAutoConfiguration(exclude = {
+        // JPA 相关（使用 MyBatis-Plus）
+        HibernateJpaAutoConfiguration.class,
+        PersistenceExceptionTranslationAutoConfiguration.class,
+
+        // 数据库迁移工具（未使用）
+        FlywayAutoConfiguration.class,
+        LiquibaseAutoConfiguration.class,
+
+        // 缓存（未使用）
+        CacheAutoConfiguration.class,
+
+        // JMX（已禁用）
+        JmxAutoConfiguration.class,
+
+        // 任务调度（未使用）
+        TaskExecutionAutoConfiguration.class,
+        TaskSchedulingAutoConfiguration.class
+})
 @ComponentScan(basePackages = { "com.voluntary.chat", "org.example.client.server" })
 @Import(SecurityConfig.class)
 @MapperScan("com.voluntary.chat.server.mapper")
