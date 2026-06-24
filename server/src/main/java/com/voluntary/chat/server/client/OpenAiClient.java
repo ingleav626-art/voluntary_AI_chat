@@ -2,6 +2,7 @@ package com.voluntary.chat.server.client;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -206,9 +207,10 @@ public class OpenAiClient {
                 config.getMaxTokens(),
                 true);
 
+        HttpURLConnection conn = null;
         try {
             final URL url = new URL(config.getBaseUrl() + "/chat/completions");
-            final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
             conn.setRequestProperty(HttpHeaders.AUTHORIZATION, "Bearer " + config.getApiKey());
@@ -225,41 +227,42 @@ public class OpenAiClient {
                 throw new RuntimeException("AI API 流式调用失败: " + errorBody);
             }
 
-            // 读取流式响应
-            final BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8));
-
             final StringBuilder fullContent = new StringBuilder();
-            String line;
+            try (final BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.startsWith("data: ")) {
+                        final String data = line.substring(6);
+                        if ("[DONE]".equals(data)) {
+                            break;
+                        }
 
-            while ((line = reader.readLine()) != null) {
-                if (line.startsWith("data: ")) {
-                    final String data = line.substring(6);
-                    if ("[DONE]".equals(data)) {
-                        break;
-                    }
+                        final JsonNode root = objectMapper.readTree(data);
+                        final JsonNode choices = root.path("choices");
 
-                    final JsonNode root = objectMapper.readTree(data);
-                    final JsonNode choices = root.path("choices");
+                        if (choices.isArray() && choices.size() > 0) {
+                            final JsonNode delta = choices.get(0).path("delta");
+                            final String content = delta.path("content").asText("");
 
-                    if (choices.isArray() && choices.size() > 0) {
-                        final JsonNode delta = choices.get(0).path("delta");
-                        final String content = delta.path("content").asText("");
-
-                        if (!content.isEmpty()) {
-                            fullContent.append(content);
-                            config.getOnChunk().accept(content);
+                            if (!content.isEmpty()) {
+                                fullContent.append(content);
+                                config.getOnChunk().accept(content);
+                            }
                         }
                     }
                 }
             }
 
-            reader.close();
             config.getOnComplete().accept(fullContent.toString());
 
         } catch (final IOException e) {
             log.error("AI API 流式调用IO异常", e);
             throw new RuntimeException("AI API 流式调用IO异常", e);
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
         }
     }
 
@@ -292,30 +295,34 @@ public class OpenAiClient {
      * 读取响应体
      */
     private String readResponseBody(final HttpURLConnection conn) throws IOException {
-        final BufferedReader reader = new BufferedReader(
-                new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8));
-        final StringBuilder body = new StringBuilder();
-        String line;
-        while ((line = reader.readLine()) != null) {
-            body.append(line);
+        try (final BufferedReader reader = new BufferedReader(
+                new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+            final StringBuilder body = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                body.append(line);
+            }
+            return body.toString();
         }
-        reader.close();
-        return body.toString();
     }
 
     /**
      * 读取错误响应体
      */
     private String readErrorBody(final HttpURLConnection conn) throws IOException {
-        final BufferedReader reader = new BufferedReader(
-                new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8));
-        final StringBuilder body = new StringBuilder();
-        String line;
-        while ((line = reader.readLine()) != null) {
-            body.append(line);
+        final InputStream errorStream = conn.getErrorStream();
+        if (errorStream == null) {
+            return "";
         }
-        reader.close();
-        return body.toString();
+        try (final BufferedReader reader = new BufferedReader(
+                new InputStreamReader(errorStream, StandardCharsets.UTF_8))) {
+            final StringBuilder body = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                body.append(line);
+            }
+            return body.toString();
+        }
     }
 
     /**
