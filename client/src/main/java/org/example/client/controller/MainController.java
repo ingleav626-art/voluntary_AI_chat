@@ -16,6 +16,7 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Alert;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
@@ -32,6 +33,7 @@ import org.example.client.model.ConversationInfo;
 import org.example.client.model.LoginResponse;
 import org.example.client.model.MessageInfo;
 import org.example.client.model.UserInfo;
+import org.example.client.util.TokenStorage;
 import org.example.client.view.ChatViewModel;
 import org.example.client.view.MainViewModel;
 import org.slf4j.Logger;
@@ -499,6 +501,13 @@ public final class MainController implements Initializable {
     @FXML
     private void handleGroup() {
         LOG.info("切换到群组面板");
+        // 检查登录状态
+        final LoginResponse token = TokenStorage.load();
+        if (token == null || token.getAccessToken() == null) {
+            LOG.warn("用户未登录，无法访问群组面板");
+            showAlert("请先登录", "您需要登录后才能访问群组功能");
+            return;
+        }
         org.example.client.App.switchToGroup();
     }
 
@@ -508,6 +517,13 @@ public final class MainController implements Initializable {
     @FXML
     private void handleAi() {
         LOG.info("切换到AI助手面板");
+        // 检查登录状态
+        final LoginResponse token = TokenStorage.load();
+        if (token == null || token.getAccessToken() == null) {
+            LOG.warn("用户未登录，无法访问AI助手面板");
+            showAlert("请先登录", "您需要登录后才能访问AI助手功能");
+            return;
+        }
         org.example.client.App.switchToAi();
     }
 
@@ -518,6 +534,20 @@ public final class MainController implements Initializable {
     private void handleLogout() {
         LOG.info("退出登录");
         viewModel.logout();
+    }
+
+    /**
+     * 显示提示对话框
+     *
+     * @param title   标题
+     * @param message 消息
+     */
+    private void showAlert(final String title, final String message) {
+        final Alert alert = new Alert(Alert.AlertType.WARNING);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
     }
 
     /**

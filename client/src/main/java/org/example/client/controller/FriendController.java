@@ -171,6 +171,40 @@ public final class FriendController implements Initializable {
             cell.getStyleClass().add("friend-cell");
             cell.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 
+            // 头像
+            final javafx.scene.shape.Circle avatarCircle = new javafx.scene.shape.Circle(18);
+            avatarCircle.setFill(javafx.scene.paint.Color.valueOf("#3498DB"));
+            final Label avatarText = new Label(
+                    item.getUsername() != null && !item.getUsername().isEmpty()
+                            ? String.valueOf(item.getUsername().charAt(0)) : "友");
+            avatarText.setStyle("-fx-text-fill: white; -fx-font-size: 13; -fx-font-weight: bold;");
+            final javafx.scene.layout.StackPane avatarPane = new javafx.scene.layout.StackPane(
+                    avatarCircle, avatarText);
+
+            // 如果有头像URL，尝试加载图片
+            if (item.getAvatar() != null && !item.getAvatar().isEmpty()) {
+                try {
+                    final javafx.scene.image.Image image =
+                            new javafx.scene.image.Image(item.getAvatar(), true);
+                    final javafx.scene.image.ImageView avatarImage =
+                            new javafx.scene.image.ImageView(image);
+                    avatarImage.setFitWidth(36);
+                    avatarImage.setFitHeight(36);
+                    // 圆形裁剪
+                    final javafx.scene.shape.Circle clip = new javafx.scene.shape.Circle(18);
+                    avatarImage.setClip(clip);
+                    // 图片加载失败时显示默认头像
+                    image.errorProperty().addListener((obs, oldVal, newVal) -> {
+                        if (newVal) {
+                            avatarPane.getChildren().setAll(avatarCircle, avatarText);
+                        }
+                    });
+                    avatarPane.getChildren().setAll(avatarImage);
+                } catch (final Exception e) {
+                    // 图片加载失败，保持默认头像
+                }
+            }
+
             final VBox info = new VBox(2);
             info.getStyleClass().add("friend-info");
 
@@ -191,7 +225,7 @@ public final class FriendController implements Initializable {
                 viewModel.deleteFriend(item.getUserId());
             });
 
-            cell.getChildren().addAll(info, spacer, deleteBtn);
+            cell.getChildren().addAll(avatarPane, info, spacer, deleteBtn);
             setGraphic(cell);
             setText(null);
         }

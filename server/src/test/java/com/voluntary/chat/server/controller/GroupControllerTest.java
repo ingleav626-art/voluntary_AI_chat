@@ -54,7 +54,14 @@ class GroupControllerTest {
                 groupService = mock(GroupService.class);
                 ChatWebSocketHandler webSocketHandler = mock(ChatWebSocketHandler.class);
                 UserService userService = mock(UserService.class);
-                GroupController controller = new GroupController(groupService, webSocketHandler, userService);
+                GroupController controller = new GroupController(groupService, userService);
+                try {
+                    java.lang.reflect.Field wsField = GroupController.class.getDeclaredField("webSocketHandler");
+                    wsField.setAccessible(true);
+                    wsField.set(controller, webSocketHandler);
+                } catch (NoSuchFieldException | IllegalAccessException e) {
+                    throw new RuntimeException(e);
+                }
                 mockMvc = MockMvcBuilders
                                 .standaloneSetup(controller)
                                 .setControllerAdvice(new GlobalExceptionHandler())

@@ -48,6 +48,9 @@ public final class GroupController implements Initializable {
     /** 修改群信息对话框 FXML */
     private static final String GROUP_INFO_DIALOG_FXML = "/fxml/group_info_dialog.fxml";
 
+    /** 修改群头像对话框 FXML */
+    private static final String GROUP_AVATAR_DIALOG_FXML = "/fxml/group_avatar_dialog.fxml";
+
     /** 邀请成员对话框 FXML */
     private static final String GROUP_INVITE_DIALOG_FXML = "/fxml/group_invite_dialog.fxml";
 
@@ -84,6 +87,9 @@ public final class GroupController implements Initializable {
     /** 群操作按钮 */
     @FXML
     private Button inviteMemberButton;
+
+    @FXML
+    private Button avatarButton;
 
     @FXML
     private Button editGroupButton;
@@ -184,6 +190,10 @@ public final class GroupController implements Initializable {
         inviteMemberButton.setVisible(true);
         inviteMemberButton.setManaged(true);
 
+        // 头像按钮所有人可见
+        avatarButton.setVisible(true);
+        avatarButton.setManaged(true);
+
         // 群主显示"解散群组"和"修改群信息"，成员显示"退出群组"
         if (viewModel.isOwnerOfSelectedGroup()) {
             editGroupButton.setVisible(true);
@@ -210,6 +220,8 @@ public final class GroupController implements Initializable {
     private void setActionButtonsVisible(final boolean visible) {
         inviteMemberButton.setVisible(visible);
         inviteMemberButton.setManaged(visible);
+        avatarButton.setVisible(visible);
+        avatarButton.setManaged(visible);
         editGroupButton.setVisible(visible);
         editGroupButton.setManaged(visible);
         leaveGroupButton.setVisible(visible);
@@ -307,6 +319,45 @@ public final class GroupController implements Initializable {
         } catch (final Exception e) {
             LOG.error("打开修改群信息对话框失败", e);
             errorLabel.setText("打开修改窗口失败");
+        }
+    }
+
+    /**
+     * 打开修改群头像对话框
+     */
+    @FXML
+    private void handleEditAvatar() {
+        final GroupInfo selected = viewModel.getSelectedGroup();
+        if (selected == null) {
+            return;
+        }
+
+        try {
+            final FXMLLoader loader = new FXMLLoader(getClass().getResource(GROUP_AVATAR_DIALOG_FXML));
+            final Parent root = loader.load();
+
+            final GroupAvatarController controller = loader.getController();
+            // 传入当前群信息
+            controller.initData(
+                    selected.getGroupId(),
+                    viewModel,
+                    selected.getName(),
+                    selected.getAvatar()  // 当前头像URL
+            );
+
+            final Stage dialog = new Stage();
+            dialog.setTitle("修改群头像");
+            dialog.setScene(new Scene(root, 400, 380));
+            dialog.initModality(Modality.APPLICATION_MODAL);
+            dialog.initOwner(avatarButton.getScene().getWindow());
+            final java.net.URL cssUrl = getClass().getResource("/css/default.css");
+            if (cssUrl != null) {
+                dialog.getScene().getStylesheets().add(cssUrl.toExternalForm());
+            }
+            dialog.showAndWait();
+        } catch (final Exception e) {
+            LOG.error("打开修改群头像对话框失败", e);
+            errorLabel.setText("打开头像窗口失败");
         }
     }
 

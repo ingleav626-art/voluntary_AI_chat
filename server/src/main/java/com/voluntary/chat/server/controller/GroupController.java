@@ -17,7 +17,8 @@ import com.voluntary.chat.server.service.GroupService;
 import com.voluntary.chat.server.service.UserService;
 import com.voluntary.chat.server.websocket.ChatWebSocketHandler;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,12 +37,24 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/group")
-@RequiredArgsConstructor
 public class GroupController {
 
     private final GroupService groupService;
-    private final ChatWebSocketHandler webSocketHandler;
     private final UserService userService;
+
+    /**
+     * WebSocket 处理器，懒注入以避免依赖链初始化失败。
+     * ChatWebSocketHandler → AiChatService → OpenAiClient 链断裂时，
+     * 会导致 GroupController 无法创建，进而 GET /list 等无需 WebSocket 的接口也返回 500。
+     */
+    @Autowired
+    @Lazy
+    private ChatWebSocketHandler webSocketHandler;
+
+    public GroupController(final GroupService groupService, final UserService userService) {
+        this.groupService = groupService;
+        this.userService = userService;
+    }
 
     /**
      * 创建群组
