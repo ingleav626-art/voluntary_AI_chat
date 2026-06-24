@@ -9,8 +9,10 @@ import com.voluntary.chat.server.dto.request.SendMessageRequest;
 import com.voluntary.chat.server.dto.response.MessageResponse;
 import com.voluntary.chat.server.dto.response.SendMessageResponse;
 import com.voluntary.chat.server.entity.User;
+import com.voluntary.chat.server.entity.AiGroupConfig;
 import com.voluntary.chat.server.mapper.GroupMemberMapper;
 import com.voluntary.chat.server.service.AiChatService;
+import com.voluntary.chat.server.service.AiGroupConfigService;
 import com.voluntary.chat.server.service.MessageService;
 import com.voluntary.chat.server.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +42,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
   private final UserService userService;
   private final GroupMemberMapper groupMemberMapper;
   private final AiChatService aiChatService;
+  private final AiGroupConfigService aiGroupConfigService;
   private final ObjectMapper objectMapper;
 
   /** userId -> WebSocketSession，用于在线状态管理和消息推送 */
@@ -195,6 +198,41 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     log.info("群消息广播: groupId={}, senderId={}, memberCount={}",
         groupId, senderId, groupMembers.size());
+
+    // 群聊 AI 触发检查
+    triggerGroupAi(groupId, senderId, request.getContent());
+  }
+
+  /**
+   * 群聊 AI 触发检查
+   *
+   * <p>
+   * 遍历群内启用的 AI 配置，检查是否满足触发条件，满足则异步调用 AI 回复。
+   * </p>
+   *
+   * @param groupId  群组ID
+   * @param senderId 发送者ID
+   * @param content  消息内容
+   */
+  private void triggerGroupAi(Long groupId, Long senderId, String content) {
+    try {
+      final List<AiGroupConfig> enabledConfigs = aiGroupConfigService.getEnabledConfigs(groupId);
+      if (enabledConfigs == null || enabledConfigs.isEmpty()) {
+        return;
+      }
+
+      for (AiGroupConfig config : enabledConfigs) {
+        final Long aiId = config.getAiId();
+        if (aiGroupConfigService.checkTrigger(groupId, content, aiId)) {
+          final String sessionId = "g_" + groupId + "_a_" + aiId;
+          final String messageId = "group_ai_" + System.currentTimeMillis() + "_" + aiId;
+          log.info("群聊AI触发: groupId={}, aiId={}, senderId={}", groupId, aiId, senderId);
+          aiChatService.handleAiChat(senderId, aiId, sessionId, content, messageId);
+        }
+      }
+    } catch (Exception e) {
+      log.warn("群聊AI触发检查异常: groupId={}", groupId, e);
+    }
   }
 
   /**

@@ -141,12 +141,12 @@ public class AiMemoryService {
     @Transactional
     public void summarizeIfNeeded(final Long aiId, final Long userId, final String sessionId) {
         // 查询当前对话轮数
-        final LambdaQueryWrapper<Message> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Message::getSessionId, sessionId)
+        final LambdaQueryWrapper<Message> countWrapper = new LambdaQueryWrapper<>();
+        countWrapper.eq(Message::getSessionId, sessionId)
                 .eq(Message::getSenderType, 0) // 用户消息
-                .eq(Message::getRecallTime, null);
+                .isNull(Message::getRecallTime);
 
-        final long userMessageCount = messageMapper.selectCount(wrapper);
+        final long userMessageCount = messageMapper.selectCount(countWrapper);
         final int threshold = aiConfig.getMemory().getSummarizeThreshold();
 
         // 检查是否达到摘要阈值
@@ -158,10 +158,14 @@ public class AiMemoryService {
             return;
         }
 
-        // 获取最近 N 轮对话用于摘要
+        // 获取最近 N 轮对话用于摘要（使用独立 wrapper 避免条件污染）
         final int startOffset = (int) (memoryCount * threshold);
-        wrapper.last("LIMIT " + threshold + " OFFSET " + startOffset);
-        final List<Message> messages = messageMapper.selectList(wrapper);
+        final LambdaQueryWrapper<Message> listWrapper = new LambdaQueryWrapper<>();
+        listWrapper.eq(Message::getSessionId, sessionId)
+                .isNull(Message::getRecallTime)
+                .orderByAsc(Message::getCreateTime)
+                .last("LIMIT " + threshold + " OFFSET " + startOffset);
+        final List<Message> messages = messageMapper.selectList(listWrapper);
 
         if (messages.isEmpty()) {
             return;

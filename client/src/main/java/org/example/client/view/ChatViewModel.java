@@ -716,8 +716,8 @@ public final class ChatViewModel {
         }
     }
 
-    /** AI 流式输出缓存：clientId -> MessageInfo（用于增量追加） */
-    private static final Map<String, MessageInfo> aiStreamCache = new ConcurrentHashMap<>();
+    /** AI 流式输出缓存：streamMessageId -> MessageInfo（用于增量追加），实例变量避免跨会话污染 */
+    private final Map<String, MessageInfo> aiStreamCache = new ConcurrentHashMap<>();
 
     /**
      * 处理 AI 流式输出
@@ -737,6 +737,10 @@ public final class ChatViewModel {
         MessageInfo aiMsg = aiStreamCache.get(streamMessageId);
 
         if (aiMsg == null) {
+            if (done) {
+                LOG.warn("[AI-STREAM] 收到完成消息但无占位缓存，可能是超时清理或异常重发: streamId={}", streamMessageId);
+                return;
+            }
             // 首次收到流式消息，创建 AI 消息占位
             aiMsg = new MessageInfo();
             aiMsg.setMessageId(-System.currentTimeMillis());

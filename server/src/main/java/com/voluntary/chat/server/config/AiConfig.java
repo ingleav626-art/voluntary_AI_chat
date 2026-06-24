@@ -12,8 +12,8 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "ai")
 public class AiConfig {
 
-    /** API Key 加密密钥（32字节） */
-    private String encryptionKey = "default-key-for-dev-only-32b!";
+    /** API Key 加密密钥（32字节，必须通过配置或环境变量提供） */
+    private String encryptionKey;
 
     /** 默认温度参数 */
     private Double defaultTemperature = 0.7;

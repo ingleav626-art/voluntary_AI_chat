@@ -354,6 +354,37 @@ class AiServiceTest {
         assertEquals(0L, result.getTotal());
     }
 
+    @Test
+    @DisplayName("创建 AI 角色 - 加密密钥未配置时抛出异常")
+    void createAiProfile_shouldThrowWhenEncryptionKeyMissing() {
+        reset(aiConfig);
+        when(aiConfig.getEncryptionKey()).thenReturn(null);
+
+        final CreateAiProfileRequest request = new CreateAiProfileRequest();
+        request.setName("小助手");
+        request.setApiKey("sk-test-key");
+
+        final BusinessException ex = assertThrows(BusinessException.class,
+                () -> aiService.createAiProfile(USER_ID, request));
+        assertEquals(ErrorCode.INTERNAL_ERROR, ex.getErrorCode());
+
+        verify(aiProfileMapper, never()).insert(any(AiProfile.class));
+    }
+
+    @Test
+    @DisplayName("解密 API Key - 加密密钥未配置时抛出异常")
+    void decryptApiKey_shouldThrowWhenEncryptionKeyMissing() {
+        reset(aiConfig);
+        when(aiConfig.getEncryptionKey()).thenReturn("");
+
+        final AiProfile profile = createAiProfile(AI_ID, "小助手");
+        profile.setApiKeyEnc("encrypted-data");
+
+        final BusinessException ex = assertThrows(BusinessException.class,
+                () -> aiService.decryptApiKey(profile));
+        assertEquals(ErrorCode.INTERNAL_ERROR, ex.getErrorCode());
+    }
+
     private AiProfile createAiProfile(final Long id, final String name) {
         final AiProfile profile = new AiProfile();
         profile.setId(id);
