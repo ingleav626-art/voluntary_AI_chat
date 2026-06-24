@@ -39,9 +39,7 @@ public final class AesKeyUtil {
         }
 
         final byte[] keyBytes = getKeyBytes(key);
-        if (keyBytes.length != KEY_LENGTH) {
-            throw new IllegalArgumentException("密钥长度必须为 32 字节");
-        }
+        // getKeyBytes 始终返回 32 字节，不需要额外检查
 
         try {
             // 生成随机 IV
@@ -84,9 +82,7 @@ public final class AesKeyUtil {
         }
 
         final byte[] keyBytes = getKeyBytes(key);
-        if (keyBytes.length != KEY_LENGTH) {
-            throw new IllegalArgumentException("密钥长度必须为 32 字节");
-        }
+        // getKeyBytes 始终返回 32 字节，不需要额外检查
 
         try {
             // Base64 解码

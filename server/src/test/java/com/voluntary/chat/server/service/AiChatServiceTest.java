@@ -6,6 +6,7 @@ import com.voluntary.chat.server.config.AiConfig;
 import com.voluntary.chat.server.entity.AiProfile;
 import com.voluntary.chat.server.entity.Message;
 import com.voluntary.chat.server.mapper.MessageMapper;
+import com.voluntary.chat.server.websocket.ChatWebSocketHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
@@ -42,6 +44,9 @@ class AiChatServiceTest {
     @Mock
     private MessageMapper messageMapper;
 
+    @Mock
+    private ChatWebSocketHandler webSocketHandler;
+
     private static final Long USER_ID = 1001L;
     private static final Long AI_ID = 3001L;
     private static final String SESSION_ID = "a_3001_1001";
@@ -49,6 +54,7 @@ class AiChatServiceTest {
     @BeforeEach
     void setUp() {
         aiChatService = new AiChatService(aiService, openAiClient, aiConfig, messageMapper);
+        ReflectionTestUtils.setField(aiChatService, "webSocketHandler", webSocketHandler);
 
         final AiConfig.ContextConfig contextConfig = new AiConfig.ContextConfig();
         contextConfig.setMaxHistoryRounds(10);
@@ -286,10 +292,24 @@ class AiChatServiceTest {
         when(aiService.decryptApiKey(profile)).thenReturn("sk-test-key");
         when(openAiClient.getBaseUrl("openai")).thenReturn("https://api.openai.com/v1");
         when(messageMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+        when(messageMapper.insert(any(Message.class))).thenAnswer(invocation -> {
+            Message msg = invocation.getArgument(0);
+            msg.setId(5001L);
+            return 1;
+        });
+
+        // 触发回调执行，覆盖 saveAiMessage 和 WebSocket 推送逻辑
+        doAnswer(invocation -> {
+            OpenAiClient.StreamConfig config = invocation.getArgument(0);
+            config.getOnChunk().accept("你好");
+            config.getOnComplete().accept("你好！有什么可以帮助你的？");
+            return null;
+        }).when(openAiClient).streamChatCompletion(any(OpenAiClient.StreamConfig.class));
 
         aiChatService.handleAiChat(USER_ID, AI_ID, SESSION_ID, "你好", "msg-001");
 
-        // 验证streamChatCompletion被调用，消息保存会在回调中执行
+        // 验证用户消息和AI消息都被保存
+        verify(messageMapper, times(2)).insert(any(Message.class));
         verify(openAiClient).streamChatCompletion(any(OpenAiClient.StreamConfig.class));
     }
 

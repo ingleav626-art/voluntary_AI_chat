@@ -151,15 +151,20 @@ public class GroupService {
         }
 
         // 2. 分页查询群组信息
-        LambdaQueryWrapper<GroupEntity> wrapper = new LambdaQueryWrapper<>();
-        wrapper.in(GroupEntity::getId, groupIds)
+        // 注意：count 查询与 list 查询必须使用独立的 wrapper，
+        // 因为 H2 不允许 COUNT(*) 查询带 ORDER BY 子句
+        LambdaQueryWrapper<GroupEntity> countWrapper = new LambdaQueryWrapper<>();
+        countWrapper.in(GroupEntity::getId, groupIds)
+                .eq(GroupEntity::getIsDeleted, 0);
+        long total = groupMapper.selectCount(countWrapper);
+
+        LambdaQueryWrapper<GroupEntity> listWrapper = new LambdaQueryWrapper<>();
+        listWrapper.in(GroupEntity::getId, groupIds)
                 .eq(GroupEntity::getIsDeleted, 0)
                 .orderByDesc(GroupEntity::getCreateTime);
-
-        long total = groupMapper.selectCount(wrapper);
         int offset = (page - 1) * size;
         List<GroupEntity> groups = groupMapper.selectList(
-                wrapper.last("LIMIT " + offset + ", " + size));
+                listWrapper.last("LIMIT " + offset + ", " + size));
 
         // 3. 批量查询成员数量
         List<GroupResponse> list = groups.stream()
@@ -180,16 +185,21 @@ public class GroupService {
     public PageResult<GroupMemberResponse> getGroupMembers(final Long groupId, final int page, final int size) {
         GroupEntity group = findGroupById(groupId);
 
-        LambdaQueryWrapper<GroupMember> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(GroupMember::getGroupId, groupId)
+        // 注意：count 查询与 list 查询必须使用独立的 wrapper，
+        // 因为 H2 不允许 COUNT(*) 查询带 ORDER BY 子句
+        LambdaQueryWrapper<GroupMember> countWrapper = new LambdaQueryWrapper<>();
+        countWrapper.eq(GroupMember::getGroupId, groupId)
+                .eq(GroupMember::getIsDeleted, 0);
+        long total = groupMemberMapper.selectCount(countWrapper);
+
+        LambdaQueryWrapper<GroupMember> listWrapper = new LambdaQueryWrapper<>();
+        listWrapper.eq(GroupMember::getGroupId, groupId)
                 .eq(GroupMember::getIsDeleted, 0)
                 .orderByAsc(GroupMember::getRole)
                 .orderByAsc(GroupMember::getCreateTime);
-
-        long total = groupMemberMapper.selectCount(wrapper);
         int offset = (page - 1) * size;
         List<GroupMember> members = groupMemberMapper.selectList(
-                wrapper.last("LIMIT " + offset + ", " + size));
+                listWrapper.last("LIMIT " + offset + ", " + size));
 
         if (members.isEmpty()) {
             return PageResult.of(Collections.emptyList(), total, page, size);

@@ -363,6 +363,7 @@ class GroupServiceTest {
 
         when(groupMapper.selectById(GROUP_ID)).thenReturn(group);
         when(groupMemberMapper.selectRoleByGroupIdAndUserId(GROUP_ID, OWNER_ID)).thenReturn(2);
+        when(userService.findById(MEMBER_ID_1)).thenReturn(mockUser2);
 
         groupService.removeMember(OWNER_ID, GROUP_ID, MEMBER_ID_1);
 
@@ -408,6 +409,7 @@ class GroupServiceTest {
         group.setOwnerId(OWNER_ID);
 
         when(groupMapper.selectById(GROUP_ID)).thenReturn(group);
+        when(userService.findById(MEMBER_ID_1)).thenReturn(mockUser2);
 
         groupService.leaveGroup(MEMBER_ID_1, GROUP_ID);
 

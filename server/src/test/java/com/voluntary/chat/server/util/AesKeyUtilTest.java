@@ -160,4 +160,50 @@ class AesKeyUtilTest {
 
         assertEquals(unicodeText, decrypted);
     }
+
+    @Test
+    @DisplayName("私有构造函数 - 通过反射验证可实例化")
+    void privateConstructor_shouldBeAccessible_viaReflection() throws Exception {
+        final java.lang.reflect.Constructor<AesKeyUtil> constructor =
+                AesKeyUtil.class.getDeclaredConstructor();
+        constructor.setAccessible(true);
+        final AesKeyUtil instance = constructor.newInstance();
+        assertNotNull(instance);
+    }
+
+    @Test
+    @DisplayName("加密失败 - 明文和密钥同时为 null")
+    void encrypt_shouldFail_whenBothNull() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            AesKeyUtil.encrypt(null, null);
+        });
+    }
+
+    @Test
+    @DisplayName("解密失败 - 密文和密钥同时为 null")
+    void decrypt_shouldFail_whenBothNull() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            AesKeyUtil.decrypt(null, null);
+        });
+    }
+
+    @Test
+    @DisplayName("加密成功 - 长密钥自动截取")
+    void encrypt_shouldSucceed_withLongKey() {
+        // 超过 32 字节的密钥会被截取到 32 字节
+        final String longKey = "this-key-is-much-longer-than-32-bytes-1234567890";
+        final String encrypted = AesKeyUtil.encrypt(TEST_TEXT, longKey);
+        final String decrypted = AesKeyUtil.decrypt(encrypted, longKey);
+        assertEquals(TEST_TEXT, decrypted);
+    }
+
+    @Test
+    @DisplayName("加密解密 - 空格和特殊字符")
+    void encryptDecrypt_shouldHandle_specialCharacters() {
+        final String specialText = "  \t\n  !@#$%^&*()_+-=[]{}|;':\",./<>?  ";
+        final String encrypted = AesKeyUtil.encrypt(specialText, VALID_KEY);
+        final String decrypted = AesKeyUtil.decrypt(encrypted, VALID_KEY);
+
+        assertEquals(specialText, decrypted);
+    }
 }

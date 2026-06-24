@@ -121,81 +121,83 @@
 
         <!-- 账号安全 Tab -->
         <Tab text="账号安全">
-            <VBox spacing="15.0" styleClass="tab-content">
-                <padding>
-                    <Insets bottom="15.0" left="15.0" right="15.0" top="15.0"/>
-                </padding>
+            <ScrollPane fitToWidth="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED">
+                <VBox spacing="15.0" styleClass="tab-content">
+                    <padding>
+                        <Insets bottom="15.0" left="15.0" right="15.0" top="15.0"/>
+                    </padding>
 
-                <!-- 修改密码区域 -->
-                <VBox spacing="10.0" styleClass="section-box">
-                    <Label text="修改密码" styleClass="section-title"/>
+                    <!-- 修改密码区域 -->
+                    <VBox spacing="10.0" styleClass="section-box">
+                        <Label text="修改密码" styleClass="section-title"/>
 
-                    <HBox alignment="CENTER_LEFT" spacing="10.0">
-                        <Label text="当前手机:" prefWidth="80.0"/>
-                        <Label fx:id="passwordPhoneLabel" text="-" styleClass="info-label"/>
-                    </HBox>
+                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                            <Label text="当前手机:" prefWidth="80.0"/>
+                            <Label fx:id="passwordPhoneLabel" text="-" styleClass="info-label"/>
+                        </HBox>
 
-                    <HBox alignment="CENTER_LEFT" spacing="10.0">
-                        <Button fx:id="sendPasswordSmsButton" text="发送验证码" styleClass="btn-secondary"
-                                onAction="#handleSendPasswordSms"/>
-                        <TextField fx:id="passwordSmsField" promptText="6位验证码" prefWidth="150.0"/>
-                    </HBox>
+                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                            <Button fx:id="sendPasswordSmsButton" text="发送验证码" styleClass="btn-secondary"
+                                    onAction="#handleSendPasswordSms"/>
+                            <TextField fx:id="passwordSmsField" promptText="6位验证码" prefWidth="150.0"/>
+                        </HBox>
 
-                    <HBox alignment="CENTER_LEFT" spacing="10.0">
-                        <Label text="新密码:" prefWidth="80.0"/>
-                        <PasswordField fx:id="newPasswordField" promptText="新密码（6-50字符）" prefWidth="280.0"/>
-                    </HBox>
+                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                            <Label text="新密码:" prefWidth="80.0"/>
+                            <PasswordField fx:id="newPasswordField" promptText="新密码（6-50字符）" prefWidth="280.0"/>
+                        </HBox>
 
-                    <HBox alignment="CENTER_LEFT" spacing="10.0">
-                        <Label text="确认密码:" prefWidth="80.0"/>
-                        <PasswordField fx:id="confirmPasswordField" promptText="确认密码" prefWidth="280.0"/>
-                    </HBox>
+                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                            <Label text="确认密码:" prefWidth="80.0"/>
+                            <PasswordField fx:id="confirmPasswordField" promptText="确认密码" prefWidth="280.0"/>
+                        </HBox>
 
-                    <StackPane>
-                        <Button fx:id="changePasswordButton" text="确认修改" styleClass="btn-primary"
-                                prefWidth="120.0" onAction="#handleChangePassword"/>
-                        <ProgressIndicator fx:id="passwordLoadingIndicator" prefHeight="20.0" prefWidth="20.0"
-                                           visible="false"/>
-                    </StackPane>
+                        <StackPane>
+                            <Button fx:id="changePasswordButton" text="确认修改" styleClass="btn-primary"
+                                    prefWidth="120.0" onAction="#handleChangePassword"/>
+                            <ProgressIndicator fx:id="passwordLoadingIndicator" prefHeight="20.0" prefWidth="20.0"
+                                               visible="false"/>
+                        </StackPane>
+                    </VBox>
+
+                    <!-- 修改手机号区域 -->
+                    <VBox spacing="10.0" styleClass="section-box">
+                        <Label text="修改手机号" styleClass="section-title"/>
+
+                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                            <Label text="当前手机:" prefWidth="80.0"/>
+                            <Label fx:id="changePhoneLabel" text="-" styleClass="info-label"/>
+                        </HBox>
+
+                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                            <Button fx:id="sendCurrentSmsButton" text="发送验证码" styleClass="btn-secondary"
+                                    onAction="#handleSendCurrentSms"/>
+                            <TextField fx:id="currentSmsField" promptText="当前验证码" prefWidth="150.0"/>
+                        </HBox>
+
+                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                            <Label text="新手机号:" prefWidth="80.0"/>
+                            <TextField fx:id="newPhoneField" promptText="新手机号" prefWidth="280.0"/>
+                        </HBox>
+
+                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                            <Button fx:id="sendNewSmsButton" text="发送验证码" styleClass="btn-secondary"
+                                    onAction="#handleSendNewSms"/>
+                            <TextField fx:id="newSmsField" promptText="新验证码" prefWidth="150.0"/>
+                        </HBox>
+
+                        <StackPane>
+                            <Button fx:id="changePhoneButton" text="确认修改" styleClass="btn-primary"
+                                    prefWidth="120.0" onAction="#handleChangePhone"/>
+                            <ProgressIndicator fx:id="phoneLoadingIndicator" prefHeight="20.0" prefWidth="20.0"
+                                               visible="false"/>
+                        </StackPane>
+                    </VBox>
+
+                    <!-- 消息提示 -->
+                    <Label fx:id="securityMessageLabel" styleClass="message-label" text=""/>
                 </VBox>
-
-                <!-- 修改手机号区域 -->
-                <VBox spacing="10.0" styleClass="section-box">
-                    <Label text="修改手机号" styleClass="section-title"/>
-
-                    <HBox alignment="CENTER_LEFT" spacing="10.0">
-                        <Label text="当前手机:" prefWidth="80.0"/>
-                        <Label fx:id="changePhoneLabel" text="-" styleClass="info-label"/>
-                    </HBox>
-
-                    <HBox alignment="CENTER_LEFT" spacing="10.0">
-                        <Button fx:id="sendCurrentSmsButton" text="发送验证码" styleClass="btn-secondary"
-                                onAction="#handleSendCurrentSms"/>
-                        <TextField fx:id="currentSmsField" promptText="当前验证码" prefWidth="150.0"/>
-                    </HBox>
-
-                    <HBox alignment="CENTER_LEFT" spacing="10.0">
-                        <Label text="新手机号:" prefWidth="80.0"/>
-                        <TextField fx:id="newPhoneField" promptText="新手机号" prefWidth="280.0"/>
-                    </HBox>
-
-                    <HBox alignment="CENTER_LEFT" spacing="10.0">
-                        <Button fx:id="sendNewSmsButton" text="发送验证码" styleClass="btn-secondary"
-                                onAction="#handleSendNewSms"/>
-                        <TextField fx:id="newSmsField" promptText="新验证码" prefWidth="150.0"/>
-                    </HBox>
-
-                    <StackPane>
-                        <Button fx:id="changePhoneButton" text="确认修改" styleClass="btn-primary"
-                                prefWidth="120.0" onAction="#handleChangePhone"/>
-                        <ProgressIndicator fx:id="phoneLoadingIndicator" prefHeight="20.0" prefWidth="20.0"
-                                           visible="false"/>
-                    </StackPane>
-                </VBox>
-
-                <!-- 消息提示 -->
-                <Label fx:id="securityMessageLabel" styleClass="message-label" text=""/>
-            </VBox>
+            </ScrollPane>
         </Tab>
     </TabPane>
 
