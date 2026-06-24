@@ -1,35 +1,95 @@
+# 本地模式配置（精简启动，仅AI组件）
+# 启动方式：--spring.profiles.active=local
+# 适用场景：纯AI聊天、隐私模式、云端服务器不可用
+
 spring:
+  main:
+    lazy-initialization: true
+    banner-mode: off
+    # 仅加载AI相关组件，排除真人聊天模块
+    web-application-type: servlet
+
+  jmx:
+    enabled: false
+
   datasource:
-    url: jdbc:mysql://localhost:3306/voluntary_ai_chat?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
-    username: root
-    password: ${DB_PASSWORD:123456}
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:h2:file:${user.dir}/data/voluntary_ai_chat;AUTO_SERVER=TRUE;MODE=MySQL;NON_KEYWORDS=USER
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
     hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
+      maximum-pool-size: 3
+      minimum-idle: 1
+      initialization-fail-timeout: -1
+      connection-timeout: 5000
+
+  h2:
+    console:
+      enabled: false
 
   sql:
     init:
       mode: always
-      schema-locations: classpath:db/schema.sql
-      continue-on-error: true
+      schema-locations: classpath:db/schema-h2.sql
+      encoding: UTF-8
 
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    show-sql: true
-    open-in-view: false
-    defer-datasource-initialization: true
+  # 本地模式不依赖 Redis
+  data:
+    redis:
+      enabled: false
 
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
-      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+  jackson:
+    default-property-inclusion: non_null
 
+  # 禁用不必要的端点
+  management:
+    endpoints:
+      enabled-by-default: false
+
+# 应用数据目录
+app:
+  data:
+    dir: ./data
+
+# 本地模式配置
+local:
+  mode:
+    enabled: true
+    # 仅加载AI相关组件
+    ai-only: true
+    # 排除真人聊天模块
+    exclude-modules:
+      - friend
+      - group
+      - conversation
+      - message-human
+
+# 向量库配置（本地Lucene）
+vector:
+  store:
+    type: lucene
+    enabled: true
+    index-dir: ${app.data.dir}/vector-index
+
+# AI配置
+ai:
+  memory:
+    max-count: 10
+    similarity-threshold: 0.7
+    summary-threshold: 20
+
+# 优化日志级别
 logging:
   level:
-    root: INFO
-    com.voluntary.chat: DEBUG
+    root: WARN
+    com.voluntary.chat: INFO
+    com.voluntary.chat.server.service.AiChatService: DEBUG
+    org.springframework.boot.autoconfigure: WARN
 
 server:
   port: 8080
+
+upload:
+  image:
+    dir: ${app.data.dir}/uploads/chat/images
+    base-url: http://localhost:8080/files

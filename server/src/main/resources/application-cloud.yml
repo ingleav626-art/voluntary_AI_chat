@@ -1,0 +1,129 @@
+# 云端模式配置（公网服务器）
+# 启动方式：--spring.profiles.active=cloud
+# 适用场景：真人实时聊天、群聊（包含AI）、多人协作
+
+spring:
+  application:
+    name: voluntary-ai-chat-server-cloud
+
+  # 云端MySQL数据库
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:3306/voluntary_ai_chat?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=true&requireSSL=true
+    username: ${DB_USER:voluntary_user}
+    password: ${DB_PASSWORD:YourStrongPassword123!}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 5000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  # 云端Redis
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:YourRedisPassword123!}
+      timeout: 3000
+      connect-timeout: 3000
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 4
+          min-idle: 2
+
+  sql:
+    init:
+      mode: never  # 生产环境不自动执行schema.sql
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null
+
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    db-config:
+      id-type: ASSIGN_ID
+      logic-delete-field: isDeleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# JWT配置（生产环境必须使用强密钥）
+jwt:
+  secret: ${JWT_SECRET:CHANGE_THIS_TO_RANDOM_256BIT_SECRET_IN_PRODUCTION}
+  access-token-expiration: 7200000
+  refresh-token-expiration: 604800000
+
+# CORS配置（允许客户端域名）
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,https://your-domain.com}
+  allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+  allowed-headers: Authorization,Content-Type
+  allow-credentials: true
+  max-age: 3600
+
+# 云端模式启用
+cloud:
+  mode:
+    enabled: true
+
+server:
+  port: 8080
+  # 生产环境通过Nginx代理，不直接暴露
+  broadcast:
+    enabled: false
+
+# 图片上传配置（使用对象存储）
+upload:
+  image:
+    dir: /opt/app/uploads/chat/images
+    base-url: https://your-domain.com/files
+    # 或使用OSS配置
+    oss:
+      enabled: false
+      endpoint: https://oss-cn-hangzhou.aliyuncs.com
+      bucket-name: voluntary-ai-chat
+      access-key: ${OSS_ACCESS_KEY:}
+      secret-key: ${OSS_SECRET_KEY:}
+
+# 请求限流配置
+rate-limit:
+  enabled: true
+  capacity: 20       # 令牌桶容量（最大突发请求数）
+  refill-rate: 10    # 每秒补充令牌数
+
+# 优化日志级别
+logging:
+  level:
+    root: WARN
+    com.voluntary.chat: INFO
+    org.springframework.security: WARN
+  file:
+    name: /opt/app/logs/server.log
+    max-size: 10MB
+    max-history: 7
+
+# 安全配置
+security:
+  # 强制HTTPS（生产环境启用）
+  require-ssl: false
+  # 会话超时
+  session:
+    timeout: 7200
+  # 安全响应头
+  headers:
+    x-content-type-options: nosniff
+    x-frame-options: DENY
+    x-xss-protection: 1; mode=block
+    strict-transport-security: max-age=31536000; includeSubDomains

@@ -1,6 +1,7 @@
 package org.example.client;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
@@ -9,15 +10,24 @@ import javafx.scene.Scene;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import org.example.client.config.ClientConfig;
+import org.example.client.config.ServerConnectionManager;
 import org.example.client.controller.MainController;
 import org.example.client.model.ConversationInfo;
 import org.example.client.model.LoginResponse;
-import org.example.client.util.ServerDiscovery;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * JavaFX 客户端主应用
+ * JavaFX 客户端主应用（三模式启动策略）
+ *
+ * <p>
+ * 支持三种启动模式：
+ * <ul>
+ * <li>LOCAL - 本地模式：内嵌后端，H2数据库，AI隐私数据本地存储</li>
+ * <li>HOTSPOT - 热点模式：连接局域网测试服务器，用于开发测试</li>
+ * <li>CLOUD - 云端模式：连接公网服务器，真人实时通信</li>
+ * </ul>
+ * </p>
  *
  * @author voluntary-ai-chat
  * @since 1.0.0
@@ -86,20 +96,29 @@ public class App extends Application {
             LOG.info("使用自定义配置文件: {}", configEnv);
             ClientConfig.getInstance().load();
         } else {
-            // 尝试自动发现服务器
-            LOG.info("尝试自动发现服务器...");
-            final String discoveredServer = ServerDiscovery.autoDiscover();
-            if (discoveredServer != null) {
-                LOG.info("自动发现服务器成功: {}", discoveredServer);
-                // 动态设置服务器地址
-                ClientConfig.getInstance().setBaseUrl(discoveredServer);
-            } else {
-                LOG.info("自动发现失败，使用默认配置");
-                ClientConfig.getInstance().load();
+            // 使用三模式启动策略
+            LOG.info("使用三模式启动策略...");
+            final ServerConnectionManager connectionManager = ServerConnectionManager.getInstance();
+
+            // 异步检查服务器连接状态，等待结果（最多5秒）
+            try {
+                final String finalServerUrl = connectionManager.checkServerAvailabilityAsync()
+                        .get(5, TimeUnit.SECONDS);
+
+                // 设置最终的服务器地址
+                ClientConfig.getInstance().setBaseUrl(finalServerUrl);
+                LOG.info("服务器连接检查完成，使用服务器: {}", finalServerUrl);
+            } catch (final Exception e) {
+                LOG.warn("服务器连接检查超时或失败，使用默认本地服务器", e);
+                ClientConfig.getInstance().setBaseUrl(ServerConnectionManager.getInstance().getCurrentMode().getDefaultBaseUrl());
             }
+
+            ClientConfig.getInstance().load();
         }
 
-        LOG.info("客户端配置加载成功: baseUrl={}", ClientConfig.getInstance().getBaseUrl());
+        LOG.info("客户端配置加载成功: baseUrl={}, mode={}",
+                ClientConfig.getInstance().getBaseUrl(),
+                ServerConnectionManager.getInstance().getCurrentMode().getDescription());
     }
 
     @Override

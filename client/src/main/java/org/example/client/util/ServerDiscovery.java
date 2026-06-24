@@ -20,7 +20,9 @@ import org.slf4j.LoggerFactory;
 /**
  * 服务器发现工具
  *
- * <p>通过UDP广播监听或主动扫描局域网发现服务器地址。</p>
+ * <p>
+ * 通过UDP广播监听或主动扫描局域网发现服务器地址。
+ * </p>
  *
  * @author voluntary-ai-chat
  * @since 1.0.0
@@ -47,13 +49,9 @@ public final class ServerDiscovery {
     /** 广播消息格式 */
     private static final String BROADCAST_MESSAGE_PREFIX = "VOLUNTARY_CHAT_SERVER:";
 
-    /** 常见局域网IP段 */
+    /** 常见局域网IP段（只扫描一个IP段，减少扫描时间） */
     private static final String[] COMMON_IP_SEGMENTS = {
-            "192.168.43.",  // Android热点常见
-            "192.168.0.",   // 路由器常见
-            "192.168.1.",   // 路由器常见
-            "10.0.0.",      // 部分路由器
-            "172.16.0."     // 部分企业网络
+            "192.168.1." // 路由器常见（只扫描一个IP段）
     };
 
     private ServerDiscovery() {

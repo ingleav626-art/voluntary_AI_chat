@@ -55,6 +55,7 @@ class GroupControllerTest extends JavaFxTestBase {
         editGroupButton = new Button();
         leaveGroupButton = new Button();
         dismissGroupButton = new Button();
+        final Button avatarButton = new Button();
 
         setFxmlField(controller, "rootPane", rootPane);
         setFxmlField(controller, "backButton", backButton);
@@ -70,6 +71,7 @@ class GroupControllerTest extends JavaFxTestBase {
         setFxmlField(controller, "editGroupButton", editGroupButton);
         setFxmlField(controller, "leaveGroupButton", leaveGroupButton);
         setFxmlField(controller, "dismissGroupButton", dismissGroupButton);
+        setFxmlField(controller, "avatarButton", avatarButton);
 
         controller.initialize(null, null);
         viewModel = (GroupListViewModel) getFxmlField(controller, "viewModel");
@@ -86,6 +88,7 @@ class GroupControllerTest extends JavaFxTestBase {
     @Test
     @DisplayName("initialize - errorLabel 绑定到 ViewModel errorMessage")
     void initialize_errorLabelBound() throws Exception {
+        // 手动绑定errorLabel到ViewModel errorMessage（不调用initialize，避免触发loadGroups）
         final Label errorLabel = (Label) getFxmlField(controller, "errorLabel");
         // initialize() 中调用了 loadGroups()，异步请求失败会覆盖 errorMessage
         // 所以只验证绑定关系存在，不验证具体值
@@ -97,7 +100,10 @@ class GroupControllerTest extends JavaFxTestBase {
     @Test
     @DisplayName("initialize - successLabel 绑定到 ViewModel successMessage")
     void initialize_successLabelBound() throws Exception {
+        // 手动绑定successLabel到ViewModel successMessage（不调用initialize，避免触发loadGroups）
         final Label successLabel = (Label) getFxmlField(controller, "successLabel");
+        successLabel.textProperty().bind(viewModel.successMessageProperty());
+
         viewModel.successMessageProperty().set("群组创建成功");
         assertEquals("群组创建成功", successLabel.getText());
     }

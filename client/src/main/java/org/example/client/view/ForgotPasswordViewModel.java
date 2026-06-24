@@ -128,7 +128,7 @@ public final class ForgotPasswordViewModel {
                 confirmPassword.get());
 
         AuthService.getInstance().forgotPassword(request)
-                .thenAcceptAsync(response -> {
+                .thenAcceptAsync(response -> Platform.runLater(() -> {
                     loading.set(false);
 
                     if (response != null && response.isSuccess()) {
@@ -136,7 +136,7 @@ public final class ForgotPasswordViewModel {
                     } else {
                         handleFailure(response != null ? response.getMessage() : "密码重置失败");
                     }
-                });
+                }));
     }
 
     private boolean validateInput() {

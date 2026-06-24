@@ -64,5 +64,12 @@ test_error
 logs/
 *.log
 
+# 上传文件（图片、文件等）
+server/uploads/
+uploads/
+
+# H2 数据库文件（运行时生成，含用户数据）
+server/data/
+
 # AI 开发规范（每次发送给 AI，不提交）
 AGENTS.md

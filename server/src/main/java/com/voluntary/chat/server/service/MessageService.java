@@ -82,14 +82,20 @@ public class MessageService {
      * 获取聊天记录（按会话维度分页）
      */
     public PageResult<MessageResponse> getHistory(String sessionId, Long userId, int page, int size) {
-        LambdaQueryWrapper<Message> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Message::getSessionId, sessionId)
+        // COUNT 查询不需要 ORDER BY（H2 不支持 COUNT + ORDER BY 组合）
+        LambdaQueryWrapper<Message> countWrapper = new LambdaQueryWrapper<>();
+        countWrapper.eq(Message::getSessionId, sessionId)
+                .eq(Message::getIsDeleted, 0);
+        long total = messageMapper.selectCount(countWrapper);
+
+        // 数据查询需要 ORDER BY
+        LambdaQueryWrapper<Message> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Message::getSessionId, sessionId)
                 .eq(Message::getIsDeleted, 0)
                 .orderByDesc(Message::getCreateTime);
 
-        long total = messageMapper.selectCount(wrapper);
         int offset = (page - 1) * size;
-        List<Message> messages = messageMapper.selectList(wrapper.last("LIMIT " + offset + ", " + size));
+        List<Message> messages = messageMapper.selectList(queryWrapper.last("LIMIT " + offset + ", " + size));
 
         // 批量获取发送者信息，避免循环查询
         Set<Long> senderIds = messages.stream()
@@ -355,6 +361,27 @@ public class MessageService {
         return messages.stream()
                 .map(msg -> toResponse(msg, userMap))
                 .toList();
+    }
+
+    /**
+     * 根据消息ID列表查找消息发送者（去重）
+     *
+     * @param messageIds 消息ID列表
+     * @return 发送者ID列表（去重）
+     */
+    public List<Long> findMessageSenders(final List<Long> messageIds) {
+        if (messageIds == null || messageIds.isEmpty()) {
+            return List.of();
+        }
+        // 使用 SQL: SELECT DISTINCT sender_id FROM message WHERE id IN (...)
+        final LambdaQueryWrapper<Message> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(Message::getId, messageIds)
+                .select(Message::getSenderId);
+        final List<Message> messages = messageMapper.selectList(wrapper);
+        return messages.stream()
+                .map(Message::getSenderId)
+                .distinct()
+                .collect(Collectors.toList());
     }
 
     /**

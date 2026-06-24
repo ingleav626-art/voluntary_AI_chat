@@ -8,7 +8,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * 客户端配置管理（单例）
+ * 客户端配置管理（单例，支持双服务器配置）
+ *
+ * <p>
+ * 支持三种启动模式的服务器配置：
+ * <ul>
+ * <li>LOCAL - 本地服务器（内嵌后端，H2数据库）</li>
+ * <li>HOTSPOT - 热点服务器（局域网测试）</li>
+ * <li>CLOUD - 云端服务器（公网服务器）</li>
+ * </ul>
+ * </p>
  *
  * @author voluntary-ai-chat
  * @since 1.0.0
@@ -21,7 +30,7 @@ public final class ClientConfig {
 
     private static final String DEFAULT_CONFIG_FILE = "application-client.properties";
 
-    private static final String DEFAULT_BASE_URL = "http://localhost:8080/api";
+    private static final String DEFAULT_LOCAL_BASE_URL = "http://localhost:8080/api";
 
     private static final int DEFAULT_CONNECT_TIMEOUT = 10;
 
@@ -30,8 +39,17 @@ public final class ClientConfig {
     /** 配置文件名称 */
     private String configFile = DEFAULT_CONFIG_FILE;
 
-    /** 服务端 Base URL */
-    private String baseUrl = DEFAULT_BASE_URL;
+    /** 本地服务器 Base URL（内嵌后端） */
+    private String localBaseUrl = DEFAULT_LOCAL_BASE_URL;
+
+    /** 云端服务器 Base URL（公网服务器） */
+    private String cloudBaseUrl;
+
+    /** 热点服务器 Base URL（局域网测试） */
+    private String hotspotBaseUrl;
+
+    /** 当前使用的服务器 Base URL（根据启动模式动态决定） */
+    private String currentBaseUrl = DEFAULT_LOCAL_BASE_URL;
 
     /** 连接超时（秒） */
     private int connectTimeout = DEFAULT_CONNECT_TIMEOUT;
@@ -57,12 +75,43 @@ public final class ClientConfig {
     }
 
     /**
-     * 设置服务器 Base URL
+     * 设置当前服务器 Base URL
      *
      * @param baseUrl 服务器 Base URL
      */
     public void setBaseUrl(final String baseUrl) {
-        this.baseUrl = baseUrl;
+        this.currentBaseUrl = baseUrl;
+        LOG.info("当前服务器地址设置为: {}", baseUrl);
+    }
+
+    /**
+     * 设置本地服务器 Base URL
+     *
+     * @param baseUrl 本地服务器 Base URL
+     */
+    public void setLocalBaseUrl(final String baseUrl) {
+        this.localBaseUrl = baseUrl;
+        LOG.debug("本地服务器地址设置为: {}", baseUrl);
+    }
+
+    /**
+     * 设置云端服务器 Base URL
+     *
+     * @param baseUrl 云端服务器 Base URL
+     */
+    public void setCloudBaseUrl(final String baseUrl) {
+        this.cloudBaseUrl = baseUrl;
+        LOG.debug("云端服务器地址设置为: {}", baseUrl);
+    }
+
+    /**
+     * 设置热点服务器 Base URL
+     *
+     * @param baseUrl 热点服务器 Base URL
+     */
+    public void setHotspotBaseUrl(final String baseUrl) {
+        this.hotspotBaseUrl = baseUrl;
+        LOG.debug("热点服务器地址设置为: {}", baseUrl);
     }
 
     public void load() {
@@ -75,14 +124,34 @@ public final class ClientConfig {
             final Properties props = new Properties();
             props.load(is);
 
-            baseUrl = props.getProperty("client.base-url", DEFAULT_BASE_URL);
+            // 读取本地服务器地址
+            localBaseUrl = props.getProperty("client.local-base-url", DEFAULT_LOCAL_BASE_URL);
+
+            // 读取云端服务器地址
+            cloudBaseUrl = props.getProperty("client.cloud-base-url");
+
+            // 读取热点服务器地址
+            hotspotBaseUrl = props.getProperty("client.hotspot-base-url");
+
+            // 读取当前服务器地址（如果配置文件中指定）
+            // 注意：如果已经通过 ServerConnectionManager 设置了地址（如自动发现），不覆盖
+            final String configBaseUrl = props.getProperty("client.base-url");
+            if (configBaseUrl != null && !configBaseUrl.isEmpty()) {
+                // 只有当 currentBaseUrl 还是默认值时才从配置文件覆盖
+                // 热点/云端模式会自动发现并设置正确的地址，不应被配置文件覆盖
+                if (currentBaseUrl == null || DEFAULT_LOCAL_BASE_URL.equals(currentBaseUrl)) {
+                    currentBaseUrl = configBaseUrl;
+                }
+            }
+
+            // 读取超时配置
             connectTimeout = Integer.parseInt(props.getProperty("client.connect-timeout",
                     String.valueOf(DEFAULT_CONNECT_TIMEOUT)));
             readTimeout = Integer.parseInt(props.getProperty("client.read-timeout",
                     String.valueOf(DEFAULT_READ_TIMEOUT)));
 
-            LOG.debug("配置加载完成: baseUrl={}, connectTimeout={}, readTimeout={}",
-                    baseUrl, connectTimeout, readTimeout);
+            LOG.debug("配置加载完成: local={}, cloud={}, hotspot={}, current={}, connectTimeout={}, readTimeout={}",
+                    localBaseUrl, cloudBaseUrl, hotspotBaseUrl, currentBaseUrl, connectTimeout, readTimeout);
         } catch (final IOException e) {
             LOG.error("加载配置文件失败", e);
         } catch (final NumberFormatException e) {
@@ -90,8 +159,59 @@ public final class ClientConfig {
         }
     }
 
+    /**
+     * 获取当前使用的服务器 Base URL
+     *
+     * @return 当前服务器 Base URL
+     */
     public String getBaseUrl() {
-        return baseUrl;
+        return currentBaseUrl;
+    }
+
+    /**
+     * 获取本地服务器 Base URL
+     *
+     * @return 本地服务器 Base URL
+     */
+    public String getLocalBaseUrl() {
+        return localBaseUrl;
+    }
+
+    /**
+     * 获取云端服务器 Base URL
+     *
+     * @return 云端服务器 Base URL，未配置时返回null
+     */
+    public String getCloudBaseUrl() {
+        return cloudBaseUrl;
+    }
+
+    /**
+     * 获取热点服务器 Base URL
+     *
+     * @return 热点服务器 Base URL，未配置时返回null
+     */
+    public String getHotspotBaseUrl() {
+        return hotspotBaseUrl;
+    }
+
+    /**
+     * 根据启动模式获取对应的服务器 Base URL
+     *
+     * @param mode 启动模式
+     * @return 对应的服务器 Base URL
+     */
+    public String getBaseUrlByMode(final ServerMode mode) {
+        switch (mode) {
+            case LOCAL:
+                return localBaseUrl;
+            case HOTSPOT:
+                return hotspotBaseUrl != null ? hotspotBaseUrl : localBaseUrl;
+            case CLOUD:
+                return cloudBaseUrl != null ? cloudBaseUrl : localBaseUrl;
+            default:
+                return localBaseUrl;
+        }
     }
 
     public int getConnectTimeout() {
