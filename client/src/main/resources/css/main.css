@@ -1,85 +1,110 @@
-/* 主界面模块样式 - 侧边栏、会话列表（温馨主题） */
+/* 主界面模块样式 - 三栏+顶栏布局（粉白毛玻璃主题） */
 
-/* 主根容器 - 温暖米色背景 */
+/* ========== 配色变量 ========== */
+/* 主粉色 #FF6B9D | 浅粉 #FFE0EC | 深粉 #E8507A */
+/* 纯白 #FFFFFF | 浅灰 #F5F5F5 | 中灰 #E0E0E0 */
+/* 深灰文字 #333333 | 浅灰文字 #999999 */
+
+/* ========== 主根容器 ========== */
 .main-root {
-    -fx-background-color: #FFF8F0;
+    -fx-background-color: #F5F5F5;
 }
 
-/* 侧边栏 - 温暖深棕 */
-.sidebar {
-    -fx-background-color: #4A3426;
-    -fx-padding: 0;
+/* ========== 主体三栏容器 ========== */
+.main-body {
+    -fx-background-color: #F5F5F5;
     -fx-spacing: 0;
 }
 
-/* 用户卡片 - 略浅暖棕 */
-.user-card {
-    -fx-padding: 15;
-    -fx-background-color: #5C4033;
-    -fx-spacing: 10;
+/* ========== 功能侧边栏（毛玻璃底色） ========== */
+.function-bar {
+    -fx-background-color: rgba(255, 255, 255, 0.7);
+    -fx-background-radius: 0 12 12 0;
+    -fx-padding: 8 4;
+    -fx-spacing: 4;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 8, 0, 2, 0);
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
 }
 
-.avatar-text {
-    -fx-text-fill: #FFF8F0;
-    -fx-font-size: 16;
-    -fx-font-weight: bold;
+/* 强制覆盖JavaFX默认Button样式（防止灰色背景） */
+.function-bar .button {
+    -fx-background-color: #FF6B9D;
 }
 
-.username-label {
-    -fx-text-fill: #FFF8F0;
-    -fx-font-size: 14;
-    -fx-font-weight: bold;
-}
-
-.status-label {
-    -fx-text-fill: #D4A373;
-    -fx-font-size: 11;
-}
-
-/* 图标按钮 */
-.btn-icon {
-    -fx-background-color: transparent;
-    -fx-text-fill: #D4A373;
-    -fx-font-size: 12;
+/* 功能按钮 */
+.func-btn {
+    -fx-background-color: #FF6B9D;
+    -fx-background-radius: 12;
+    -fx-min-width: 44;
+    -fx-min-height: 44;
+    -fx-pref-width: 44;
+    -fx-pref-height: 44;
+    -fx-max-width: 44;
+    -fx-max-height: 44;
+    -fx-alignment: center;
     -fx-cursor: hand;
     -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-content-display: graphic-only;
 }
 
-.btn-icon:hover {
-    -fx-text-fill: #FFF8F0;
-    -fx-background-color: #6B4E3D;
-    -fx-background-radius: 4;
+.func-btn:hover {
+    -fx-background-color: #E8507A;
 }
 
-/* 搜索框 */
-.search-box {
-    -fx-padding: 10 15;
-    -fx-background-color: #4A3426;
-    -fx-spacing: 8;
+.func-btn-selected {
+    -fx-background-color: #FF6B9D;
+    -fx-background-radius: 12;
 }
 
-.search-icon {
-    -fx-text-fill: #D4A373;
+.func-btn-selected:hover {
+    -fx-background-color: #E8507A;
+}
+
+.func-btn-icon {
+    -fx-font-size: 18;
+    -fx-text-fill: white;
+}
+
+.func-btn-selected .func-btn-icon {
+    -fx-text-fill: white;
+}
+
+/* 消息按钮（主页入口）图标显示深粉红色 */
+.func-btn-home .func-btn-icon {
+    -fx-text-fill: #E8507A;
+    -fx-font-size: 24;
+    -fx-font-weight: bold;
+}
+
+/* 消息按钮选中时图标显示深粉红色 */
+.func-btn-home.func-btn-selected .func-btn-icon {
+    -fx-text-fill: #E8507A;
+    -fx-font-size: 24;
+    -fx-font-weight: bold;
+}
+
+/* AI 按钮图标样式（文字"AI"需更小字号适配） */
+.func-btn-icon-ai {
     -fx-font-size: 14;
+    -fx-font-weight: bold;
 }
 
-.search-input {
-    -fx-background-color: #5C4033;
-    -fx-text-fill: #FFF8F0;
-    -fx-background-radius: 8;
-    -fx-border-color: transparent;
-    -fx-font-size: 13;
-    -fx-prompt-text-fill: #B08968;
-}
-
-.search-input:focused {
-    -fx-border-color: #E76F51;
+/* ========== 会话列表面板（浅灰底色） ========== */
+.conversation-panel {
+    -fx-background-color: #F5F5F5;
+    -fx-background-radius: 0 12 12 0;
+    -fx-padding: 0;
+    -fx-spacing: 0;
+    -fx-border-color: #E0E0E0;
+    -fx-border-width: 0 1 0 0;
 }
 
 /* 会话列表 */
 .conversation-list {
-    -fx-background-color: #4A3426;
-    -fx-padding: 0;
+    -fx-background-color: #F5F5F5;
+    -fx-padding: 4 0;
     -fx-border-color: transparent;
     -fx-focus-color: transparent;
     -fx-faint-focus-color: transparent;
@@ -87,17 +112,31 @@
 
 .conversation-list .list-cell {
     -fx-background-color: transparent;
-    -fx-text-fill: #FFF8F0;
-    -fx-padding: 10 15;
+    -fx-text-fill: #333333;
+    -fx-padding: 8 12;
     -fx-cursor: hand;
+    -fx-background-radius: 8;
 }
 
 .conversation-list .list-cell:filled:selected {
-    -fx-background-color: #6B4E3D;
+    -fx-background-color: #E8507A;
+    -fx-text-fill: white;
+}
+
+.conversation-list .list-cell:filled:selected .conv-name {
+    -fx-text-fill: white;
+}
+
+.conversation-list .list-cell:filled:selected .conv-time {
+    -fx-text-fill: rgba(255,255,255,0.8);
+}
+
+.conversation-list .list-cell:filled:selected .conv-last-msg {
+    -fx-text-fill: rgba(255,255,255,0.7);
 }
 
 .conversation-list .list-cell:filled:hover {
-    -fx-background-color: #5C4033;
+    -fx-background-color: #FFE0EC;
 }
 
 .conversation-list .list-cell:focused {
@@ -111,24 +150,24 @@
 }
 
 .conv-name {
-    -fx-text-fill: #FFF8F0;
+    -fx-text-fill: #333333;
     -fx-font-size: 14;
     -fx-font-weight: bold;
 }
 
 .conv-time {
-    -fx-text-fill: #B08968;
+    -fx-text-fill: #999999;
     -fx-font-size: 11;
 }
 
 .conv-last-msg {
-    -fx-text-fill: #D4A373;
+    -fx-text-fill: #999999;
     -fx-font-size: 12;
 }
 
-/* 未读徽章 - 温暖珊瑚色 */
+/* 未读徽章 - 粉色 */
 .unread-badge {
-    -fx-background-color: #E76F51;
+    -fx-background-color: #FF6B9D;
     -fx-text-fill: white;
     -fx-font-size: 10;
     -fx-font-weight: bold;
@@ -138,36 +177,100 @@
     -fx-alignment: center;
 }
 
-/* 侧边栏底部 */
-.sidebar-footer {
-    -fx-padding: 8 12;
-    -fx-background-color: #5C4033;
+/* ========== 顶部标题栏（毛玻璃底色） ========== */
+.top-bar {
+    -fx-background-color: rgba(255, 255, 255, 0.75);
+    -fx-padding: 0 16;
+    -fx-spacing: 12;
+    -fx-alignment: CENTER_LEFT;
+    -fx-border-color: #E0E0E0;
+    -fx-border-width: 0 0 1 0;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.04), 4, 0, 0, 1);
 }
 
-.sidebar-footer .btn-icon {
-    -fx-padding: 6 0;
-    -fx-font-size: 12;
-    -fx-background-radius: 6;
-    -fx-border-radius: 6;
-}
-
-.sidebar-footer .btn-logout {
-    -fx-padding: 6 0;
-    -fx-font-size: 12;
-    -fx-background-radius: 6;
-    -fx-border-radius: 6;
-}
-
-.btn-logout {
-    -fx-background-color: transparent;
-    -fx-text-fill: #E76F51;
-    -fx-font-size: 12;
+.top-bar-user {
+    -fx-alignment: CENTER_LEFT;
+    -fx-spacing: 8;
     -fx-cursor: hand;
-    -fx-border-color: #E76F51;
-    -fx-border-width: 1;
+    -fx-padding: 4 8;
+    -fx-background-radius: 8;
 }
 
-.btn-logout:hover {
-    -fx-background-color: #E76F51;
+.top-bar-user:hover {
+    -fx-background-color: #FFE0EC;
+}
+
+.top-bar-avatar-text {
     -fx-text-fill: white;
+    -fx-font-size: 12;
+    -fx-font-weight: bold;
+}
+
+.top-bar-username {
+    -fx-text-fill: #333333;
+    -fx-font-size: 14;
+    -fx-font-weight: bold;
+}
+
+.top-bar-status {
+    -fx-text-fill: #999999;
+    -fx-font-size: 11;
+}
+
+/* 搜索框 */
+.top-bar-search-box {
+    -fx-alignment: CENTER_LEFT;
+    -fx-spacing: 6;
+    -fx-background-color: #FFE0EC;
+    -fx-background-radius: 20;
+    -fx-padding: 4 12;
+    -fx-border-color: #FF6B9D;
+    -fx-border-width: 1;
+    -fx-border-radius: 20;
+}
+
+.top-bar-search-box:focused-within {
+    -fx-border-color: #E8507A;
+    -fx-background-color: #FFF5F8;
+}
+
+.top-bar-search-icon {
+    -fx-font-size: 14;
+    -fx-text-fill: #999999;
+}
+
+.top-bar-search-input {
+    -fx-background-color: transparent;
+    -fx-text-fill: #333333;
+    -fx-font-size: 13;
+    -fx-prompt-text-fill: #BBBBBB;
+    -fx-border-color: transparent;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+    -fx-padding: 4 0;
+}
+
+/* ＋按钮 */
+.top-bar-add-btn {
+    -fx-background-color: #FF6B9D;
+    -fx-text-fill: white;
+    -fx-font-size: 16;
+    -fx-font-weight: bold;
+    -fx-background-radius: 14;
+    -fx-min-width: 28;
+    -fx-min-height: 28;
+    -fx-pref-width: 28;
+    -fx-pref-height: 28;
+    -fx-alignment: center;
+    -fx-cursor: hand;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
+
+.top-bar-add-btn:hover {
+    -fx-background-color: #E8507A;
+}
+
+.top-bar-add-btn:pressed {
+    -fx-background-color: #D4456A;
 }

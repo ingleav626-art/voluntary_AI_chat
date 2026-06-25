@@ -19,5 +19,6 @@ public class GroupMemberResponse {
     private String username;
     private String avatar;
     private String role;
+    private String nickname;
     private LocalDateTime joinTime;
 }

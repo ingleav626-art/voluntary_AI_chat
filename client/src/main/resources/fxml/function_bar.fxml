@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox fx:id="functionBar" prefWidth="60.0" minWidth="60.0" maxWidth="60.0"
+      styleClass="function-bar"
+      alignment="TOP_CENTER" spacing="4.0"
+      xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="org.example.client.controller.FunctionBarController">
+
+    <!-- 顶部间距 -->
+    <Region prefHeight="12.0"/>
+
+    <!-- AI 设置按钮 -->
+    <Button fx:id="aiSettingBtn" mnemonicParsing="false"
+            onAction="#handleAiSetting" styleClass="func-btn" maxWidth="Infinity">
+        <graphic>
+            <Label text="AI" styleClass="func-btn-icon func-btn-icon-ai"/>
+        </graphic>
+    </Button>
+
+    <!-- 消息按钮（默认选中，主页入口） -->
+    <Button fx:id="messageBtn" mnemonicParsing="false"
+            onAction="#handleMessage" styleClass="func-btn func-btn-home func-btn-selected" maxWidth="Infinity">
+        <graphic>
+            <Label text="💬" styleClass="func-btn-icon"/>
+        </graphic>
+    </Button>
+
+    <!-- 底部弹簧 -->
+    <Region VBox.vgrow="ALWAYS"/>
+
+    <!-- 底部间距 -->
+    <Region prefHeight="12.0"/>
+</VBox>

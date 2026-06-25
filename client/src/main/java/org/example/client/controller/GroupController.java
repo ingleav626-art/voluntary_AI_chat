@@ -98,6 +98,9 @@ public final class GroupController implements Initializable {
     private Button inviteMemberButton;
 
     @FXML
+    private Button aiConfigButton;
+
+    @FXML
     private Button avatarButton;
 
     @FXML
@@ -199,6 +202,10 @@ public final class GroupController implements Initializable {
         inviteMemberButton.setVisible(true);
         inviteMemberButton.setManaged(true);
 
+        // AI配置按钮所有人可见
+        aiConfigButton.setVisible(true);
+        aiConfigButton.setManaged(true);
+
         // 头像按钮所有人可见
         avatarButton.setVisible(true);
         avatarButton.setManaged(true);
@@ -229,6 +236,8 @@ public final class GroupController implements Initializable {
     private void setActionButtonsVisible(final boolean visible) {
         inviteMemberButton.setVisible(visible);
         inviteMemberButton.setManaged(visible);
+        aiConfigButton.setVisible(visible);
+        aiConfigButton.setManaged(visible);
         avatarButton.setVisible(visible);
         avatarButton.setManaged(visible);
         editGroupButton.setVisible(visible);
@@ -405,6 +414,19 @@ public final class GroupController implements Initializable {
             LOG.error("打开邀请成员对话框失败", e);
             errorLabel.setText("打开邀请窗口失败");
         }
+    }
+
+    /**
+     * 打开群 AI 配置对话框
+     */
+    @FXML
+    private void handleAiConfig() {
+        final GroupInfo selected = viewModel.getSelectedGroup();
+        if (selected == null) {
+            return;
+        }
+
+        GroupAiConfigDialog.show(aiConfigButton.getScene().getWindow(), selected.getGroupId());
     }
 
     /**

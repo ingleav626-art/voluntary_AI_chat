@@ -16,8 +16,6 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextArea;
-import javafx.scene.control.TextField;
-import javafx.scene.control.Alert;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
@@ -28,13 +26,9 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
-import javafx.util.Callback;
-
 import org.example.client.model.ConversationInfo;
 import org.example.client.model.LoginResponse;
 import org.example.client.model.MessageInfo;
-import org.example.client.model.UserInfo;
-import org.example.client.util.TokenStorage;
 import org.example.client.view.ChatViewModel;
 import org.example.client.view.MainViewModel;
 import org.slf4j.Logger;
@@ -43,20 +37,8 @@ import org.slf4j.LoggerFactory;
 /**
  * 主界面控制器
  *
- * <p>
- * 负责会话列表展示、会话切换、聊天区域交互、WebSocket 连接状态展示。
- * </p>
- *
- * <p>
- * <b>TODO:⚠️ 类长度超限警告：当前545行，超出Controller限制（300行）</b>
- * <br>
- * 请勿在此类中添加新的职责，应拆分为：
- * <ul>
- * <li>ConversationListController（会话列表管理）</li>
- * <li>ChatAreaController（聊天区域管理）</li>
- * <li>MainController（主控制器，协调上述组件）</li>
- * </ul>
- * </p>
+ * <p>负责会话列表展示、会话切换、聊天区域交互。</p>
+ * <p>顶部标题栏和功能侧边栏由 TopBarController 和 FunctionBarController 分别管理。</p>
  *
  * @author voluntary-ai-chat
  * @since 1.0.0
@@ -69,40 +51,10 @@ public final class MainController implements Initializable {
     private BorderPane rootPane;
 
     @FXML
-    private Circle avatarCircle;
-
-    @FXML
-    private Label avatarText;
-
-    @FXML
-    private Label usernameLabel;
-
-    @FXML
-    private Circle statusDot;
-
-    @FXML
-    private Label statusLabel;
-
-    @FXML
-    private Button settingsButton;
-
-    @FXML
-    private TextField searchField;
+    private VBox conversationPanel;
 
     @FXML
     private ListView<ConversationInfo> conversationList;
-
-    @FXML
-    private Button friendButton;
-
-    @FXML
-    private Button groupButton;
-
-    @FXML
-    private Button aiButton;
-
-    @FXML
-    private Button logoutButton;
 
     @FXML
     private Label chatTitleLabel;
@@ -128,55 +80,36 @@ public final class MainController implements Initializable {
     @FXML
     private Button plusButton;
 
+    /** 嵌套的顶部标题栏控制器（由 fx:include 自动注入） */
+    @FXML
+    private TopBarController topBarController;
+
+    /** 嵌套的功能侧边栏控制器（由 fx:include 自动注入） */
+    @FXML
+    private FunctionBarController functionBarController;
+
     private MainViewModel viewModel;
+
+    /** 响应式隐藏阈值：窗口宽度低于此值时隐藏会话列表 */
+    private static final double COLLAPSE_THRESHOLD = 760.0;
+
+    /** 时间分割线显示阈值：与上一条消息间隔超过此分钟数时显示分割线 */
+    private static final long TIME_SEPARATOR_INTERVAL_MINUTES = 5L;
+
+    /** 毛玻璃效果：顶栏 */
+    private org.example.client.util.FrostGlassEffect topBarFrost;
+
+    /** 毛玻璃效果：功能栏 */
+    private org.example.client.util.FrostGlassEffect functionBarFrost;
 
     @Override
     public void initialize(final URL location, final ResourceBundle resources) {
         viewModel = new MainViewModel();
 
-        // 绑定用户信息
-        usernameLabel.textProperty().bind(
-                Bindings.createStringBinding(() -> {
-                    final UserInfo user = viewModel.currentUserProperty().get();
-                    return user != null && user.getUsername() != null ? user.getUsername() : "用户";
-                }, viewModel.currentUserProperty()));
-
-        avatarText.textProperty().bind(
-                Bindings.createStringBinding(() -> {
-                    final UserInfo user = viewModel.currentUserProperty().get();
-                    if (user != null && user.getUsername() != null && !user.getUsername().isEmpty()) {
-                        return String.valueOf(user.getUsername().charAt(0));
-                    }
-                    return "?";
-                }, viewModel.currentUserProperty()));
-
-        // 绑定连接状态
-        statusLabel.textProperty().bind(
-                Bindings.createStringBinding(() -> viewModel.connectedProperty().get() ? "在线" : "离线",
-                        viewModel.connectedProperty()));
-
-        statusDot.fillProperty().bind(
-                Bindings.createObjectBinding(
-                        () -> viewModel.connectedProperty().get() ? Color.valueOf("#4CAF50") : Color.valueOf("#9E9E9E"),
-                        viewModel.connectedProperty()));
-
-        connectionLabel.textProperty().bind(
-                Bindings.createStringBinding(() -> viewModel.connectedProperty().get() ? "已连接" : "连接中...",
-                        viewModel.connectedProperty()));
-
         // 绑定会话列表
         conversationList.itemsProperty().bind(viewModel.conversationsProperty());
-
-        // 设置会话列表 Cell
         conversationList.setCellFactory(param -> new ConversationCell());
-
-        // 会话点击事件
         conversationList.setOnMouseClicked(this::handleConversationClick);
-
-        // 搜索会话：监听搜索框文本变化，防抖避免频繁请求
-        searchField.textProperty().addListener((obs, oldVal, newVal) -> {
-            viewModel.searchConversations(newVal);
-        });
 
         // 绑定聊天标题
         chatTitleLabel.textProperty().bind(
@@ -185,6 +118,11 @@ public final class MainController implements Initializable {
                     return chatVm != null ? chatVm.getConversationName() : "请选择会话";
                 }, viewModel.chatViewModelProperty()));
 
+        // 绑定连接状态
+        connectionLabel.textProperty().bind(
+                Bindings.createStringBinding(() -> viewModel.connectedProperty().get() ? "已连接" : "连接中...",
+                        viewModel.connectedProperty()));
+
         // 绑定消息列表
         messageList.itemsProperty().bind(
                 Bindings.createObjectBinding(() -> {
@@ -192,17 +130,7 @@ public final class MainController implements Initializable {
                     return chatVm != null ? chatVm.messagesProperty().get() : FXCollections.observableArrayList();
                 }, viewModel.chatViewModelProperty()));
 
-        // 设置消息列表 Cell
         messageList.setCellFactory(param -> new MessageCell());
-
-        // 防止聊天区域内容溢出覆盖侧边栏：裁剪 center 到自身实际边界
-        final javafx.scene.Node centerNode = rootPane.getCenter();
-        final javafx.scene.shape.Rectangle centerClip = new javafx.scene.shape.Rectangle();
-        centerNode.setClip(centerClip);
-        centerNode.layoutBoundsProperty().addListener((obs, oldVal, newVal) -> {
-            centerClip.setWidth(newVal.getWidth());
-            centerClip.setHeight(newVal.getHeight());
-        });
 
         // 监听消息列表滚动，滚动到顶部时加载更多历史消息
         messageList.skinProperty().addListener((obs, oldSkin, newSkin) -> {
@@ -211,14 +139,6 @@ public final class MainController implements Initializable {
             }
         });
 
-        // 监听搜索框文本变化，实时过滤会话列表
-        searchField.textProperty().addListener((obs, oldVal, newVal) -> viewModel.filterConversations(newVal));
-
-        // 绑定输入框
-        final ChatViewModel chatVm = viewModel.chatViewModelProperty().get();
-        if (chatVm != null) {
-            inputArea.textProperty().bindBidirectional(chatVm.inputTextProperty());
-        }
         // 监听 chatViewModel 变化，重新绑定输入框
         viewModel.chatViewModelProperty().addListener((obs, oldVm, newVm) -> {
             if (oldVm != null) {
@@ -226,12 +146,10 @@ public final class MainController implements Initializable {
             }
             if (newVm != null) {
                 inputArea.textProperty().bindBidirectional(newVm.inputTextProperty());
-                // 显示输入区域
                 inputAreaContainer.setVisible(true);
                 inputAreaContainer.setManaged(true);
             } else {
                 inputArea.clear();
-                // 隐藏输入区域
                 inputAreaContainer.setVisible(false);
                 inputAreaContainer.setManaged(false);
             }
@@ -242,48 +160,77 @@ public final class MainController implements Initializable {
         if (initialChatVm == null) {
             inputAreaContainer.setVisible(false);
             inputAreaContainer.setManaged(false);
-        } else {
-            inputAreaContainer.setVisible(true);
-            inputAreaContainer.setManaged(true);
         }
 
         // 绑定错误消息
         errorLabel.textProperty().bind(viewModel.errorMessageProperty());
 
         // 设置退出登录回调
-        viewModel.setOnLogout(e -> {
-            Platform.runLater(() -> {
-                org.example.client.App.switchToLogin();
-            });
+        viewModel.setOnLogout(e -> Platform.runLater(org.example.client.App::switchToLogin));
+
+        // 设置被踢下线回调
+        viewModel.setOnKickedOut(message -> Platform.runLater(() -> {
+            final Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("账号被踢下线");
+            alert.setHeaderText("您的账号已在其他设备登录");
+            alert.setContentText(message);
+            alert.getDialogPane().setMinWidth(380);
+            alert.getDialogPane().setMinHeight(180);
+            alert.setOnCloseRequest(e -> org.example.client.App.switchToLogin());
+            alert.show();
+        }));
+
+        // 响应式：窗口宽度变化时自动隐藏/显示会话列表
+        rootPane.widthProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal.doubleValue() < COLLAPSE_THRESHOLD) {
+                conversationPanel.setVisible(false);
+                conversationPanel.setManaged(false);
+            } else {
+                conversationPanel.setVisible(true);
+                conversationPanel.setManaged(true);
+            }
         });
 
-        // 设置被踢下线回调：弹窗提示后跳转到登录页
-        viewModel.setOnKickedOut(message -> {
-            Platform.runLater(() -> {
-                final Alert alert = new Alert(Alert.AlertType.WARNING);
-                alert.setTitle("账号被踢下线");
-                alert.setHeaderText("您的账号已在其他设备登录");
-                alert.setContentText(message);
-                alert.getDialogPane().setMinWidth(380);
-                alert.getDialogPane().setMinHeight(180);
-                // 弹窗关闭后跳转到登录页
-                alert.setOnCloseRequest(e -> {
-                    org.example.client.App.switchToLogin();
-                });
-                alert.show();
-            });
-        });
-
-        // 调试：输出加号按钮状态
-        if (plusButton != null) {
-            LOG.info("加号按钮初始化: text='{}', visible={}, styleClass={}, width={}, height={}",
-                    plusButton.getText(), plusButton.isVisible(),
-                    plusButton.getStyleClass(), plusButton.getWidth(), plusButton.getHeight());
-        } else {
-            LOG.warn("加号按钮为 null！FXML 注入可能失败");
-        }
+        // 应用毛玻璃磨砂效果（方案A：Snapshot + GaussianBlur）
+        // 延迟到 UI 渲染完成后挂载，确保节点已加入场景图
+        Platform.runLater(this::setupFrostGlass);
 
         LOG.info("主界面控制器初始化完成");
+    }
+
+    /**
+     * 挂载毛玻璃效果到顶栏和功能栏
+     *
+     * <p>方案A 实现：截取根节点快照并应用高斯模糊，
+     * 在顶栏和功能栏底层显示模糊背景，模拟 Win11/macOS 毛玻璃质感。
+     * 仅在窗口尺寸变化时更新快照，避免性能问题。</p>
+     */
+    private void setupFrostGlass() {
+        try {
+            // 顶栏毛玻璃：背景源为根节点
+            if (topBarController != null && topBarController.getTopBar() != null) {
+                topBarFrost = org.example.client.util.FrostGlassEffect.create(
+                        topBarController.getTopBar(), rootPane);
+                topBarFrost.attach();
+            }
+            // 功能栏毛玻璃：背景源为根节点
+            if (functionBarController != null && functionBarController.getFunctionBar() != null) {
+                functionBarFrost = org.example.client.util.FrostGlassEffect.create(
+                        functionBarController.getFunctionBar(), rootPane);
+                functionBarFrost.attach();
+            }
+        } catch (final RuntimeException e) {
+            LOG.warn("毛玻璃效果挂载失败，回退到半透明背景", e);
+        }
+    }
+
+    /**
+     * 获取主视图模型，供 TopBarController 使用
+     *
+     * @return 主视图模型
+     */
+    public MainViewModel getViewModel() {
+        return viewModel;
     }
 
     /**
@@ -293,6 +240,11 @@ public final class MainController implements Initializable {
      */
     public void initData(final LoginResponse loginResponse) {
         viewModel.initialize(loginResponse);
+
+        // 将 viewModel 传递给 TopBarController
+        if (topBarController != null) {
+            topBarController.setViewModel(viewModel);
+        }
     }
 
     /**
@@ -300,13 +252,12 @@ public final class MainController implements Initializable {
      *
      * @param conv AI 会话信息
      */
-    public void selectAiConversation(final org.example.client.model.ConversationInfo conv) {
+    public void selectAiConversation(final ConversationInfo conv) {
         if (conv == null) {
             return;
         }
-        // 先在会话列表中添加（如果不存在）
         boolean found = false;
-        for (final org.example.client.model.ConversationInfo existing : viewModel.conversationsProperty()) {
+        for (final ConversationInfo existing : viewModel.conversationsProperty()) {
             if (conv.getSessionId().equals(existing.getSessionId())) {
                 viewModel.selectConversation(existing);
                 found = true;
@@ -314,7 +265,6 @@ public final class MainController implements Initializable {
             }
         }
         if (!found) {
-            // 会话列表中可能还没有 AI 会话，直接选中
             viewModel.selectConversation(conv);
         }
         LOG.info("已选中AI会话: sessionId={}, name={}", conv.getSessionId(), conv.getTargetName());
@@ -322,8 +272,6 @@ public final class MainController implements Initializable {
 
     /**
      * 处理会话点击
-     *
-     * @param event 鼠标事件
      */
     private void handleConversationClick(final MouseEvent event) {
         final ConversationInfo selected = conversationList.getSelectionModel().getSelectedItem();
@@ -332,35 +280,27 @@ public final class MainController implements Initializable {
         }
     }
 
-    /** 标记正在加载更多历史消息，防止重复触发 */
+    /** 标记正在加载更多历史消息 */
     private volatile boolean isLoadingMoreHistory;
 
     /**
      * 设置消息列表滚动监听
-     * 使用垂直滚动条监听滚动位置，滚动到顶部时加载更多历史消息
      */
     private void setupScrollListener() {
-        // 延迟到 VirtualFlow 渲染完成后查找 ScrollBar
         Platform.runLater(() -> {
             for (final javafx.scene.Node node : messageList.lookupAll(".scroll-bar")) {
                 if (node instanceof javafx.scene.control.ScrollBar scrollBar
                         && scrollBar.getOrientation() == javafx.geometry.Orientation.VERTICAL) {
                     scrollBar.valueProperty().addListener((obs, oldVal, newVal) -> {
-                        // 滚动到顶部（value <= 0.01）且没有正在加载
                         if (newVal.doubleValue() <= 0.01 && !isLoadingMoreHistory) {
                             final ChatViewModel chatVm = viewModel.chatViewModelProperty().get();
                             if (chatVm != null && !chatVm.loadingProperty().get()) {
                                 isLoadingMoreHistory = true;
-                                final int currentSize = chatVm.getMessages().size();
                                 chatVm.loadMoreHistory();
-                                // 加载完成后恢复状态
-                                Platform.runLater(() -> {
-                                    isLoadingMoreHistory = false;
-                                });
+                                Platform.runLater(() -> isLoadingMoreHistory = false);
                             }
                         }
                     });
-                    LOG.debug("消息列表滚动监听已注册");
                     break;
                 }
             }
@@ -380,7 +320,6 @@ public final class MainController implements Initializable {
 
     /**
      * 处理发送图片
-     * 打开文件选择器，选择图片后上传并发送
      */
     @FXML
     private void handleSendImage() {
@@ -397,30 +336,20 @@ public final class MainController implements Initializable {
 
         final java.io.File selectedFile = fileChooser.showOpenDialog(plusButton.getScene().getWindow());
         if (selectedFile != null) {
-            // 校验文件大小（10MB）
             if (selectedFile.length() > 10 * 1024 * 1024) {
                 errorLabel.setText("图片大小不能超过10MB");
                 return;
             }
-
-            // 显示图片预览对话框
             final ImagePreviewDialog previewDialog = new ImagePreviewDialog(selectedFile);
             final boolean confirmed = previewDialog.showAndWait();
-
-            // 用户确认后上传
             if (confirmed) {
                 chatVm.sendImage(selectedFile.toPath());
-                LOG.info("用户确认上传图片: {}", selectedFile.getName());
-            } else {
-                LOG.info("用户取消上传图片: {}", selectedFile.getName());
             }
         }
     }
 
     /**
      * 处理输入框按键
-     *
-     * @param event 键盘事件
      */
     @FXML
     private void handleInputKeyPress(final KeyEvent event) {
@@ -432,14 +361,13 @@ public final class MainController implements Initializable {
 
     /**
      * 处理 + 按钮点击
-     * 弹出快捷菜单：发送图片、发送文件
      */
     @FXML
     private void handlePlusButton() {
-        final javafx.scene.control.ContextMenu menu = new javafx.scene.control.ContextMenu();
-        final javafx.scene.control.MenuItem imageItem = new javafx.scene.control.MenuItem("发送图片");
+        final ContextMenu menu = new ContextMenu();
+        final MenuItem imageItem = new MenuItem("发送图片");
         imageItem.setOnAction(e -> handleSendImage());
-        final javafx.scene.control.MenuItem fileItem = new javafx.scene.control.MenuItem("发送文件");
+        final MenuItem fileItem = new MenuItem("发送文件");
         fileItem.setOnAction(e -> handleSendFile());
         menu.getItems().addAll(imageItem, fileItem);
         menu.show(plusButton, javafx.geometry.Side.BOTTOM, 0, 0);
@@ -447,7 +375,6 @@ public final class MainController implements Initializable {
 
     /**
      * 处理发送文件
-     * 打开文件选择器，选择文件后发送
      */
     @FXML
     private void handleSendFile() {
@@ -463,117 +390,12 @@ public final class MainController implements Initializable {
 
         final java.io.File selectedFile = fileChooser.showOpenDialog(plusButton.getScene().getWindow());
         if (selectedFile != null) {
-            // 校验文件大小（50MB）
             if (selectedFile.length() > 50 * 1024 * 1024) {
                 errorLabel.setText("文件大小不能超过50MB");
                 return;
             }
             chatVm.sendFile(selectedFile.toPath());
-            LOG.info("用户选择发送文件: {}", selectedFile.getName());
         }
-    }
-
-    /**
-     * 处理设置
-     */
-    @FXML
-    private void handleSettings() {
-        LOG.info("点击设置");
-        try {
-            // 加载 FXML
-            final javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(
-                    getClass().getResource("/fxml/profile_dialog.fxml"));
-            final javafx.scene.Parent root = loader.load();
-
-            // 获取控制器
-            final ProfileController controller = loader.getController();
-            controller.setMainViewModel(viewModel);
-
-            // 创建 Stage
-            final javafx.stage.Stage dialogStage = new javafx.stage.Stage();
-            dialogStage.setTitle("个人设置");
-            dialogStage.initModality(javafx.stage.Modality.APPLICATION_MODAL);
-            dialogStage.initOwner(settingsButton.getScene().getWindow());
-
-            // 设置 Scene
-            final javafx.scene.Scene scene = new javafx.scene.Scene(root);
-            scene.getStylesheets().add(getClass().getResource("/css/main.css").toExternalForm());
-            dialogStage.setScene(scene);
-
-            // 设置控制器中的 Stage
-            controller.setDialogStage(dialogStage);
-
-            // 显示对话框
-            dialogStage.showAndWait();
-
-        } catch (final java.io.IOException e) {
-            LOG.error("加载个人设置对话框失败", e);
-            NotificationDialog.showWarning("无法打开设置面板", "请稍后重试");
-        }
-    }
-
-    /**
-     * 处理好友管理
-     */
-    @FXML
-    private void handleFriend() {
-        LOG.info("切换到好友面板");
-        org.example.client.App.switchToFriend();
-    }
-
-    /**
-     * 处理群组管理
-     */
-    @FXML
-    private void handleGroup() {
-        LOG.info("切换到群组面板");
-        // 检查登录状态
-        final LoginResponse token = TokenStorage.load();
-        if (token == null || token.getAccessToken() == null) {
-            LOG.warn("用户未登录，无法访问群组面板");
-            showAlert("请先登录", "您需要登录后才能访问群组功能");
-            return;
-        }
-        org.example.client.App.switchToGroup();
-    }
-
-    /**
-     * 处理 AI 助手
-     */
-    @FXML
-    private void handleAi() {
-        LOG.info("切换到AI助手面板");
-        // 检查登录状态
-        final LoginResponse token = TokenStorage.load();
-        if (token == null || token.getAccessToken() == null) {
-            LOG.warn("用户未登录，无法访问AI助手面板");
-            showAlert("请先登录", "您需要登录后才能访问AI助手功能");
-            return;
-        }
-        org.example.client.App.switchToAi();
-    }
-
-    /**
-     * 处理退出登录
-     */
-    @FXML
-    private void handleLogout() {
-        LOG.info("退出登录");
-        viewModel.logout();
-    }
-
-    /**
-     * 显示提示对话框
-     *
-     * @param title   标题
-     * @param message 消息
-     */
-    private void showAlert(final String title, final String message) {
-        final Alert alert = new Alert(Alert.AlertType.WARNING);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(message);
-        alert.showAndWait();
     }
 
     /**
@@ -581,7 +403,7 @@ public final class MainController implements Initializable {
      */
     private static final class ConversationCell extends ListCell<ConversationInfo> {
         private final HBox cell;
-        private final javafx.scene.shape.Circle avatarCircle;
+        private final Circle avatarCircle;
         private final Label avatarText;
         private final javafx.scene.layout.StackPane avatarPane;
         private final VBox infoBox;
@@ -596,9 +418,8 @@ public final class MainController implements Initializable {
             cell.getStyleClass().add("conversation-cell");
             cell.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 
-            // 头像
-            avatarCircle = new javafx.scene.shape.Circle(18);
-            avatarCircle.setFill(javafx.scene.paint.Color.valueOf("#42A5F5"));
+            avatarCircle = new Circle(18);
+            avatarCircle.setFill(Color.valueOf("#FF6B9D"));
             avatarText = new Label("?");
             avatarText.setStyle("-fx-text-fill: white; -fx-font-size: 13; -fx-font-weight: bold;");
             avatarPane = new javafx.scene.layout.StackPane(avatarCircle, avatarText);
@@ -632,7 +453,6 @@ public final class MainController implements Initializable {
             badge.getStyleClass().add("unread-badge");
 
             infoBox.getChildren().addAll(topBox, bottomBox);
-
             cell.getChildren().addAll(avatarPane, infoBox);
         }
 
@@ -646,23 +466,20 @@ public final class MainController implements Initializable {
                 return;
             }
 
-            // 头像颜色：AI用橙红，群组用深暖棕，单聊用蓝色
             final String displayName = item.getTargetName() != null ? item.getTargetName() : "?";
             if ("AI".equals(item.getTargetType())) {
-                avatarCircle.setFill(javafx.scene.paint.Color.valueOf("#E76F51"));
+                avatarCircle.setFill(Color.valueOf("#FF6B9D"));
             } else if ("GROUP".equals(item.getTargetType())) {
-                avatarCircle.setFill(javafx.scene.paint.Color.valueOf("#4A3426"));
+                avatarCircle.setFill(Color.valueOf("#9C27B0"));
             } else {
-                avatarCircle.setFill(javafx.scene.paint.Color.valueOf("#42A5F5"));
+                avatarCircle.setFill(Color.valueOf("#42A5F5"));
             }
             avatarText.setText(!displayName.isEmpty() ? String.valueOf(displayName.charAt(0)) : "?");
-            avatarPane.setMouseTransparent(true);
 
             name.setText(displayName);
             time.setText(formatTime(item.getLastMessageTime()));
             lastMsg.setText(item.getLastMessage() != null ? item.getLastMessage() : "");
 
-            // 更新未读徽章
             bottomBox.getChildren().clear();
             if (item.getUnreadCount() > 0) {
                 badge.setText(String.valueOf(item.getUnreadCount()));
@@ -675,12 +492,6 @@ public final class MainController implements Initializable {
             setText(null);
         }
 
-        /**
-         * 格式化时间
-         *
-         * @param time 时间
-         * @return 格式化字符串
-         */
         private String formatTime(final java.time.LocalDateTime time) {
             if (time == null) {
                 return "";
@@ -695,9 +506,14 @@ public final class MainController implements Initializable {
 
     /**
      * 消息列表 Cell
-     * 非静态内部类，可访问外部类的 viewModel 实现撤回
      */
     private final class MessageCell extends ListCell<MessageInfo> {
+
+        /** 是否显示时间分割线 */
+        private boolean showTimeSeparator;
+
+        /** 当前渲染的消息（用于时间分割线包装） */
+        private MessageInfo currentMessage;
 
         @Override
         protected void updateItem(final MessageInfo item, final boolean empty) {
@@ -710,16 +526,19 @@ public final class MainController implements Initializable {
                 return;
             }
 
+            // 计算是否需要显示时间分割线（跨日期或与上一条间隔超过5分钟）
+            currentMessage = item;
+            showTimeSeparator = shouldShowTimeSeparator(item);
+
             if (item.isRecalled()) {
                 final Label recalled = new Label("消息已撤回");
                 recalled.getStyleClass().add("message-recalled");
-                setGraphic(recalled);
+                setGraphic(wrapWithSeparator(recalled));
                 setText(null);
                 setContextMenu(null);
                 return;
             }
 
-            // 系统消息（群成员加入等）居中灰色文字显示
             if ("SYSTEM".equals(item.getType())) {
                 final Label systemLabel = new Label(item.getContent());
                 systemLabel.getStyleClass().add("message-system");
@@ -727,15 +546,15 @@ public final class MainController implements Initializable {
                 final HBox systemBox = new HBox(systemLabel);
                 systemBox.setAlignment(javafx.geometry.Pos.CENTER);
                 systemBox.setMaxWidth(Double.MAX_VALUE);
-                setGraphic(systemBox);
+                setGraphic(wrapWithSeparator(systemBox));
                 setText(null);
                 setContextMenu(null);
                 return;
             }
 
             final VBox bubble = new VBox(4);
-
             final boolean sentByMe = item.isSentByMe();
+
             if (sentByMe) {
                 bubble.getStyleClass().add("message-bubble-sent");
                 bubble.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
@@ -744,57 +563,36 @@ public final class MainController implements Initializable {
                 bubble.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
             }
 
-            // 根据消息类型渲染内容
             if ("IMAGE".equals(item.getType())) {
-                // 图片消息：不带气泡框，直接显示图片 + 底部时间
                 final String thumbnailUrl = item.getThumbnailUrl();
                 final String originalUrl = item.getContent();
                 final String imageUrl = thumbnailUrl != null && !thumbnailUrl.isEmpty() ? thumbnailUrl : originalUrl;
 
                 final javafx.scene.image.ImageView imageView = new javafx.scene.image.ImageView();
-                final double thumbWidth = 200;
-                final double thumbHeight = 150;
                 imageView.setPreserveRatio(true);
-                imageView.setFitWidth(thumbWidth);
-                imageView.setFitHeight(thumbHeight);
+                imageView.setFitWidth(200);
+                imageView.setFitHeight(150);
                 imageView.getStyleClass().add("message-image");
                 imageView.setCursor(javafx.scene.Cursor.HAND);
 
-                // 添加点击事件（点击显示原图）
-                imageView.setOnMouseClicked(e -> {
-                    LOG.info("点击图片: originalUrl={}", originalUrl);
-                    final ImageViewerDialog dialog = new ImageViewerDialog(originalUrl);
-                    dialog.show();
-                });
+                imageView.setOnMouseClicked(e -> new ImageViewerDialog(originalUrl).show());
 
-                // 时间标签
                 final Label time = new Label(formatTime(item.getCreateTime()));
                 time.getStyleClass().add("message-time");
-                // 图片消息的时间颜色
                 time.setStyle("-fx-text-fill: #999;");
 
-                // 图片 + 时间垂直排列
                 final VBox imageCell = new VBox(4, imageView, time);
-                imageCell.setAlignment(sentByMe
-                        ? javafx.geometry.Pos.CENTER_RIGHT
-                        : javafx.geometry.Pos.CENTER_LEFT);
+                imageCell.setAlignment(sentByMe ? javafx.geometry.Pos.CENTER_RIGHT : javafx.geometry.Pos.CENTER_LEFT);
 
-                // 左右对齐
                 final HBox alignBox = new HBox(imageCell);
-                if (sentByMe) {
-                    alignBox.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
-                } else {
-                    alignBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-                }
+                alignBox.setAlignment(sentByMe ? javafx.geometry.Pos.CENTER_RIGHT : javafx.geometry.Pos.CENTER_LEFT);
                 alignBox.setMaxWidth(Double.MAX_VALUE);
-                setGraphic(alignBox);
+                setGraphic(wrapWithSeparator(alignBox));
                 setText(null);
 
-                // 为图片消息添加右键菜单（撤回）
                 if (item.isSentByMe() && item.getMessageId() != null) {
                     final ContextMenu imageContextMenu = new ContextMenu();
-                    final boolean canRecall = isRecallable(item);
-                    if (canRecall) {
+                    if (isRecallable(item)) {
                         final MenuItem recallItem = new MenuItem("撤回");
                         recallItem.setOnAction(e -> handleRecallMessage(item));
                         imageContextMenu.getItems().add(recallItem);
@@ -804,7 +602,6 @@ public final class MainController implements Initializable {
                     }
                 }
 
-                // 异步加载图片（携带认证 Token）
                 if (imageUrl != null && !imageUrl.isEmpty()) {
                     final MessageInfo currentItem = item;
                     org.example.client.service.ChatService.getInstance()
@@ -825,11 +622,8 @@ public final class MainController implements Initializable {
                                 return null;
                             });
                 }
-
-                // 图片消息不走后续通用逻辑，直接返回
                 return;
             } else if ("FILE".equals(item.getType())) {
-                // 文件消息：显示文件名和大小
                 final String fileName = item.getContent();
                 final HBox fileBox = new HBox(10);
                 fileBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
@@ -843,7 +637,6 @@ public final class MainController implements Initializable {
                 nameLabel.setWrapText(true);
                 nameLabel.setMaxWidth(250);
 
-                // 解析文件大小
                 String sizeText = "";
                 if (item.getExtra() != null) {
                     try {
@@ -865,12 +658,10 @@ public final class MainController implements Initializable {
                 }
                 final Label sizeLabel = new Label(sizeText);
                 sizeLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #888;");
-
                 fileInfo.getChildren().addAll(nameLabel, sizeLabel);
                 fileBox.getChildren().addAll(fileIcon, fileInfo);
                 bubble.getChildren().add(fileBox);
             } else {
-                // 文本消息：渲染 Label
                 final Label content = new Label(item.getContent() != null ? item.getContent() : "");
                 content.getStyleClass().add("message-content");
                 content.setWrapText(true);
@@ -881,9 +672,6 @@ public final class MainController implements Initializable {
             final Label time = new Label(formatTime(item.getCreateTime()));
             time.getStyleClass().add("message-time");
 
-            // 已读状态标签（仅私聊中自己发送的消息显示，群聊不显示）
-            // messageId > 0 → 已确认发送，根据 isRead 显示已读/未读
-            // messageId <= 0 → 待确认发送，默认显示未读（避免空白被误认为已读）
             final boolean isGroupChat = item.getSessionId() != null && item.getSessionId().startsWith("g_");
             if (item.isSentByMe() && !isGroupChat) {
                 final boolean isPending = item.getMessageId() == null || item.getMessageId() <= 0;
@@ -894,33 +682,21 @@ public final class MainController implements Initializable {
                 bubble.getChildren().add(time);
             }
 
-            setGraphic(bubble);
+            final HBox alignBox = new HBox(bubble);
+            HBox.setHgrow(bubble, Priority.NEVER);
+            alignBox.setAlignment(sentByMe ? javafx.geometry.Pos.CENTER_RIGHT : javafx.geometry.Pos.CENTER_LEFT);
+            alignBox.setMaxWidth(Double.MAX_VALUE);
+            setGraphic(wrapWithSeparator(alignBox));
             setText(null);
 
-            // 通过外层 HBox 控制气泡在单元格内的左右对齐
-            final HBox alignBox = new HBox(bubble);
-            HBox.setHgrow(bubble, javafx.scene.layout.Priority.NEVER);
-            if (sentByMe) {
-                alignBox.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
-            } else {
-                alignBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-            }
-            alignBox.setMaxWidth(Double.MAX_VALUE);
-            setGraphic(alignBox);
-
-            // 为自己发送且未撤回的消息添加右键菜单
+            // 右键菜单
             if (item.isSentByMe() && item.getMessageId() != null) {
                 final ContextMenu contextMenu = new ContextMenu();
-
-                // 判断是否可撤回：AI会话可随时撤回，普通会话2分钟内可撤回
-                final boolean canRecall = isRecallable(item);
-                if (canRecall) {
+                if (isRecallable(item)) {
                     final MenuItem recallItem = new MenuItem("撤回");
                     recallItem.setOnAction(e -> handleRecallMessage(item));
                     contextMenu.getItems().add(recallItem);
                 }
-
-                // 只有菜单有内容时才设置
                 if (!contextMenu.getItems().isEmpty()) {
                     setContextMenu(contextMenu);
                 } else {
@@ -930,29 +706,21 @@ public final class MainController implements Initializable {
                 setContextMenu(null);
             }
 
-            // 为所有文本消息添加复制菜单
-            if (item.getContent() != null && !item.getContent().isEmpty()
-                    && !"IMAGE".equals(item.getType())) {
-                final ContextMenu copyMenu = new ContextMenu();
+            // 复制菜单
+            if (item.getContent() != null && !item.getContent().isEmpty() && !"IMAGE".equals(item.getType())) {
                 final MenuItem copyItem = new MenuItem("复制");
                 copyItem.setOnAction(e -> copyMessageText(item.getContent()));
-                copyMenu.getItems().add(copyItem);
-
-                // 如果已有撤回菜单，合并到同一个菜单
                 if (getContextMenu() != null) {
                     getContextMenu().getItems().add(new javafx.scene.control.SeparatorMenuItem());
                     getContextMenu().getItems().add(copyItem);
                 } else {
+                    final ContextMenu copyMenu = new ContextMenu();
+                    copyMenu.getItems().add(copyItem);
                     setContextMenu(copyMenu);
                 }
             }
         }
 
-        /**
-         * 处理撤回消息
-         *
-         * @param message 消息
-         */
         private void handleRecallMessage(final MessageInfo message) {
             final ChatViewModel chatVm = viewModel.chatViewModelProperty().get();
             if (chatVm != null) {
@@ -960,20 +728,11 @@ public final class MainController implements Initializable {
             }
         }
 
-        /**
-         * 判断消息是否可撤回
-         * AI会话可随时撤回，普通会话2分钟内可撤回
-         *
-         * @param message 消息
-         * @return 是否可撤回
-         */
         private boolean isRecallable(final MessageInfo message) {
-            // AI会话可随时撤回
             final String sessionId = message.getSessionId();
             if (sessionId != null && sessionId.startsWith("a_")) {
                 return true;
             }
-            // 普通会话：2分钟内可撤回
             if (message.getCreateTime() == null) {
                 return false;
             }
@@ -982,28 +741,122 @@ public final class MainController implements Initializable {
             return duration.toMinutes() < 2;
         }
 
-        /**
-         * 复制消息文本到剪贴板
-         *
-         * @param text 消息文本
-         */
         private void copyMessageText(final String text) {
             final javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
             content.putString(text);
             javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
         }
 
-        /**
-         * 格式化时间
-         *
-         * @param time 时间
-         * @return 格式化字符串
-         */
         private String formatTime(final java.time.LocalDateTime time) {
             if (time == null) {
                 return "";
             }
-            return time.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
+            final java.time.LocalDate today = java.time.LocalDate.now();
+            if (time.toLocalDate().equals(today)) {
+                return time.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
+            }
+            return time.format(java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm"));
+        }
+
+        /**
+         * 判断是否需要显示时间分割线
+         *
+         * <p>规则：第一条消息、跨日期、或与上一条间隔超过5分钟时显示。</p>
+         *
+         * @param current 当前消息
+         * @return 是否显示分割线
+         */
+        private boolean shouldShowTimeSeparator(final MessageInfo current) {
+            final int index = getIndex();
+            final ListView<MessageInfo> list = getListView();
+            if (list == null || list.getItems() == null || index <= 0) {
+                return true;
+            }
+            if (index - 1 >= list.getItems().size()) {
+                return true;
+            }
+            final MessageInfo previous = list.getItems().get(index - 1);
+            if (previous == null || previous.getCreateTime() == null) {
+                return true;
+            }
+            if (current.getCreateTime() == null) {
+                return false;
+            }
+            // 跨日期显示分割线
+            if (!current.getCreateTime().toLocalDate().equals(previous.getCreateTime().toLocalDate())) {
+                return true;
+            }
+            // 同一天间隔超过阈值显示分割线
+            final long minutes = java.time.Duration.between(
+                    previous.getCreateTime(), current.getCreateTime()).toMinutes();
+            return minutes >= TIME_SEPARATOR_INTERVAL_MINUTES;
+        }
+
+        /**
+         * 创建时间分割线节点（居中灰色横线 + 时间文字）
+         *
+         * @param time 消息时间
+         * @return 分割线节点
+         */
+        private javafx.scene.Node createTimeSeparator(final java.time.LocalDateTime time) {
+            final HBox separator = new HBox();
+            separator.getStyleClass().add("message-time-separator");
+            separator.setAlignment(javafx.geometry.Pos.CENTER);
+
+            final Region leftLine = new Region();
+            HBox.setHgrow(leftLine, Priority.ALWAYS);
+            leftLine.getStyleClass().add("separator-line");
+
+            final Label timeLabel = new Label(formatSeparatorTime(time));
+            timeLabel.getStyleClass().add("separator-text");
+
+            final Region rightLine = new Region();
+            HBox.setHgrow(rightLine, Priority.ALWAYS);
+            rightLine.getStyleClass().add("separator-line");
+
+            separator.getChildren().addAll(leftLine, timeLabel, rightLine);
+            return separator;
+        }
+
+        /**
+         * 格式化分割线时间文字
+         *
+         * <p>今天显示 HH:mm，昨天显示"昨天 HH:mm"，同年显示"MM月dd日 HH:mm"，跨年显示完整日期。</p>
+         *
+         * @param time 消息时间
+         * @return 格式化后的时间文字
+         */
+        private String formatSeparatorTime(final java.time.LocalDateTime time) {
+            if (time == null) {
+                return "";
+            }
+            final java.time.LocalDate today = java.time.LocalDate.now();
+            final java.time.LocalDate yesterday = today.minusDays(1);
+            if (time.toLocalDate().equals(today)) {
+                return time.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
+            } else if (time.toLocalDate().equals(yesterday)) {
+                return "昨天 " + time.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
+            } else if (time.getYear() == today.getYear()) {
+                return time.format(java.time.format.DateTimeFormatter.ofPattern("MM月dd日 HH:mm"));
+            } else {
+                return time.format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm"));
+            }
+        }
+
+        /**
+         * 用时间分割线包装消息内容（如需要）
+         *
+         * @param content 消息内容节点
+         * @return 包装后的节点
+         */
+        private javafx.scene.Node wrapWithSeparator(final javafx.scene.Node content) {
+            if (!showTimeSeparator || currentMessage == null) {
+                return content;
+            }
+            final VBox outer = new VBox();
+            outer.getChildren().add(createTimeSeparator(currentMessage.getCreateTime()));
+            outer.getChildren().add(content);
+            return outer;
         }
     }
 }

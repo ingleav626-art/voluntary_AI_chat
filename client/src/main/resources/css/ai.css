@@ -1,19 +1,19 @@
-/* AI 模块样式 - 温馨主题 */
+/* AI 模块样式（粉白主题） */
 
 /* AI 面板根容器 */
 .ai-root {
-    -fx-background-color: #FFF8F0;
+    -fx-background-color: #FFF5F8;
 }
 
 /* AI 标题栏 */
 .ai-header {
     -fx-padding: 15 20;
-    -fx-background-color: #4A3426;
+    -fx-background-color: #E8507A;
     -fx-spacing: 10;
 }
 
 .ai-title {
-    -fx-text-fill: #FFF8F0;
+    -fx-text-fill: #FFFFFF;
     -fx-font-size: 18;
     -fx-font-weight: bold;
 }
@@ -21,7 +21,7 @@
 /* AI 面板 */
 .ai-panel {
     -fx-padding: 10;
-    -fx-background-color: #FFF8F0;
+    -fx-background-color: #FFF5F8;
 }
 
 .ai-panel-header {
@@ -30,40 +30,40 @@
 }
 
 .ai-panel-title {
-    -fx-text-fill: #4A3426;
+    -fx-text-fill: #333333;
     -fx-font-size: 14;
     -fx-font-weight: bold;
 }
 
 /* AI 角色列表 */
 .ai-list {
-    -fx-background-color: #FFF8F0;
+    -fx-background-color: #FFF5F8;
     -fx-border-color: transparent;
 }
 
 .ai-list .list-cell {
     -fx-padding: 8 12;
     -fx-background-color: transparent;
-    -fx-border-color: #E8D5C4 transparent #E8D5C4 transparent;
+    -fx-border-color: #E0E0E0 transparent #E0E0E0 transparent;
     -fx-border-width: 0 0 1 0;
 }
 
 .ai-list .list-cell:hover {
-    -fx-background-color: #FFE8D6;
+    -fx-background-color: #FFE0EC;
 }
 
 .ai-list .list-cell:selected {
-    -fx-background-color: #E76F51;
+    -fx-background-color: #E8507A;
 }
 
 .ai-list .list-cell:selected .ai-profile-name,
 .ai-list .list-cell:selected .ai-profile-model {
-    -fx-text-fill: #FFF8F0;
+    -fx-text-fill: #FFFFFF;
 }
 
 /* AI 头像圆形（点击可编辑） */
 .ai-avatar-circle {
-    -fx-stroke: #FFF8F0;
+    -fx-stroke: #FFFFFF;
     -fx-stroke-width: 2;
 }
 
@@ -73,19 +73,19 @@
 }
 
 .ai-profile-name {
-    -fx-text-fill: #4A3426;
+    -fx-text-fill: #333333;
     -fx-font-size: 14;
     -fx-font-weight: bold;
 }
 
 .ai-profile-model {
-    -fx-text-fill: #9E8E7E;
+    -fx-text-fill: #999999;
     -fx-font-size: 11;
 }
 
 .ai-group-badge {
-    -fx-background-color: #E76F51;
-    -fx-text-fill: #FFF8F0;
+    -fx-background-color: #FF6B9D;
+    -fx-text-fill: #FFFFFF;
     -fx-font-size: 10;
     -fx-padding: 2 6;
     -fx-background-radius: 8;
@@ -94,12 +94,12 @@
 /* AI 详情区域 */
 .ai-detail {
     -fx-padding: 10;
-    -fx-background-color: #FFF8F0;
+    -fx-background-color: #FFF5F8;
 }
 
 .ai-detail-content {
     -fx-padding: 10;
-    -fx-background-color: #FFF0E6;
+    -fx-background-color: #FFFFFF;
     -fx-background-radius: 8;
     -fx-spacing: 6;
 }
@@ -109,36 +109,36 @@
 }
 
 .ai-empty-hint {
-    -fx-text-fill: #B08968;
+    -fx-text-fill: #999999;
     -fx-font-size: 14;
 }
 
 .ai-detail-label {
-    -fx-text-fill: #9E8E7E;
+    -fx-text-fill: #999999;
     -fx-font-size: 12;
     -fx-min-width: 60;
 }
 
 .ai-detail-value {
-    -fx-text-fill: #4A3426;
+    -fx-text-fill: #333333;
     -fx-font-size: 13;
 }
 
 /* AI 记忆列表 */
 .ai-memory-list {
-    -fx-background-color: #FFF8F0;
+    -fx-background-color: #FFF5F8;
     -fx-border-color: transparent;
 }
 
 .ai-memory-list .list-cell {
     -fx-padding: 8 12;
     -fx-background-color: transparent;
-    -fx-border-color: #E8D5C4 transparent #E8D5C4 transparent;
+    -fx-border-color: #E0E0E0 transparent #E0E0E0 transparent;
     -fx-border-width: 0 0 1 0;
 }
 
 .ai-memory-list .list-cell:hover {
-    -fx-background-color: #FFE8D6;
+    -fx-background-color: #FFE0EC;
 }
 
 .ai-memory-cell {
@@ -146,31 +146,31 @@
 }
 
 .ai-memory-summary {
-    -fx-text-fill: #4A3426;
+    -fx-text-fill: #333333;
     -fx-font-size: 12;
 }
 
 .ai-memory-keywords {
-    -fx-text-fill: #E76F51;
+    -fx-text-fill: #FF6B9D;
     -fx-font-size: 10;
 }
 
 .ai-memory-time {
-    -fx-text-fill: #B08968;
+    -fx-text-fill: #999999;
     -fx-font-size: 10;
 }
 
 /* AI 底部状态栏 */
 .ai-footer {
     -fx-padding: 8 15;
-    -fx-background-color: #4A3426;
+    -fx-background-color: #E8507A;
     -fx-spacing: 10;
 }
 
 /* 主按钮 */
 .btn-primary {
-    -fx-background-color: #E76F51;
-    -fx-text-fill: #FFF8F0;
+    -fx-background-color: #FF6B9D;
+    -fx-text-fill: #FFFFFF;
     -fx-font-size: 12;
     -fx-padding: 6 16;
     -fx-background-radius: 6;
@@ -179,27 +179,27 @@
 }
 
 .btn-primary:hover {
-    -fx-background-color: #D4573B;
+    -fx-background-color: #E8507A;
 }
 
 .btn-primary:pressed {
-    -fx-background-color: #C04A30;
+    -fx-background-color: #D4456A;
 }
 
 /* 危险按钮 */
 .btn-danger {
     -fx-background-color: transparent;
-    -fx-text-fill: #E76F51;
+    -fx-text-fill: #FF6B9D;
     -fx-font-size: 12;
     -fx-cursor: hand;
-    -fx-border-color: #E76F51;
+    -fx-border-color: #FF6B9D;
     -fx-border-radius: 4;
     -fx-padding: 4 12;
 }
 
 .btn-danger:hover {
-    -fx-background-color: #E76F51;
-    -fx-text-fill: #FFF8F0;
+    -fx-background-color: #FF6B9D;
+    -fx-text-fill: #FFFFFF;
 }
 
 /* 成功消息 */
@@ -212,11 +212,11 @@
 
 .ai-dialog-root {
     -fx-padding: 20;
-    -fx-background-color: #FFF8F0;
+    -fx-background-color: #FFF5F8;
 }
 
 .ai-dialog-title {
-    -fx-text-fill: #4A3426;
+    -fx-text-fill: #333333;
     -fx-font-size: 18;
     -fx-font-weight: bold;
 }
@@ -226,41 +226,41 @@
 }
 
 .ai-form-label {
-    -fx-text-fill: #4A3426;
+    -fx-text-fill: #333333;
     -fx-font-size: 12;
     -fx-font-weight: bold;
 }
 
 .ai-form-input {
-    -fx-background-color: #FFF0E6;
-    -fx-text-fill: #4A3426;
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #333333;
     -fx-background-radius: 6;
-    -fx-border-color: #E8D5C4;
+    -fx-border-color: #E0E0E0;
     -fx-font-size: 13;
-    -fx-prompt-text-fill: #B08968;
+    -fx-prompt-text-fill: #999999;
 }
 
 .ai-form-input:focused {
-    -fx-border-color: #E76F51;
+    -fx-border-color: #FF6B9D;
 }
 
 .ai-form-combo {
-    -fx-background-color: #FFF0E6;
+    -fx-background-color: #FFFFFF;
     -fx-background-radius: 6;
-    -fx-border-color: #E8D5C4;
+    -fx-border-color: #E0E0E0;
 }
 
 .ai-form-textarea {
-    -fx-background-color: #FFF0E6;
-    -fx-text-fill: #4A3426;
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #333333;
     -fx-background-radius: 6;
-    -fx-border-color: #E8D5C4;
+    -fx-border-color: #E0E0E0;
     -fx-font-size: 13;
-    -fx-prompt-text-fill: #B08968;
+    -fx-prompt-text-fill: #999999;
 }
 
 .ai-form-textarea:focused {
-    -fx-border-color: #E76F51;
+    -fx-border-color: #FF6B9D;
 }
 
 .ai-dialog-footer {
@@ -271,8 +271,8 @@
 /* ===== 主界面 AI 入口按钮 ===== */
 
 .btn-ai-entry {
-    -fx-background-color: #E76F51;
-    -fx-text-fill: #FFF8F0;
+    -fx-background-color: #FF6B9D;
+    -fx-text-fill: #FFFFFF;
     -fx-font-size: 13;
     -fx-font-weight: bold;
     -fx-padding: 10 0;
@@ -282,17 +282,17 @@
 }
 
 .btn-ai-entry:hover {
-    -fx-background-color: #D4573B;
+    -fx-background-color: #E8507A;
 }
 
 .btn-ai-entry:pressed {
-    -fx-background-color: #C04A30;
+    -fx-background-color: #D4456A;
 }
 
 /* AI 跳转按钮 */
 .btn-ai-jump {
-    -fx-background-color: #E76F51;
-    -fx-text-fill: #FFF8F0;
+    -fx-background-color: #FF6B9D;
+    -fx-text-fill: #FFFFFF;
     -fx-font-size: 11;
     -fx-font-weight: bold;
     -fx-padding: 4 10;
@@ -302,9 +302,9 @@
 }
 
 .btn-ai-jump:hover {
-    -fx-background-color: #D4573B;
+    -fx-background-color: #E8507A;
 }
 
 .btn-ai-jump:pressed {
-    -fx-background-color: #C04A30;
+    -fx-background-color: #D4456A;
 }

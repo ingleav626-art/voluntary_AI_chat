@@ -55,6 +55,9 @@
                 <Button fx:id="inviteMemberButton" mnemonicParsing="false"
                         onAction="#handleInviteMembers" styleClass="btn-icon" text="邀请成员"
                         visible="false" managed="false"/>
+                <Button fx:id="aiConfigButton" mnemonicParsing="false"
+                        onAction="#handleAiConfig" styleClass="btn-icon" text="AI配置"
+                        visible="false" managed="false"/>
                 <Button fx:id="avatarButton" mnemonicParsing="false"
                         onAction="#handleEditAvatar" styleClass="btn-icon" text="头像"
                         visible="false" managed="false"/>

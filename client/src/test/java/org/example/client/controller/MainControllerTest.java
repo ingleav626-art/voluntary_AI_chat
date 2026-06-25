@@ -693,6 +693,80 @@ class MainControllerTest extends JavaFxTestBase {
         assertNotNull(cell.getGraphic());
     }
 
+    // ============ 时间分割线测试 ============
+
+    @Test
+    @DisplayName("MessageCell - formatSeparatorTime 今天显示 HH:mm")
+    void messageCell_formatSeparatorTime_today() throws Exception {
+        final Object cell = createMessageCell();
+        final java.time.LocalDateTime time = java.time.LocalDateTime.now().withHour(14).withMinute(30);
+        final String result = invokeFormatSeparatorTime(cell, time);
+        assertEquals("14:30", result);
+    }
+
+    @Test
+    @DisplayName("MessageCell - formatSeparatorTime 昨天显示 昨天 HH:mm")
+    void messageCell_formatSeparatorTime_yesterday() throws Exception {
+        final Object cell = createMessageCell();
+        final java.time.LocalDateTime time = java.time.LocalDateTime.now().minusDays(1).withHour(9).withMinute(5);
+        final String result = invokeFormatSeparatorTime(cell, time);
+        assertEquals("昨天 09:05", result);
+    }
+
+    @Test
+    @DisplayName("MessageCell - formatSeparatorTime 同年显示 MM月dd日 HH:mm")
+    void messageCell_formatSeparatorTime_sameYear() throws Exception {
+        final Object cell = createMessageCell();
+        final java.time.LocalDateTime time = java.time.LocalDateTime.now().minusDays(10).withMonth(1).withDayOfMonth(15)
+                .withHour(8).withMinute(0);
+        final String result = invokeFormatSeparatorTime(cell, time);
+        assertEquals("01月15日 08:00", result);
+    }
+
+    @Test
+    @DisplayName("MessageCell - formatSeparatorTime null 返回空串")
+    void messageCell_formatSeparatorTime_null() throws Exception {
+        final Object cell = createMessageCell();
+        final String result = invokeFormatSeparatorTime(cell, null);
+        assertEquals("", result);
+    }
+
+    @Test
+    @DisplayName("MessageCell - updateItem 第一条消息包含时间分割线")
+    void messageCell_updateItem_firstMessageHasSeparator() throws Exception {
+        final javafx.scene.control.ListCell<MessageInfo> cell =
+                (javafx.scene.control.ListCell<MessageInfo>) createMessageCell();
+
+        final MessageInfo info = new MessageInfo();
+        info.setMessageId(200L);
+        info.setSessionId("p_1001_1002");
+        info.setType("TEXT");
+        info.setContent("第一条消息");
+        info.setSenderId(1001L);
+        info.setSentByMe(true);
+        info.setCreateTime(LocalDateTime.now());
+
+        callUpdateItem(cell, info, false);
+        // 第一条消息（index=-1，未附加到 ListView）应显示分割线，graphic 为 VBox
+        assertNotNull(cell.getGraphic());
+        assertTrue(cell.getGraphic() instanceof VBox, "第一条消息应被时间分割线包装为 VBox");
+    }
+
+    /** 创建 MessageCell 实例（非静态内部类，需要 MainController 实例） */
+    private Object createMessageCell() throws Exception {
+        final Class<?> cellClass = Class.forName("org.example.client.controller.MainController$MessageCell");
+        final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(MainController.class);
+        constructor.setAccessible(true);
+        return constructor.newInstance(controller);
+    }
+
+    /** 反射调用 formatSeparatorTime 方法 */
+    private String invokeFormatSeparatorTime(final Object cell, final java.time.LocalDateTime time) throws Exception {
+        final Method method = cell.getClass().getDeclaredMethod("formatSeparatorTime", java.time.LocalDateTime.class);
+        method.setAccessible(true);
+        return (String) method.invoke(cell, time);
+    }
+
     // ============ 辅助方法 ============
 
     private static void setField(final Object obj, final String name, final Object value) throws Exception {

@@ -1,36 +1,38 @@
-/* 聊天模块样式 - 消息气泡、输入区域（温馨主题） */
+/* 聊天模块样式 - 消息气泡、输入区域（粉白主题） */
 
-/* 聊天区域 - 温暖米色背景 */
+/* ========== 聊天区域 - 纯白底色 ========== */
 .chat-area {
-    -fx-background-color: #FFF8F0;
+    -fx-background-color: #FFFFFF;
+    -fx-background-radius: 12 0 0 12;
     -fx-spacing: 0;
     -fx-focus-color: transparent;
     -fx-faint-focus-color: transparent;
 }
 
-/* 聊天标题栏 - 暖白 */
+/* ========== 聊天标题栏 ========== */
 .chat-header {
-    -fx-padding: 15 20;
-    -fx-background-color: #FFFEF8;
-    -fx-border-color: #E8D5C4;
+    -fx-padding: 12 20;
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #E0E0E0;
     -fx-border-width: 0 0 1 0;
     -fx-spacing: 10;
+    -fx-background-radius: 12 0 0 0;
 }
 
 .chat-title {
     -fx-font-size: 16;
     -fx-font-weight: bold;
-    -fx-text-fill: #4A3426;
+    -fx-text-fill: #333333;
 }
 
 .connection-label {
     -fx-font-size: 12;
-    -fx-text-fill: #B08968;
+    -fx-text-fill: #999999;
 }
 
-/* 消息列表 */
+/* ========== 消息列表 ========== */
 .message-list {
-    -fx-background-color: #FFF8F0;
+    -fx-background-color: #FFFFFF;
     -fx-padding: 10;
     -fx-border-color: transparent;
     -fx-focus-color: transparent;
@@ -42,19 +44,37 @@
     -fx-padding: 5 15;
 }
 
-/* 去掉消息单元格焦点边框，防止点击时布局偏移 */
 .message-list .list-cell:focused {
     -fx-background-color: transparent;
 }
 
-/* 消息气泡 - 发送（温暖珊瑚渐变） */
+/* ========== 时间分割线（灰色居中横线 + 时间文字） ========== */
+.message-time-separator {
+    -fx-alignment: center;
+    -fx-padding: 10 20;
+    -fx-spacing: 8;
+}
+
+.message-time-separator .separator-line {
+    -fx-background-color: #E0E0E0;
+    -fx-pref-height: 1;
+    -fx-min-height: 1;
+    -fx-max-height: 1;
+}
+
+.message-time-separator .separator-text {
+    -fx-text-fill: #999999;
+    -fx-font-size: 11;
+}
+
+/* ========== 消息气泡 - 发送（粉色） ========== */
 .message-bubble-sent {
-    -fx-background-color: linear-gradient(from 0% 0% to 100% 0%, #F4A261 0%, #E76F51 100%);
-    -fx-background-radius: 10 10 0 10;
+    -fx-background-color: #FF6B9D;
+    -fx-background-radius: 12 12 0 12;
     -fx-padding: 8 12;
     -fx-max-width: 400;
     -fx-alignment: center-right;
-    -fx-effect: dropshadow(gaussian, rgba(231,111,81,0.2), 4, 0, 0, 1);
+    -fx-effect: dropshadow(gaussian, rgba(255,107,157,0.2), 4, 0, 0, 1);
 }
 
 .message-bubble-sent .message-content {
@@ -63,85 +83,85 @@
 }
 
 .message-bubble-sent .message-time {
-    -fx-text-fill: rgba(255, 248, 240, 0.8);
+    -fx-text-fill: rgba(255, 255, 255, 0.8);
     -fx-font-size: 10;
 }
 
-/* 消息气泡 - 接收（暖白带柔和边框） */
+/* ========== 消息气泡 - 接收（浅灰） ========== */
 .message-bubble-received {
-    -fx-background-color: #FFFEF8;
-    -fx-background-radius: 10 10 10 0;
+    -fx-background-color: #F0F0F0;
+    -fx-background-radius: 12 12 12 0;
     -fx-padding: 8 12;
     -fx-max-width: 400;
     -fx-alignment: center-left;
-    -fx-border-color: #E8D5C4;
-    -fx-border-radius: 10 10 10 0;
-    -fx-border-width: 1;
 }
 
 .message-bubble-received .message-content {
-    -fx-text-fill: #4A3426;
+    -fx-text-fill: #333333;
     -fx-font-size: 14;
 }
 
 .message-bubble-received .message-time {
-    -fx-text-fill: #B08968;
+    -fx-text-fill: #999999;
     -fx-font-size: 10;
 }
 
-/* 撤回消息 */
+/* ========== 撤回消息 ========== */
 .message-recalled {
-    -fx-text-fill: #B08968;
+    -fx-text-fill: #999999;
     -fx-font-size: 12;
     -fx-italic: true;
     -fx-alignment: center;
 }
 
-/* 系统消息（群成员加入等）居中小字 */
+/* ========== 系统消息 ========== */
 .message-system {
-    -fx-text-fill: #B08968;
+    -fx-text-fill: #999999;
     -fx-font-size: 12px;
     -fx-padding: 4 0;
     -fx-alignment: center;
 }
 
-/* 图片消息 */
+/* ========== 图片消息 ========== */
 .message-image {
     -fx-background-radius: 8;
     -fx-cursor: hand;
 }
 
-/* 已读状态 */
+/* ========== 已读状态 ========== */
 .message-read-status {
     -fx-font-size: 10;
-    -fx-text-fill: rgba(255, 248, 240, 0.7);
+    -fx-text-fill: rgba(255, 255, 255, 0.7);
 }
 
 .message-bubble-received .message-read-status {
-    -fx-text-fill: #D4A373;
+    -fx-text-fill: #999999;
 }
 
-/* 输入区域 - 暖白 */
+/* ========== 输入区域 ========== */
 .input-area {
     -fx-padding: 10 15;
-    -fx-background-color: #FFFEF8;
-    -fx-border-color: #E8D5C4;
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #E0E0E0;
     -fx-border-width: 1 0 0 0;
     -fx-spacing: 8;
 }
 
 .input-textarea {
-    -fx-background-color: #FFF8F0;
-    -fx-background-radius: 8;
-    -fx-border-color: #E8D5C4;
-    -fx-border-radius: 8;
+    -fx-background-color: #FFE0EC;
+    -fx-background-radius: 12;
+    -fx-border-color: #FF6B9D;
+    -fx-border-radius: 12;
     -fx-font-size: 14;
-    -fx-padding: 8;
+    -fx-padding: 8 12;
+    -fx-text-fill: #333333;
+    -fx-prompt-text-fill: #FF6B9D;
 }
 
 .input-textarea:focused {
-    -fx-border-color: #E76F51;
-    -fx-effect: dropshadow(gaussian, rgba(231,111,81,0.15), 4, 0, 0, 0);
+    -fx-border-color: #E8507A;
+    -fx-background-color: #FFF5F8;
+    -fx-effect: dropshadow(gaussian, rgba(255,107,157,0.25), 6, 0, 0, 0);
 }
 
 .input-toolbar {
@@ -149,17 +169,16 @@
     -fx-spacing: 8;
 }
 
-/* 输入区底部行（错误提示 + 发送按钮） */
 .input-footer {
     -fx-padding: 8 0 0 0;
     -fx-spacing: 10;
 }
 
-/* 工具栏按钮 - 圆形暖色按钮 */
+/* ========== 工具栏按钮 ========== */
 .btn-tool {
-    -fx-background-color: #FFE8D6;
-    -fx-text-fill: #E76F51;
-    -fx-font-size: 18;
+    -fx-background-color: #FFE0EC;
+    -fx-text-fill: #FF6B9D;
+    -fx-font-size: 20;
     -fx-font-weight: bold;
     -fx-background-radius: 18;
     -fx-min-width: 36;
@@ -169,42 +188,43 @@
     -fx-alignment: center;
     -fx-cursor: hand;
     -fx-border-color: transparent;
-    -fx-content-display: center;
+    -fx-content-display: text-only;
+    -fx-padding: 0;
 }
 
 .btn-tool:hover {
-    -fx-background-color: #F4A261;
+    -fx-background-color: #FF6B9D;
     -fx-text-fill: white;
 }
 
 .btn-tool:pressed {
-    -fx-background-color: #E76F51;
+    -fx-background-color: #E8507A;
     -fx-text-fill: white;
 }
 
-/* 发送按钮 - 温暖珊瑚渐变 */
+/* ========== 发送按钮（粉色胶囊） ========== */
 .btn-send {
-    -fx-background-color: linear-gradient(from 0% 0% to 100% 0%, #F4A261 0%, #E76F51 100%);
+    -fx-background-color: #FF6B9D;
     -fx-text-fill: white;
     -fx-font-size: 14;
     -fx-font-weight: bold;
     -fx-background-radius: 20;
     -fx-padding: 8 25;
     -fx-cursor: hand;
-    -fx-effect: dropshadow(gaussian, rgba(231,111,81,0.3), 6, 0, 0, 1);
+    -fx-effect: dropshadow(gaussian, rgba(255,107,157,0.3), 6, 0, 0, 1);
 }
 
 .btn-send:hover {
-    -fx-background-color: linear-gradient(from 0% 0% to 100% 0%, #E76F51 0%, #D4622A 100%);
+    -fx-background-color: #E8507A;
 }
 
 .btn-send:pressed {
-    -fx-background-color: #D4622A;
-    -fx-effect: dropshadow(gaussian, rgba(231,111,81,0.15), 3, 0, 0, 1);
+    -fx-background-color: #D4456A;
+    -fx-effect: dropshadow(gaussian, rgba(255,107,157,0.15), 3, 0, 0, 1);
 }
 
 .btn-send:disabled {
-    -fx-background-color: #D4A373;
-    -fx-text-fill: #F5E6D3;
+    -fx-background-color: #E0E0E0;
+    -fx-text-fill: #999999;
     -fx-effect: none;
 }

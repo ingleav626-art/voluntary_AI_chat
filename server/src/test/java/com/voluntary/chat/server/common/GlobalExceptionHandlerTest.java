@@ -10,6 +10,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -72,13 +73,25 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    @DisplayName("处理通用 Exception")
+    @DisplayName("处理 NoResourceFoundException - 应返回404而非500")
+    void handleNoResourceFoundException() {
+        NoResourceFoundException ex = new NoResourceFoundException(
+                org.springframework.http.HttpMethod.GET, "api/group/list");
+
+        ApiResult<Void> result = handler.handleNoResourceFoundException(ex);
+
+        assertEquals(404, result.getCode());
+        assertEquals("请求的接口不存在", result.getMessage());
+    }
+
+    @Test
+    @DisplayName("处理通用 Exception - 不泄露内部异常细节")
     void handleException() {
         Exception ex = new RuntimeException("内部错误");
 
         ApiResult<Void> result = handler.handleException(ex);
 
         assertEquals(500, result.getCode());
-        assertEquals("内部错误", result.getMessage());
+        assertEquals("服务器内部错误，请稍后重试", result.getMessage());
     }
 }

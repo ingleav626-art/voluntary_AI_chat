@@ -1,25 +1,25 @@
-/* 好友模块样式 - 好友列表、申请列表（温馨主题） */
+/* 好友模块样式 - 好友列表、申请列表（粉白主题） */
 
 .friend-root {
-    -fx-background-color: #FFF8F0;
+    -fx-background-color: #FFF5F8;
 }
 
 .friend-header {
-    -fx-background-color: #FFFEF8;
+    -fx-background-color: #FFFFFF;
     -fx-padding: 15 20;
-    -fx-border-color: #E8D5C4;
+    -fx-border-color: #E0E0E0;
     -fx-border-width: 0 0 1 0;
 }
 
 .friend-title {
     -fx-font-size: 20;
     -fx-font-weight: bold;
-    -fx-text-fill: #D4622A;
+    -fx-text-fill: #E8507A;
 }
 
 .friend-panel {
     -fx-padding: 10;
-    -fx-background-color: #FFFEF8;
+    -fx-background-color: #FFFFFF;
 }
 
 .friend-panel-header {
@@ -29,7 +29,7 @@
 .friend-panel-title {
     -fx-font-size: 16;
     -fx-font-weight: bold;
-    -fx-text-fill: #4A3426;
+    -fx-text-fill: #333333;
 }
 
 .friend-list {
@@ -40,12 +40,12 @@
 .friend-list .list-cell {
     -fx-background-color: transparent;
     -fx-padding: 8 5;
-    -fx-border-color: #FFE8D6;
+    -fx-border-color: #E0E0E0;
     -fx-border-width: 0 0 1 0;
 }
 
 .friend-list .list-cell:filled:hover {
-    -fx-background-color: #FFF8F0;
+    -fx-background-color: #FFE0EC;
 }
 
 .friend-cell {
@@ -59,12 +59,12 @@
 .friend-name {
     -fx-font-size: 14;
     -fx-font-weight: bold;
-    -fx-text-fill: #4A3426;
+    -fx-text-fill: #333333;
 }
 
 .friend-remark {
     -fx-font-size: 12;
-    -fx-text-fill: #B08968;
+    -fx-text-fill: #999999;
 }
 
 .apply-list {
@@ -75,7 +75,7 @@
 .apply-list .list-cell {
     -fx-background-color: transparent;
     -fx-padding: 8 5;
-    -fx-border-color: #FFE8D6;
+    -fx-border-color: #E0E0E0;
     -fx-border-width: 0 0 1 0;
 }
 
@@ -87,49 +87,49 @@
 .apply-name {
     -fx-font-size: 14;
     -fx-font-weight: bold;
-    -fx-text-fill: #4A3426;
+    -fx-text-fill: #333333;
 }
 
 .apply-status {
     -fx-font-size: 12;
-    -fx-text-fill: #B08968;
+    -fx-text-fill: #999999;
 }
 
 .apply-message {
     -fx-font-size: 12;
-    -fx-text-fill: #8B6F47;
+    -fx-text-fill: #999999;
 }
 
 .add-friend-form {
     -fx-padding: 10;
-    -fx-background-color: #FFF8F0;
+    -fx-background-color: #FFF5F8;
     -fx-background-radius: 8;
     -fx-spacing: 8;
 }
 
 .friend-input {
-    -fx-background-color: #FFFEF8;
+    -fx-background-color: #FFFFFF;
     -fx-background-radius: 8;
-    -fx-border-color: #E8D5C4;
+    -fx-border-color: #E0E0E0;
     -fx-border-radius: 8;
     -fx-font-size: 13;
     -fx-padding: 8;
 }
 
 .friend-input:focused {
-    -fx-border-color: #E76F51;
+    -fx-border-color: #FF6B9D;
 }
 
 .friend-footer {
-    -fx-background-color: #FFFEF8;
+    -fx-background-color: #FFFFFF;
     -fx-padding: 8 20;
-    -fx-border-color: #E8D5C4;
+    -fx-border-color: #E0E0E0;
     -fx-border-width: 1 0 0 0;
 }
 
-/* 小型按钮 - 温暖珊瑚/暖棕 */
+/* 小型按钮 - 粉红色 */
 .btn-success-sm {
-    -fx-background-color: #F4A261;
+    -fx-background-color: #FF6B9D;
     -fx-text-fill: white;
     -fx-font-size: 12;
     -fx-background-radius: 8;
@@ -138,11 +138,11 @@
 }
 
 .btn-success-sm:hover {
-    -fx-background-color: #E76F51;
+    -fx-background-color: #E8507A;
 }
 
 .btn-danger-sm {
-    -fx-background-color: #E76F51;
+    -fx-background-color: #FF6B9D;
     -fx-text-fill: white;
     -fx-font-size: 12;
     -fx-background-radius: 8;
@@ -151,5 +151,5 @@
 }
 
 .btn-danger-sm:hover {
-    -fx-background-color: #D4622A;
+    -fx-background-color: #E8507A;
 }

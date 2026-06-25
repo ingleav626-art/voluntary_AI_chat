@@ -1,41 +1,91 @@
-/* 公共样式 - 通用组件、变量、滚动条 */
+/* 公共样式 - 通用组件、变量、滚动条（粉白主题） */
 
 /* 主按钮 */
 .btn-primary {
-    -fx-background-color: #1976D2;
+    -fx-background-color: #FF6B9D;
     -fx-text-fill: white;
     -fx-font-size: 15;
     -fx-font-weight: bold;
-    -fx-background-radius: 4;
+    -fx-background-radius: 8;
     -fx-cursor: hand;
 }
 
 .btn-primary:hover {
-    -fx-background-color: #1565C0;
+    -fx-background-color: #E8507A;
 }
 
 .btn-primary:pressed {
-    -fx-background-color: #0D47A1;
+    -fx-background-color: #D4456A;
 }
 
 .btn-primary:disabled {
-    -fx-background-color: #BDBDBD;
-    -fx-text-fill: #9E9E9E;
+    -fx-background-color: #E0E0E0;
+    -fx-text-fill: #999999;
+}
+
+/* 图标按钮（通用） */
+.btn-icon {
+    -fx-background-color: #FF6B9D;
+    -fx-text-fill: white;
+    -fx-border-color: transparent;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-padding: 6px 14px;
+    -fx-font-size: 13px;
+    -fx-cursor: hand;
+}
+
+.btn-icon:hover {
+    -fx-background-color: #E8507A;
+}
+
+/* 危险按钮（通用） */
+.btn-danger {
+    -fx-background-color: transparent;
+    -fx-text-fill: #FF6B9D;
+    -fx-font-size: 12;
+    -fx-cursor: hand;
+    -fx-border-color: #FF6B9D;
+    -fx-border-radius: 4;
+    -fx-padding: 4 12;
+}
+
+.btn-danger:hover {
+    -fx-background-color: #FF6B9D;
+    -fx-text-fill: white;
+}
+
+/* 小型危险按钮（通用） */
+.btn-danger-sm {
+    -fx-background-color: #FF6B9D;
+    -fx-text-fill: #ffffff;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-padding: 4px 10px;
+    -fx-font-size: 12px;
+    -fx-cursor: hand;
+}
+
+.btn-danger-sm:hover {
+    -fx-background-color: #E8507A;
 }
 
 /* 输入框 */
 .input-field {
-    -fx-background-color: white;
-    -fx-background-radius: 4;
-    -fx-border-color: #E0E0E0;
-    -fx-border-radius: 4;
+    -fx-background-color: #FFE0EC;
+    -fx-background-radius: 8;
+    -fx-border-color: #FF6B9D;
+    -fx-border-radius: 8;
     -fx-font-size: 14;
     -fx-padding: 10;
     -fx-pref-width: 320;
+    -fx-text-fill: #333333;
+    -fx-prompt-text-fill: #FF6B9D;
 }
 
 .input-field:focused {
-    -fx-border-color: #1976D2;
+    -fx-border-color: #E8507A;
+    -fx-background-color: #FFF5F8;
 }
 
 /* 错误提示 */
@@ -54,12 +104,12 @@
 /* 链接标签 */
 .link-label {
     -fx-font-size: 13;
-    -fx-text-fill: #1976D2;
+    -fx-text-fill: #FF6B9D;
     -fx-cursor: hand;
 }
 
 .link-label:hover {
-    -fx-text-fill: #1565C0;
+    -fx-text-fill: #E8507A;
     -fx-underline: true;
 }
 
@@ -69,12 +119,12 @@
 }
 
 .scroll-bar .thumb {
-    -fx-background-color: #BDBDBD;
+    -fx-background-color: #E0E0E0;
     -fx-background-radius: 4;
 }
 
 .scroll-bar .thumb:hover {
-    -fx-background-color: #9E9E9E;
+    -fx-background-color: #CCCCCC;
 }
 
 .scroll-bar .increment-button,

@@ -61,11 +61,48 @@ jwt:
   access-token-expiration: 7200000
   refresh-token-expiration: 604800000
 
+# AI配置
+ai:
+  # API Key 加密密钥（必须为32字节，生产环境通过环境变量覆盖）
+  encryption-key: ${AI_ENCRYPTION_KEY:dev-only-encryption-key-32b!}
+  default-temperature: 0.7
+  default-max-tokens: 2048
+  context:
+    max-history-rounds: 10
+    max-memory-count: 10
+    memory-similarity-threshold: 0.7
+  memory:
+    summarize-threshold: 20
+    max-summary-length: 500
+  embedding:
+    provider: openai
+    model: text-embedding-3-small
+    dimension: 1536
+  vector:
+    enabled: false
+    type: milvus
+    base-url: http://localhost:19530
+    collection: ai_memory
+  providers:
+    openai:
+      base-url: https://api.openai.com/v1
+      default-model: gpt-4o-mini
+    deepseek:
+      base-url: https://api.deepseek.com/v1
+      default-model: deepseek-chat
+    qwen:
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      default-model: qwen-plus
+    zhipu:
+      base-url: https://open.bigmodel.cn/api/paas/v4
+      default-model: glm-4-flash
+
 logging:
   level:
     root: INFO
     com.voluntary.chat: DEBUG
     org.springframework.security: DEBUG
+    com.voluntary.chat.server.service.AiChatService: DEBUG
 
 server:
   # 绑定到所有网络接口，允许局域网访问
@@ -74,3 +111,8 @@ server:
   # 热点模式启用广播服务
   broadcast:
     enabled: true
+
+upload:
+  image:
+    dir: ./data/uploads/chat/images
+    base-url: http://localhost:8080/files

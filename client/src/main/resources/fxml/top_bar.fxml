@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.shape.*?>
+
+<HBox fx:id="topBar" prefHeight="48.0" minHeight="48.0" maxHeight="48.0"
+      styleClass="top-bar"
+      alignment="CENTER_LEFT" spacing="12.0"
+      xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="org.example.client.controller.TopBarController">
+
+    <!-- 左侧：头像 + 用户名 + 在线状态 -->
+    <HBox alignment="CENTER_LEFT" spacing="8.0" styleClass="top-bar-user" onMouseClicked="#handleAvatarClick">
+        <Circle fx:id="avatarCircle" fill="#FF6B9D" radius="16.0"/>
+        <Label fx:id="avatarText" styleClass="top-bar-avatar-text" text="?"/>
+        <VBox spacing="1.0">
+            <Label fx:id="usernameLabel" styleClass="top-bar-username" text="用户名"/>
+            <HBox spacing="4.0" alignment="CENTER_LEFT">
+                <Circle fx:id="statusDot" fill="#9E9E9E" radius="3.0"/>
+                <Label fx:id="statusLabel" styleClass="top-bar-status" text="离线"/>
+            </HBox>
+        </VBox>
+    </HBox>
+
+    <!-- 中间：搜索框 + ＋按钮 -->
+    <Region HBox.hgrow="ALWAYS"/>
+
+    <HBox alignment="CENTER_LEFT" spacing="8.0" styleClass="top-bar-search-box">
+        <Label text="🔍" styleClass="top-bar-search-icon"/>
+        <TextField fx:id="searchField" promptText="搜索会话" styleClass="top-bar-search-input" prefWidth="200.0"/>
+        <Button fx:id="addButton" mnemonicParsing="false"
+                onAction="#handleAddButton" styleClass="top-bar-add-btn" text="+"/>
+    </HBox>
+
+    <Region HBox.hgrow="ALWAYS"/>
+
+    <!-- 右侧占位 -->
+    <Region prefWidth="60.0"/>
+</HBox>

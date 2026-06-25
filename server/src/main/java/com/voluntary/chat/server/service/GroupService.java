@@ -34,16 +34,27 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 群组服务
+ * 群组服务（已废弃）
  *
- * <p>处理群组的创建、管理、成员操作等业务逻辑。</p>
+ * <p><strong>⚠️ 此类已废弃，不再使用！</strong></p>
  *
+ * <p>原GroupService.java已拆分为三个更小的服务类，符合AGENTS.md的文件规范（≤400行）：</p>
+ * <ul>
+ *   <li><strong>GroupCoreService</strong>：核心群组操作（创建、查询、修改、解散）</li>
+ *   <li><strong>GroupMemberService</strong>：成员管理（邀请、移除、退出、成员列表、昵称）</li>
+ *   <li><strong>GroupRoleService</strong>：权限管理（转让群主、设置管理员、角色验证）</li>
+ * </ul>
+ *
+ * <p>请直接使用上述三个服务类，不要使用GroupService。</p>
+ *
+ * @deprecated 已拆分为 {@link GroupCoreService}、{@link GroupMemberService}、{@link GroupRoleService}
  * @author voluntary-ai-chat
  * @since 1.0.0
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Deprecated
 public class GroupService {
 
     private final GroupMapper groupMapper;
@@ -81,9 +92,12 @@ public class GroupService {
 
         // 3. 添加初始成员（去重，排除创建者自己），并发送系统消息
         final String groupSessionId = "g_" + group.getId();
-        Set<Long> memberIds = request.getMemberIds().stream()
-                .filter(id -> !id.equals(userId))
-                .collect(Collectors.toSet());
+        List<Long> rawMemberIds = request.getMemberIds();
+        Set<Long> memberIds = rawMemberIds == null
+                ? Collections.emptySet()
+                : rawMemberIds.stream()
+                        .filter(id -> !id.equals(userId))
+                        .collect(Collectors.toSet());
         if (!memberIds.isEmpty()) {
             // 验证用户是否存在
             Map<Long, User> userMap = userService.findByIds(memberIds);

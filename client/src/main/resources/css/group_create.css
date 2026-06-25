@@ -1,4 +1,4 @@
-/* ===== 创建群组对话框样式 ===== */
+/* ===== 创建群组对话框样式（粉白主题） ===== */
 
 .group-create-root {
     -fx-background-color: #ffffff;
@@ -7,13 +7,13 @@
 
 .group-create-header {
     -fx-padding: 15px 20px;
-    -fx-background-color: #5C4033;
+    -fx-background-color: #E8507A;
 }
 
 .group-create-title {
     -fx-font-size: 16px;
     -fx-font-weight: bold;
-    -fx-text-fill: #FFF8F0;
+    -fx-text-fill: #FFFFFF;
 }
 
 .group-create-name-section {
@@ -27,31 +27,31 @@
 .group-create-label {
     -fx-font-size: 13px;
     -fx-font-weight: bold;
-    -fx-text-fill: #555555;
+    -fx-text-fill: #333333;
 }
 
 .group-create-count {
     -fx-font-size: 12px;
-    -fx-text-fill: #888888;
+    -fx-text-fill: #999999;
 }
 
 .group-create-input {
     -fx-pref-height: 32px;
     -fx-padding: 4px 10px;
-    -fx-border-color: #d0d0d0;
+    -fx-border-color: #E0E0E0;
     -fx-border-radius: 4px;
     -fx-background-radius: 4px;
     -fx-font-size: 13px;
 }
 
 .group-create-input:focused {
-    -fx-border-color: #42A5F5;
+    -fx-border-color: #FF6B9D;
 }
 
 /* 好友复选框列表 */
 .group-create-friend-list {
     -fx-background-color: transparent;
-    -fx-border-color: #e0e0e0;
+    -fx-border-color: #E0E0E0;
     -fx-border-radius: 4px;
     -fx-background-radius: 4px;
 }
@@ -62,17 +62,17 @@
 }
 
 .group-create-friend-list .list-cell:selected {
-    -fx-background-color: #e3f2fd;
+    -fx-background-color: #FFE0EC;
 }
 
 .friend-check-cell {
     -fx-padding: 8px 10px;
-    -fx-border-color: transparent transparent #f0f0f0 transparent;
+    -fx-border-color: transparent transparent #E0E0E0 transparent;
     -fx-border-width: 0 0 1px 0;
 }
 
 .friend-check-cell:hover {
-    -fx-background-color: #f5f8ff;
+    -fx-background-color: #FFF5F8;
 }
 
 .friend-check-name {
@@ -89,8 +89,8 @@
 /* 底部 */
 .group-create-footer {
     -fx-padding: 12px 20px;
-    -fx-background-color: #fafafa;
-    -fx-border-color: #e0e0e0;
+    -fx-background-color: #F5F5F5;
+    -fx-border-color: #E0E0E0;
     -fx-border-width: 1px 0 0 0;
 }
 
@@ -100,7 +100,7 @@
 }
 
 .btn-primary {
-    -fx-background-color: #42A5F5;
+    -fx-background-color: #FF6B9D;
     -fx-text-fill: #ffffff;
     -fx-border-radius: 4px;
     -fx-background-radius: 4px;
@@ -110,11 +110,11 @@
 }
 
 .btn-primary:hover {
-    -fx-background-color: #1E88E5;
+    -fx-background-color: #E8507A;
 }
 
 .btn-primary:disabled {
-    -fx-background-color: #bdbdbd;
+    -fx-background-color: #E0E0E0;
     -fx-cursor: default;
 }
 
@@ -122,27 +122,12 @@
 .text-field {
     -fx-pref-height: 32px;
     -fx-padding: 4px 10px;
-    -fx-border-color: #d0d0d0;
+    -fx-border-color: #E0E0E0;
     -fx-border-radius: 4px;
     -fx-background-radius: 4px;
     -fx-font-size: 13px;
 }
 
 .text-field:focused {
-    -fx-border-color: #42A5F5;
-}
-
-/* 默认按钮样式 */
-.button {
-    -fx-background-color: #e0e0e0;
-    -fx-text-fill: #333333;
-    -fx-border-radius: 4px;
-    -fx-background-radius: 4px;
-    -fx-padding: 8px 16px;
-    -fx-font-size: 13px;
-    -fx-cursor: hand;
-}
-
-.button:hover {
-    -fx-background-color: #d0d0d0;
+    -fx-border-color: #FF6B9D;
 }
