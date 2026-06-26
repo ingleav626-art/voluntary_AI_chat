@@ -1,19 +1,20 @@
 /* 聊天模块样式 - 消息气泡、输入区域（粉白主题） */
 
-/* ========== 聊天区域 - 纯白底色 ========== */
+/* ========== 聊天区域 - 浅粉毛玻璃 ========== */
 .chat-area {
-    -fx-background-color: #FFFFFF;
+    -fx-background-color: rgba(255, 240, 244, 0.9);
     -fx-background-radius: 12 0 0 12;
     -fx-spacing: 0;
     -fx-focus-color: transparent;
     -fx-faint-focus-color: transparent;
+    -fx-effect: dropshadow(gaussian, rgba(255,107,157,0.08), 4, 0, 0, 1);
 }
 
 /* ========== 聊天标题栏 ========== */
 .chat-header {
     -fx-padding: 12 20;
-    -fx-background-color: #FFFFFF;
-    -fx-border-color: #E0E0E0;
+    -fx-background-color: rgba(255, 240, 244, 0.95);
+    -fx-border-color: rgba(255, 224, 236, 0.7);
     -fx-border-width: 0 0 1 0;
     -fx-spacing: 10;
     -fx-background-radius: 12 0 0 0;
@@ -30,9 +31,58 @@
     -fx-text-fill: #999999;
 }
 
+/* ========== 群公告区域 ========== */
+.announcement-box {
+    -fx-background-color: rgba(255, 245, 248, 0.95);
+    -fx-border-color: rgba(255, 182, 193, 0.5);
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 8 15;
+    -fx-spacing: 4;
+}
+
+.announcement-header {
+    -fx-spacing: 8;
+    -fx-alignment: CENTER_LEFT;
+}
+
+.announcement-icon {
+    -fx-font-size: 14;
+    -fx-text-fill: #FF6B9D;
+}
+
+.announcement-label {
+    -fx-font-size: 13;
+    -fx-font-weight: bold;
+    -fx-text-fill: #FF6B9D;
+}
+
+.btn-toggle-announcement {
+    -fx-background-color: rgba(255, 182, 193, 0.6);
+    -fx-text-fill: #333333;
+    -fx-font-size: 12;
+    -fx-padding: 4 8;
+    -fx-background-radius: 4;
+    -fx-cursor: hand;
+}
+
+.btn-toggle-announcement:hover {
+    -fx-background-color: rgba(255, 182, 193, 0.8);
+}
+
+.announcement-content {
+    -fx-background-color: rgba(255, 240, 244, 0.9);
+    -fx-padding: 8 10;
+    -fx-font-size: 13;
+    -fx-text-fill: #333333;
+    -fx-background-radius: 4;
+    -fx-border-color: rgba(255, 182, 193, 0.3);
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+}
+
 /* ========== 消息列表 ========== */
 .message-list {
-    -fx-background-color: #FFFFFF;
+    -fx-background-color: rgba(255, 240, 244, 0.75);
     -fx-padding: 10;
     -fx-border-color: transparent;
     -fx-focus-color: transparent;
@@ -141,8 +191,8 @@
 /* ========== 输入区域 ========== */
 .input-area {
     -fx-padding: 10 15;
-    -fx-background-color: #FFFFFF;
-    -fx-border-color: #E0E0E0;
+    -fx-background-color: rgba(255, 240, 244, 0.95);
+    -fx-border-color: rgba(255, 224, 236, 0.7);
     -fx-border-width: 1 0 0 0;
     -fx-spacing: 8;
 }

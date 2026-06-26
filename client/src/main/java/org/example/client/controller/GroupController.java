@@ -122,6 +122,24 @@ public final class GroupController implements Initializable {
         groupList.itemsProperty().bind(viewModel.groupsProperty());
         groupList.setCellFactory(param -> new GroupCell());
 
+        // 监听viewModel.selectedGroup变化，用于自动选中群组后更新UI
+        viewModel.selectedGroupProperty().addListener((obs, oldGroup, newGroup) -> {
+            if (newGroup != null) {
+                // 查找群组列表中对应的群组并选中
+                for (final GroupInfo group : groupList.getItems()) {
+                    if (group.getGroupId().equals(newGroup.getGroupId())) {
+                        groupList.getSelectionModel().select(group);
+                        groupDetailTitle.setText("群成员 - " + newGroup.getName());
+                        viewModel.loadMembers(newGroup.getGroupId());
+                        updateActionButtons(newGroup);
+                        LOG.info("监听器触发：已选中群组 groupId={}, groupName={}",
+                                newGroup.getGroupId(), newGroup.getName());
+                        break;
+                    }
+                }
+            }
+        });
+
         // 群组点击事件：显示群成员
         groupList.setOnMouseClicked(event -> {
             final GroupInfo selected = groupList.getSelectionModel().getSelectedItem();
@@ -255,6 +273,45 @@ public final class GroupController implements Initializable {
     private void handleBack() {
         LOG.info("返回主界面");
         org.example.client.App.switchToMainFromGroup();
+    }
+
+    /**
+     * 根据群组ID选中群组
+     *
+     * @param groupId 群组ID
+     */
+    public void selectGroupById(final Long groupId) {
+        if (groupId == null) {
+            LOG.warn("群组ID为空，无法选中群组");
+            return;
+        }
+
+        // 检查群组列表是否已加载
+        if (groupList.getItems().isEmpty()) {
+            LOG.info("群组列表未加载，设置待选中群组ID: {}", groupId);
+            // 设置待选中的群组ID，等待群组列表加载完成后自动选中
+            viewModel.setPendingSelectGroupId(groupId);
+            return;
+        }
+
+        // 遍历群组列表，查找匹配的群组
+        for (final GroupInfo group : groupList.getItems()) {
+            if (group.getGroupId().equals(groupId)) {
+                // 选中群组
+                groupList.getSelectionModel().select(group);
+
+                // 设置选中的群组并加载群成员
+                viewModel.setSelectedGroup(group);
+                groupDetailTitle.setText("群成员 - " + group.getName());
+                viewModel.loadMembers(groupId);
+                updateActionButtons(group);
+
+                LOG.info("已选中群组: groupId={}, groupName={}", groupId, group.getName());
+                return;
+            }
+        }
+
+        LOG.warn("未找到群组ID为{}的群组", groupId);
     }
 
     /**

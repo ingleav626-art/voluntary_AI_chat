@@ -1,14 +1,14 @@
-/* AI 模块样式（粉白主题） */
+/* AI 模块样式（粉白渐变主题） */
 
-/* AI 面板根容器 */
+/* ========== AI 根容器 - 粉白渐变背景 ========== */
 .ai-root {
-    -fx-background-color: #FFF5F8;
+    -fx-background-color: linear-gradient(from 0% 0% to 0% 100%, #FFF5F8 0%, #FFE0EC 55%, #FFC1D6 100%);
 }
 
-/* AI 标题栏 */
+/* ========== AI 标题栏 - 浅粉色调 ========== */
 .ai-header {
     -fx-padding: 15 20;
-    -fx-background-color: #E8507A;
+    -fx-background-color: rgba(255, 182, 193, 0.85);
     -fx-spacing: 10;
 }
 
@@ -18,10 +18,10 @@
     -fx-font-weight: bold;
 }
 
-/* AI 面板 */
+/* ========== AI 面板 - 浅粉毛玻璃 ========== */
 .ai-panel {
     -fx-padding: 10;
-    -fx-background-color: #FFF5F8;
+    -fx-background-color: rgba(255, 240, 244, 0.85);
 }
 
 .ai-panel-header {
@@ -35,9 +35,9 @@
     -fx-font-weight: bold;
 }
 
-/* AI 角色列表 */
+/* ========== AI 角色列表 - 浅粉毛玻璃 ========== */
 .ai-list {
-    -fx-background-color: #FFF5F8;
+    -fx-background-color: rgba(255, 240, 244, 0.75);
     -fx-border-color: transparent;
 }
 
@@ -92,14 +92,16 @@
 }
 
 /* AI 详情区域 */
+/* ========== AI 详情面板 - 浅粉毛玻璃 ========== */
 .ai-detail {
     -fx-padding: 10;
-    -fx-background-color: #FFF5F8;
+    -fx-background-color: rgba(255, 240, 244, 0.85);
 }
 
+/* ========== AI 详情内容 - 浅粉毛玻璃 ========== */
 .ai-detail-content {
     -fx-padding: 10;
-    -fx-background-color: #FFFFFF;
+    -fx-background-color: rgba(255, 240, 244, 0.9);
     -fx-background-radius: 8;
     -fx-spacing: 6;
 }
@@ -124,9 +126,9 @@
     -fx-font-size: 13;
 }
 
-/* AI 记忆列表 */
+/* ========== AI 记忆列表 - 浅粉毛玻璃 ========== */
 .ai-memory-list {
-    -fx-background-color: #FFF5F8;
+    -fx-background-color: rgba(255, 240, 244, 0.75);
     -fx-border-color: transparent;
 }
 
@@ -160,10 +162,10 @@
     -fx-font-size: 10;
 }
 
-/* AI 底部状态栏 */
+/* ========== AI 底部状态栏 - 浅粉色调 ========== */
 .ai-footer {
     -fx-padding: 8 15;
-    -fx-background-color: #E8507A;
+    -fx-background-color: rgba(255, 182, 193, 0.85);
     -fx-spacing: 10;
 }
 
@@ -171,9 +173,10 @@
 .btn-primary {
     -fx-background-color: #FF6B9D;
     -fx-text-fill: #FFFFFF;
-    -fx-font-size: 12;
-    -fx-padding: 6 16;
-    -fx-background-radius: 6;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-padding: 8px 16px;
+    -fx-background-radius: 4px;
     -fx-cursor: hand;
     -fx-border-color: transparent;
 }
@@ -210,9 +213,10 @@
 
 /* ===== AI 编辑对话框 ===== */
 
+/* ========== AI 对话框根容器 - 浅粉毛玻璃 ========== */
 .ai-dialog-root {
     -fx-padding: 20;
-    -fx-background-color: #FFF5F8;
+    -fx-background-color: rgba(255, 240, 244, 0.9);
 }
 
 .ai-dialog-title {
@@ -231,11 +235,12 @@
     -fx-font-weight: bold;
 }
 
+/* ========== AI 表单输入框 - 浅粉毛玻璃 ========== */
 .ai-form-input {
-    -fx-background-color: #FFFFFF;
+    -fx-background-color: rgba(255, 240, 244, 0.9);
     -fx-text-fill: #333333;
     -fx-background-radius: 6;
-    -fx-border-color: #E0E0E0;
+    -fx-border-color: rgba(255, 224, 236, 0.7);
     -fx-font-size: 13;
     -fx-prompt-text-fill: #999999;
 }
@@ -244,17 +249,19 @@
     -fx-border-color: #FF6B9D;
 }
 
+/* ========== AI 表单下拉框 - 浅粉毛玻璃 ========== */
 .ai-form-combo {
-    -fx-background-color: #FFFFFF;
+    -fx-background-color: rgba(255, 240, 244, 0.9);
     -fx-background-radius: 6;
-    -fx-border-color: #E0E0E0;
+    -fx-border-color: rgba(255, 224, 236, 0.7);
 }
 
+/* ========== AI 表单文本区 - 浅粉毛玻璃 ========== */
 .ai-form-textarea {
-    -fx-background-color: #FFFFFF;
+    -fx-background-color: rgba(255, 240, 244, 0.9);
     -fx-text-fill: #333333;
     -fx-background-radius: 6;
-    -fx-border-color: #E0E0E0;
+    -fx-border-color: rgba(255, 224, 236, 0.7);
     -fx-font-size: 13;
     -fx-prompt-text-fill: #999999;
 }

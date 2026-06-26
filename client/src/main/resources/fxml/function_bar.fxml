@@ -15,7 +15,7 @@
 
     <!-- AI 设置按钮 -->
     <Button fx:id="aiSettingBtn" mnemonicParsing="false"
-            onAction="#handleAiSetting" styleClass="func-btn" maxWidth="Infinity">
+            onAction="#handleAiSetting" styleClass="func-btn">
         <graphic>
             <Label text="AI" styleClass="func-btn-icon func-btn-icon-ai"/>
         </graphic>
@@ -23,7 +23,7 @@
 
     <!-- 消息按钮（默认选中，主页入口） -->
     <Button fx:id="messageBtn" mnemonicParsing="false"
-            onAction="#handleMessage" styleClass="func-btn func-btn-home func-btn-selected" maxWidth="Infinity">
+            onAction="#handleMessage" styleClass="func-btn func-btn-home func-btn-selected">
         <graphic>
             <Label text="💬" styleClass="func-btn-icon"/>
         </graphic>
@@ -31,6 +31,14 @@
 
     <!-- 底部弹簧 -->
     <Region VBox.vgrow="ALWAYS"/>
+
+    <!-- 退出登录按钮 -->
+    <Button fx:id="logoutBtn" mnemonicParsing="false"
+            onAction="#handleLogout" styleClass="func-btn">
+        <graphic>
+            <Label text="🚪" styleClass="func-btn-icon"/>
+        </graphic>
+    </Button>
 
     <!-- 底部间距 -->
     <Region prefHeight="12.0"/>

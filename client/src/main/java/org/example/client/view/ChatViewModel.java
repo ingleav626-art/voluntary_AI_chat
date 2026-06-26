@@ -668,6 +668,15 @@ public final class ChatViewModel {
         return conversation != null ? conversation.getTargetName() : "";
     }
 
+    /**
+     * 获取当前会话
+     *
+     * @return 当前会话信息
+     */
+    public ConversationInfo getConversation() {
+        return conversation;
+    }
+
     // Property getters
     public ListProperty<MessageInfo> messagesProperty() {
         return messages;

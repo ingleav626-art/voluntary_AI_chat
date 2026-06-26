@@ -142,9 +142,6 @@ public final class ProfileController implements Initializable {
     @FXML
     private Label securityMessageLabel;
 
-    @FXML
-    private Button closeButton;
-
     // ========== ViewModel ==========
 
     private ProfileViewModel viewModel;
@@ -481,17 +478,6 @@ public final class ProfileController implements Initializable {
                     });
                     return null;
                 });
-    }
-
-    /**
-     * 处理关闭对话框
-     */
-    @FXML
-    private void handleClose() {
-        LOG.info("关闭个人设置对话框");
-        if (dialogStage != null) {
-            dialogStage.close();
-        }
     }
 
     // ========== Setter ==========

@@ -136,10 +136,7 @@ public class TopBarController implements Initializable {
         final MenuItem settingsItem = new MenuItem("设置（个人）");
         settingsItem.setOnAction(e -> handleSettings());
 
-        final MenuItem logoutItem = new MenuItem("退出登录");
-        logoutItem.setOnAction(e -> handleLogout());
-
-        avatarMenu.getItems().addAll(settingsItem, logoutItem);
+        avatarMenu.getItems().addAll(settingsItem);
     }
 
     /**
@@ -169,7 +166,7 @@ public class TopBarController implements Initializable {
             dialogStage.initOwner(topBar.getScene().getWindow());
 
             final javafx.scene.Scene scene = new javafx.scene.Scene(root);
-            scene.getStylesheets().add(getClass().getResource("/css/main.css").toExternalForm());
+            scene.getStylesheets().add(getClass().getResource("/css/default.css").toExternalForm());
             dialogStage.setScene(scene);
 
             controller.setDialogStage(dialogStage);
@@ -178,16 +175,6 @@ public class TopBarController implements Initializable {
         } catch (final java.io.IOException e) {
             LOG.error("加载个人设置对话框失败", e);
             NotificationDialog.showWarning("无法打开设置面板", "请稍后重试");
-        }
-    }
-
-    /**
-     * 处理退出登录
-     */
-    private void handleLogout() {
-        LOG.info("退出登录");
-        if (viewModel != null) {
-            viewModel.logout();
         }
     }
 

@@ -1,13 +1,13 @@
 /* ===== 创建群组对话框样式（粉白主题） ===== */
 
 .group-create-root {
-    -fx-background-color: #ffffff;
+    -fx-background-color: rgba(255, 240, 244, 0.95);
     -fx-padding: 0;
 }
 
 .group-create-header {
     -fx-padding: 15px 20px;
-    -fx-background-color: #E8507A;
+    -fx-background-color: rgba(255, 182, 193, 0.85);
 }
 
 .group-create-title {
@@ -18,10 +18,12 @@
 
 .group-create-name-section {
     -fx-padding: 15px 20px 10px 20px;
+    -fx-background-color: rgba(255, 240, 244, 0.95);
 }
 
 .group-create-members-section {
     -fx-padding: 10px 20px;
+    -fx-background-color: rgba(255, 240, 244, 0.95);
 }
 
 .group-create-label {
@@ -38,10 +40,11 @@
 .group-create-input {
     -fx-pref-height: 32px;
     -fx-padding: 4px 10px;
-    -fx-border-color: #E0E0E0;
+    -fx-border-color: rgba(255, 182, 193, 0.6);
     -fx-border-radius: 4px;
     -fx-background-radius: 4px;
     -fx-font-size: 13px;
+    -fx-background-color: rgba(255, 245, 248, 0.9);
 }
 
 .group-create-input:focused {
@@ -50,8 +53,8 @@
 
 /* 好友复选框列表 */
 .group-create-friend-list {
-    -fx-background-color: transparent;
-    -fx-border-color: #E0E0E0;
+    -fx-background-color: rgba(255, 245, 248, 0.9);
+    -fx-border-color: rgba(255, 182, 193, 0.6);
     -fx-border-radius: 4px;
     -fx-background-radius: 4px;
 }
@@ -62,17 +65,17 @@
 }
 
 .group-create-friend-list .list-cell:selected {
-    -fx-background-color: #FFE0EC;
+    -fx-background-color: rgba(255, 182, 193, 0.6);
 }
 
 .friend-check-cell {
     -fx-padding: 8px 10px;
-    -fx-border-color: transparent transparent #E0E0E0 transparent;
+    -fx-border-color: transparent transparent rgba(255, 182, 193, 0.6) transparent;
     -fx-border-width: 0 0 1px 0;
 }
 
 .friend-check-cell:hover {
-    -fx-background-color: #FFF5F8;
+    -fx-background-color: rgba(255, 245, 248, 0.9);
 }
 
 .friend-check-name {
@@ -89,8 +92,8 @@
 /* 底部 */
 .group-create-footer {
     -fx-padding: 12px 20px;
-    -fx-background-color: #F5F5F5;
-    -fx-border-color: #E0E0E0;
+    -fx-background-color: rgba(255, 240, 244, 0.95);
+    -fx-border-color: rgba(255, 182, 193, 0.6);
     -fx-border-width: 1px 0 0 0;
 }
 
@@ -106,6 +109,7 @@
     -fx-background-radius: 4px;
     -fx-padding: 8px 16px;
     -fx-font-size: 13px;
+    -fx-font-weight: bold;
     -fx-cursor: hand;
 }
 
@@ -122,10 +126,11 @@
 .text-field {
     -fx-pref-height: 32px;
     -fx-padding: 4px 10px;
-    -fx-border-color: #E0E0E0;
+    -fx-border-color: rgba(255, 182, 193, 0.6);
     -fx-border-radius: 4px;
     -fx-background-radius: 4px;
     -fx-font-size: 13px;
+    -fx-background-color: rgba(255, 245, 248, 0.9);
 }
 
 .text-field:focused {

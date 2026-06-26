@@ -5,24 +5,24 @@
 /* 纯白 #FFFFFF | 浅灰 #F5F5F5 | 中灰 #E0E0E0 */
 /* 深灰文字 #333333 | 浅灰文字 #999999 */
 
-/* ========== 主根容器 ========== */
+/* ========== 主根容器 - 粉白渐变背景 ========== */
 .main-root {
-    -fx-background-color: #F5F5F5;
+    -fx-background-color: linear-gradient(from 0% 0% to 0% 100%, #FFF5F8 0%, #FFE0EC 55%, #FFC1D6 100%);
 }
 
-/* ========== 主体三栏容器 ========== */
+/* ========== 主体三栏容器 - 粉白渐变背景 ========== */
 .main-body {
-    -fx-background-color: #F5F5F5;
+    -fx-background-color: linear-gradient(from 0% 0% to 0% 100%, #FFF5F8 0%, #FFE0EC 55%, #FFC1D6 100%);
     -fx-spacing: 0;
 }
 
-/* ========== 功能侧边栏（毛玻璃底色） ========== */
+/* ========== 功能侧边栏（浅粉毛玻璃） ========== */
 .function-bar {
-    -fx-background-color: rgba(255, 255, 255, 0.7);
+    -fx-background-color: rgba(255, 240, 244, 0.75);
     -fx-background-radius: 0 12 12 0;
     -fx-padding: 8 4;
     -fx-spacing: 4;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 8, 0, 2, 0);
+    -fx-effect: dropshadow(gaussian, rgba(255,107,157,0.08), 8, 0, 2, 0);
     -fx-border-color: transparent;
     -fx-border-width: 0;
 }
@@ -30,6 +30,22 @@
 /* 强制覆盖JavaFX默认Button样式（防止灰色背景） */
 .function-bar .button {
     -fx-background-color: #FF6B9D;
+    -fx-background-radius: 12;
+    -fx-min-width: 44;
+    -fx-min-height: 44;
+    -fx-pref-width: 44;
+    -fx-pref-height: 44;
+    -fx-max-width: 44;
+    -fx-max-height: 44;
+    -fx-alignment: center;
+    -fx-cursor: hand;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-content-display: graphic-only;
+}
+
+.function-bar .button:hover {
+    -fx-background-color: #FFB6C1;
 }
 
 /* 功能按钮 */
@@ -50,7 +66,8 @@
 }
 
 .func-btn:hover {
-    -fx-background-color: #E8507A;
+    -fx-background-color: #FFB6C1;
+    -fx-effect: dropshadow(gaussian, rgba(255,107,157,0.2), 4, 0, 0, 0);
 }
 
 .func-btn-selected {
@@ -59,7 +76,7 @@
 }
 
 .func-btn-selected:hover {
-    -fx-background-color: #E8507A;
+    -fx-background-color: #FFB6C1;
 }
 
 .func-btn-icon {
@@ -91,19 +108,20 @@
     -fx-font-weight: bold;
 }
 
-/* ========== 会话列表面板（浅灰底色） ========== */
+/* ========== 会话列表面板（浅粉毛玻璃） ========== */
 .conversation-panel {
-    -fx-background-color: #F5F5F5;
+    -fx-background-color: rgba(255, 240, 244, 0.8);
     -fx-background-radius: 0 12 12 0;
     -fx-padding: 0;
     -fx-spacing: 0;
-    -fx-border-color: #E0E0E0;
+    -fx-border-color: rgba(255, 224, 236, 0.6);
     -fx-border-width: 0 1 0 0;
+    -fx-effect: dropshadow(gaussian, rgba(255,107,157,0.06), 3, 0, 1, 0);
 }
 
 /* 会话列表 */
 .conversation-list {
-    -fx-background-color: #F5F5F5;
+    -fx-background-color: rgba(255, 240, 244, 0.65);
     -fx-padding: 4 0;
     -fx-border-color: transparent;
     -fx-focus-color: transparent;
@@ -119,7 +137,7 @@
 }
 
 .conversation-list .list-cell:filled:selected {
-    -fx-background-color: #E8507A;
+    -fx-background-color: #FF8FB1;
     -fx-text-fill: white;
 }
 
@@ -177,15 +195,15 @@
     -fx-alignment: center;
 }
 
-/* ========== 顶部标题栏（毛玻璃底色） ========== */
+/* ========== 顶部标题栏（浅粉毛玻璃） ========== */
 .top-bar {
-    -fx-background-color: rgba(255, 255, 255, 0.75);
+    -fx-background-color: rgba(255, 240, 244, 0.8);
     -fx-padding: 0 16;
     -fx-spacing: 12;
     -fx-alignment: CENTER_LEFT;
-    -fx-border-color: #E0E0E0;
+    -fx-border-color: rgba(255, 224, 236, 0.6);
     -fx-border-width: 0 0 1 0;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.04), 4, 0, 0, 1);
+    -fx-effect: dropshadow(gaussian, rgba(255,107,157,0.08), 4, 0, 0, 1);
 }
 
 .top-bar-user {

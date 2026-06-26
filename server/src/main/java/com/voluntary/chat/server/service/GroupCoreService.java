@@ -120,6 +120,30 @@ public class GroupCoreService {
     }
 
     /**
+     * 获取群组详情
+     *
+     * @param userId  当前用户ID
+     * @param groupId 群组ID
+     * @return 群组详情
+     */
+    public GroupResponse getGroupDetail(final Long userId, final Long groupId) {
+        final GroupEntity group = findGroupById(groupId);
+
+        // 验证用户是否是该群成员
+        final LambdaQueryWrapper<GroupMember> memberWrapper = new LambdaQueryWrapper<>();
+        memberWrapper.eq(GroupMember::getGroupId, groupId)
+                .eq(GroupMember::getUserId, userId)
+                .eq(GroupMember::getIsDeleted, 0);
+        final GroupMember member = groupMemberMapper.selectOne(memberWrapper);
+
+        if (member == null) {
+            throw new BusinessException(ErrorCode.NO_PERMISSION, "您不是该群成员");
+        }
+
+        return toGroupResponse(group);
+    }
+
+    /**
      * 修改群信息
      *
      * <p>仅群主可修改。</p>
@@ -147,6 +171,10 @@ public class GroupCoreService {
         }
         if (request.getAnnouncementPinned() != null) {
             group.setAnnouncementPinned(request.getAnnouncementPinned());
+            changed = true;
+        }
+        if (request.getAvatar() != null) {
+            group.setAvatar(request.getAvatar());
             changed = true;
         }
 
@@ -298,6 +326,8 @@ public class GroupCoreService {
                 .avatar(group.getAvatar())
                 .memberCount(memberCount)
                 .ownerId(group.getOwnerId())
+                .announcement(group.getAnnouncement())
+                .announcementPinned(group.getAnnouncementPinned())
                 .build();
     }
 }

@@ -68,21 +68,23 @@
     -fx-effect: none;
 }
 
-/* ===== 登录页输入框 - 粉色圆角（覆盖公共样式） ===== */
+/* ===== 登录页输入框 - 浅粉色背景（覆盖公共样式） ===== */
 .login-container .input-field {
-    -fx-background-color: #FFFFFF;
+    -fx-background-color: rgba(255, 240, 244, 0.85);
     -fx-background-radius: 8;
-    -fx-border-color: #E0E0E0;
+    -fx-border-color: rgba(255, 182, 193, 0.6);
     -fx-border-radius: 8;
     -fx-border-width: 1.5;
     -fx-font-size: 14;
     -fx-padding: 12;
     -fx-pref-width: 320;
+    -fx-text-fill: #333333;
+    -fx-prompt-text-fill: #999999;
 }
 
 .login-container .input-field:focused {
     -fx-border-color: #FF6B9D;
-    -fx-background-color: #FFFFFF;
+    -fx-background-color: rgba(255, 240, 244, 0.85);
     -fx-effect: dropshadow(gaussian, rgba(255,107,157,0.2), 6, 0, 0, 0);
 }
 

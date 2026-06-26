@@ -1,13 +1,15 @@
-/* ===== 群组管理面板样式（粉白主题） ===== */
+/* ===== 群组管理面板样式（粉白渐变主题） ===== */
 
+/* ========== 群组根容器 - 粉白渐变背景 ========== */
 .group-root {
-    -fx-background-color: #F5F5F5;
+    -fx-background-color: linear-gradient(from 0% 0% to 0% 100%, #FFF5F8 0%, #FFE0EC 55%, #FFC1D6 100%);
 }
 
+/* ========== 群组标题栏 - 浅粉毛玻璃 ========== */
 .group-header {
     -fx-padding: 15px 20px;
-    -fx-background-color: #FFFFFF;
-    -fx-border-color: #E0E0E0;
+    -fx-background-color: rgba(255, 240, 244, 0.95);
+    -fx-border-color: rgba(255, 224, 236, 0.7);
     -fx-border-width: 0 0 1px 0;
 }
 
@@ -17,9 +19,10 @@
     -fx-text-fill: #333333;
 }
 
+/* ========== 群组面板 - 浅粉毛玻璃 ========== */
 .group-panel {
     -fx-padding: 10px;
-    -fx-background-color: #FFFFFF;
+    -fx-background-color: rgba(255, 240, 244, 0.85);
 }
 
 .group-panel-header {
@@ -32,11 +35,11 @@
     -fx-text-fill: #333333;
 }
 
-/* 创建群组表单 */
+/* ========== 创建群组表单 - 浅粉毛玻璃 ========== */
 .create-group-form {
     -fx-padding: 10px;
-    -fx-background-color: #F5F5F5;
-    -fx-border-color: #E0E0E0;
+    -fx-background-color: rgba(255, 240, 244, 0.85);
+    -fx-border-color: rgba(255, 224, 236, 0.7);
     -fx-border-width: 1px;
     -fx-border-radius: 6px;
     -fx-background-radius: 6px;
@@ -127,11 +130,11 @@
     -fx-text-fill: #999999;
 }
 
-/* 底部状态栏 */
+/* ========== 底部状态栏 - 浅粉毛玻璃 ========== */
 .group-footer {
     -fx-padding: 8px 20px;
-    -fx-background-color: #FFFFFF;
-    -fx-border-color: #E0E0E0;
+    -fx-background-color: rgba(255, 240, 244, 0.95);
+    -fx-border-color: rgba(255, 224, 236, 0.7);
     -fx-border-width: 1px 0 0 0;
 }
 
@@ -142,8 +145,9 @@
     -fx-border-color: transparent;
     -fx-border-radius: 4px;
     -fx-background-radius: 4px;
-    -fx-padding: 6px 14px;
+    -fx-padding: 8px 16px;
     -fx-font-size: 13px;
+    -fx-font-weight: bold;
     -fx-cursor: hand;
 }
 
@@ -158,6 +162,7 @@
     -fx-background-radius: 4px;
     -fx-padding: 8px 16px;
     -fx-font-size: 13px;
+    -fx-font-weight: bold;
     -fx-cursor: hand;
     -fx-border: none;
 }
@@ -166,13 +171,14 @@
     -fx-background-color: #E8507A;
 }
 
+/* ========== 危险按钮（解散群组） - 与普通按钮一样大 ========== */
 .btn-danger-sm {
     -fx-background-color: #FF6B9D;
     -fx-text-fill: #ffffff;
     -fx-border-radius: 4px;
     -fx-background-radius: 4px;
-    -fx-padding: 4px 10px;
-    -fx-font-size: 12px;
+    -fx-padding: 6px 14px;
+    -fx-font-size: 13px;
     -fx-cursor: hand;
 }
 
@@ -213,8 +219,8 @@
 }
 
 .btn-action-sm {
-    -fx-background-color: #F5F5F5;
-    -fx-border-color: #E0E0E0;
+    -fx-background-color: rgba(255, 240, 244, 0.85);
+    -fx-border-color: rgba(255, 224, 236, 0.7);
     -fx-border-radius: 3px;
     -fx-background-radius: 3px;
     -fx-padding: 2px 8px;

@@ -110,6 +110,16 @@ public class GroupController {
     }
 
     /**
+     * 获取群组详情
+     */
+    @GetMapping("/{groupId}")
+    public ApiResult<GroupResponse> getGroupDetail(@PathVariable Long groupId) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        GroupResponse result = groupCoreService.getGroupDetail(userId, groupId);
+        return ApiResult.ok(result);
+    }
+
+    /**
      * 获取群成员
      */
     @GetMapping("/{groupId}/members")

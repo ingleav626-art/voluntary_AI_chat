@@ -1,13 +1,15 @@
-/* 好友模块样式 - 好友列表、申请列表（粉白主题） */
+/* 好友模块样式 - 好友列表、申请列表（粉白渐变主题） */
 
+/* ========== 好友根容器 - 粉白渐变背景 ========== */
 .friend-root {
-    -fx-background-color: #FFF5F8;
+    -fx-background-color: linear-gradient(from 0% 0% to 0% 100%, #FFF5F8 0%, #FFE0EC 55%, #FFC1D6 100%);
 }
 
+/* ========== 好友标题栏 - 浅粉毛玻璃 ========== */
 .friend-header {
-    -fx-background-color: #FFFFFF;
+    -fx-background-color: rgba(255, 240, 244, 0.95);
     -fx-padding: 15 20;
-    -fx-border-color: #E0E0E0;
+    -fx-border-color: rgba(255, 224, 236, 0.7);
     -fx-border-width: 0 0 1 0;
 }
 
@@ -17,9 +19,10 @@
     -fx-text-fill: #E8507A;
 }
 
+/* ========== 好友面板 - 浅粉毛玻璃 ========== */
 .friend-panel {
     -fx-padding: 10;
-    -fx-background-color: #FFFFFF;
+    -fx-background-color: rgba(255, 240, 244, 0.85);
 }
 
 .friend-panel-header {
@@ -100,17 +103,19 @@
     -fx-text-fill: #999999;
 }
 
+/* ========== 添加好友表单 - 浅粉毛玻璃 ========== */
 .add-friend-form {
     -fx-padding: 10;
-    -fx-background-color: #FFF5F8;
+    -fx-background-color: rgba(255, 240, 244, 0.85);
     -fx-background-radius: 8;
     -fx-spacing: 8;
 }
 
+/* ========== 好友输入框 - 浅粉毛玻璃 ========== */
 .friend-input {
-    -fx-background-color: #FFFFFF;
+    -fx-background-color: rgba(255, 240, 244, 0.9);
     -fx-background-radius: 8;
-    -fx-border-color: #E0E0E0;
+    -fx-border-color: rgba(255, 224, 236, 0.7);
     -fx-border-radius: 8;
     -fx-font-size: 13;
     -fx-padding: 8;
@@ -120,10 +125,11 @@
     -fx-border-color: #FF6B9D;
 }
 
+/* ========== 好友底部栏 - 浅粉毛玻璃 ========== */
 .friend-footer {
-    -fx-background-color: #FFFFFF;
+    -fx-background-color: rgba(255, 240, 244, 0.95);
     -fx-padding: 8 20;
-    -fx-border-color: #E0E0E0;
+    -fx-border-color: rgba(255, 224, 236, 0.7);
     -fx-border-width: 1 0 0 0;
 }
 

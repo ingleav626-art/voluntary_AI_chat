@@ -300,6 +300,37 @@ public class App extends Application {
     }
 
     /**
+     * 切换到群组面板并选中指定群组
+     *
+     * @param groupId 群组ID
+     */
+    public static void switchToGroupPanel(final Long groupId) {
+        try {
+            final FXMLLoader loader = new FXMLLoader(App.class.getResource(GROUP_FXML));
+            final Parent root = loader.load();
+
+            // 获取控制器并设置选中的群组
+            final org.example.client.controller.GroupController controller = loader.getController();
+            if (controller != null && groupId != null) {
+                javafx.application.Platform.runLater(() -> {
+                    controller.selectGroupById(groupId);
+                });
+            }
+
+            final Scene scene = createScene(root, MAIN_WINDOW_WIDTH, MAIN_WINDOW_HEIGHT);
+            primaryStage.setTitle("AI 聊天 - 群组管理");
+            primaryStage.setScene(scene);
+            primaryStage.setWidth(MAIN_WINDOW_WIDTH);
+            primaryStage.setHeight(MAIN_WINDOW_HEIGHT);
+            primaryStage.setResizable(true);
+            primaryStage.centerOnScreen();
+            LOG.info("已切换到群组面板，群组ID: {}", groupId);
+        } catch (final Exception e) {
+            LOG.error("加载群组面板失败", e);
+        }
+    }
+
+    /**
      * 从群组面板返回主聊天界面
      */
     public static void switchToMainFromGroup() {

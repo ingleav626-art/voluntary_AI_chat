@@ -63,6 +63,18 @@ public final class MainController implements Initializable {
     private Label connectionLabel;
 
     @FXML
+    private Button groupManageButton;
+
+    @FXML
+    private VBox announcementBox;
+
+    @FXML
+    private Label announcementContent;
+
+    @FXML
+    private Button toggleAnnouncementBtn;
+
+    @FXML
     private ListView<MessageInfo> messageList;
 
     @FXML
@@ -139,7 +151,7 @@ public final class MainController implements Initializable {
             }
         });
 
-        // 监听 chatViewModel 变化，重新绑定输入框
+        // 监听 chatViewModel 变化，重新绑定输入框并更新管理按钮显示状态
         viewModel.chatViewModelProperty().addListener((obs, oldVm, newVm) -> {
             if (oldVm != null) {
                 inputArea.textProperty().unbindBidirectional(oldVm.inputTextProperty());
@@ -148,10 +160,22 @@ public final class MainController implements Initializable {
                 inputArea.textProperty().bindBidirectional(newVm.inputTextProperty());
                 inputAreaContainer.setVisible(true);
                 inputAreaContainer.setManaged(true);
+
+                // 根据会话类型显示/隐藏群管理按钮
+                final ConversationInfo conv = newVm.getConversation();
+                if (conv != null && "GROUP".equals(conv.getTargetType())) {
+                    groupManageButton.setVisible(true);
+                    groupManageButton.setManaged(true);
+                } else {
+                    groupManageButton.setVisible(false);
+                    groupManageButton.setManaged(false);
+                }
             } else {
                 inputArea.clear();
                 inputAreaContainer.setVisible(false);
                 inputAreaContainer.setManaged(false);
+                groupManageButton.setVisible(false);
+                groupManageButton.setManaged(false);
             }
         });
 
@@ -319,6 +343,17 @@ public final class MainController implements Initializable {
     }
 
     /**
+     * 处理群公告展开/折叠
+     */
+    @FXML
+    private void handleToggleAnnouncement() {
+        final boolean isExpanded = announcementContent.isVisible();
+        announcementContent.setVisible(!isExpanded);
+        announcementContent.setManaged(!isExpanded);
+        toggleAnnouncementBtn.setText(isExpanded ? "展开" : "折叠");
+    }
+
+    /**
      * 处理发送图片
      */
     @FXML
@@ -371,6 +406,36 @@ public final class MainController implements Initializable {
         fileItem.setOnAction(e -> handleSendFile());
         menu.getItems().addAll(imageItem, fileItem);
         menu.show(plusButton, javafx.geometry.Side.BOTTOM, 0, 0);
+    }
+
+    /**
+     * 处理群管理按钮点击，跳转到群管理界面
+     */
+    @FXML
+    private void handleGroupManage() {
+        final ChatViewModel chatVm = viewModel.chatViewModelProperty().get();
+        if (chatVm == null) {
+            return;
+        }
+
+        final ConversationInfo conv = chatVm.getConversation();
+        if (conv == null || !"GROUP".equals(conv.getTargetType())) {
+            return;
+        }
+
+        LOG.info("点击群管理按钮: groupId={}, groupName={}", conv.getTargetId(), conv.getTargetName());
+
+        try {
+            // 切换到群管理界面
+            org.example.client.App.switchToGroupPanel(conv.getTargetId());
+        } catch (final Exception e) {
+            LOG.error("跳转群管理界面失败", e);
+            final Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("错误");
+            alert.setHeaderText("无法打开群管理界面");
+            alert.setContentText("请稍后重试");
+            alert.show();
+        }
     }
 
     /**

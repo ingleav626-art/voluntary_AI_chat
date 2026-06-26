@@ -38,8 +38,24 @@
                 <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="chat-header">
                     <Label fx:id="chatTitleLabel" styleClass="chat-title" text="请选择会话"/>
                     <Region HBox.hgrow="ALWAYS"/>
+                    <Button fx:id="groupManageButton" mnemonicParsing="false"
+                            onAction="#handleGroupManage" styleClass="btn-icon" text="管理"
+                            visible="false" managed="false"/>
                     <Label fx:id="connectionLabel" styleClass="connection-label" text=""/>
                 </HBox>
+
+                <!-- 群公告显示区域（仅在群聊时显示） -->
+                <VBox fx:id="announcementBox" styleClass="announcement-box" visible="false" managed="false">
+                    <HBox alignment="CENTER_LEFT" spacing="8.0" styleClass="announcement-header">
+                        <Label styleClass="announcement-icon" text="📌"/>
+                        <Label styleClass="announcement-label" text="群公告"/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Button fx:id="toggleAnnouncementBtn" styleClass="btn-toggle-announcement"
+                                text="展开" onAction="#handleToggleAnnouncement"/>
+                    </HBox>
+                    <Label fx:id="announcementContent" styleClass="announcement-content"
+                            text="" wrapText="true" visible="false" managed="false"/>
+                </VBox>
 
                 <!-- 消息列表 -->
                 <ListView fx:id="messageList" styleClass="message-list" VBox.vgrow="ALWAYS">

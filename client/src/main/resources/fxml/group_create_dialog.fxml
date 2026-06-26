@@ -51,7 +51,7 @@
     <HBox alignment="CENTER_RIGHT" spacing="12.0" styleClass="group-create-footer">
         <Label fx:id="errorLabel" styleClass="error-message" text="" HBox.hgrow="ALWAYS"/>
         <Button fx:id="cancelButton" mnemonicParsing="false"
-                onAction="#handleCancel" text="取消"/>
+                onAction="#handleCancel" styleClass="btn-icon" text="取消"/>
         <Button fx:id="confirmCreateButton" mnemonicParsing="false"
                 onAction="#handleCreate" styleClass="btn-primary" text="创建群组"/>
     </HBox>

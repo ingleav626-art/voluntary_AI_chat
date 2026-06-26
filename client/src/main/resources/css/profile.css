@@ -1,0 +1,481 @@
+/* 个人设置界面样式 - 粉白毛玻璃主题 */
+
+/* ========== 配色变量 ========== */
+/* 主粉色 #FF6B9D | 浅粉 #FFE0EC | 深粉 #E8507A */
+/* 纯白 #FFFFFF | 浅灰 #F5F5F5 | 中灰 #E0E0E0 */
+/* 深灰文字 #333333 | 浅灰文字 #999999 */
+
+/* ========== 根容器 - 粉白渐变背景 ========== */
+.dialog-container {
+    -fx-background-color: linear-gradient(from 0% 0% to 0% 100%, #FFF5F8 0%, #FFE0EC 55%, #FFC1D6 100%);
+}
+
+/* ========== 标题 ========== */
+.dialog-title {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #E8507A;
+    -fx-padding: 10 0 15 0;
+}
+
+/* ========== TabPane - 浅粉毛玻璃 ========== */
+/* 强制覆盖JavaFX默认TabPane样式 - 使用最高优先级选择器 */
+
+/* TabPane主容器 */
+.tab-pane {
+    -fx-background-color: rgba(255, 240, 244, 0.8);
+    -fx-border-color: rgba(255, 182, 193, 0.4);
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-tab-min-width: 80px;
+}
+
+/* TabPane整体背景容器 */
+.tab-pane:top {
+    -fx-background-color: rgba(255, 240, 244, 0.8);
+}
+
+/* TabPane顶部整体背景 - 强制浅粉色（覆盖所有内部层） */
+.tab-pane > .tab-header-area {
+    -fx-background-color: rgba(255, 182, 193, 0.5);
+    -fx-padding: 0;
+    -fx-border-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+}
+
+.tab-pane .tab-header-area {
+    -fx-background-color: rgba(255, 182, 193, 0.5);
+    -fx-padding: 0;
+    -fx-border-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+}
+
+/* JavaFX隐藏的tab-header-background层 - 强制浅粉色 */
+.tab-pane > .tab-header-area > .tab-header-background {
+    -fx-background-color: rgba(255, 182, 193, 0.5);
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+    -fx-border-color: transparent;
+    -fx-effect: null;
+}
+
+.tab-pane .tab-header-area .tab-header-background {
+    -fx-background-color: rgba(255, 182, 193, 0.5);
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+    -fx-border-color: transparent;
+    -fx-effect: null;
+}
+
+/* JavaFX TabPane control-buttons-bg (关闭按钮等) - 强制浅粉色 */
+.tab-pane > .tab-header-area > .control-buttons-bg {
+    -fx-background-color: rgba(255, 182, 193, 0.5);
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+    -fx-border-color: transparent;
+}
+
+.tab-pane .tab-header-area .control-buttons-bg {
+    -fx-background-color: rgba(255, 182, 193, 0.5);
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+    -fx-border-color: transparent;
+}
+
+/* TabPane headers区域背景 - 强制浅粉色 */
+.tab-pane > .tab-header-area > .headers-region {
+    -fx-background-color: rgba(255, 182, 193, 0.5);
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+    -fx-border-color: transparent;
+}
+
+.tab-pane .tab-header-area .headers-region {
+    -fx-background-color: rgba(255, 182, 193, 0.5);
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+    -fx-border-color: transparent;
+}
+
+/* TabPane tab按钮样式 */
+.tab-pane > .tab-header-area > .headers-region > .tab {
+    -fx-background-color: rgba(255, 182, 193, 0.3);
+    -fx-background-radius: 6px 6px 0 0;
+    -fx-border-color: transparent;
+    -fx-text-fill: #333333;
+    -fx-font-size: 14px;
+    -fx-font-weight: normal;
+    -fx-padding: 8 16;
+    -fx-background-insets: 0;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+.tab-pane .tab-header-area .tab {
+    -fx-background-color: rgba(255, 182, 193, 0.3);
+    -fx-background-radius: 6px 6px 0 0;
+    -fx-border-color: transparent;
+    -fx-text-fill: #333333;
+    -fx-font-size: 14px;
+    -fx-font-weight: normal;
+    -fx-padding: 8 16;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+/* TabPane选中tab样式 - 移除蓝色focus框 */
+.tab-pane > .tab-header-area > .headers-region > .tab:selected {
+    -fx-background-color: #FF6B9D;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+.tab-pane .tab-header-area .tab:selected {
+    -fx-background-color: #FF6B9D;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+/* TabPane hover样式 */
+.tab-pane > .tab-header-area > .headers-region > .tab:hover {
+    -fx-background-color: rgba(255, 182, 193, 0.5);
+}
+
+.tab-pane .tab-header-area .tab:hover {
+    -fx-background-color: rgba(255, 182, 193, 0.5);
+}
+
+/* TabPane内容区域 */
+.tab-pane > .tab-content-area {
+    -fx-background-color: rgba(255, 240, 244, 0.75);
+    -fx-border-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+}
+
+.tab-pane .tab-content-area {
+    -fx-background-color: rgba(255, 240, 244, 0.75);
+    -fx-border-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+}
+
+/* ========== Tab内容容器 - 浅粉毛玻璃 ========== */
+.tab-content {
+    -fx-background-color: rgba(255, 240, 244, 0.7);
+    -fx-border-color: rgba(255, 182, 193, 0.3);
+    -fx-border-width: 1px;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-padding: 15px;
+    -fx-spacing: 12px;
+}
+
+/* ========== 分区容器 ========== */
+.section-box {
+    -fx-background-color: rgba(255, 240, 244, 0.65);
+    -fx-border-color: rgba(255, 182, 193, 0.4);
+    -fx-border-width: 1px;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-padding: 15px;
+    -fx-spacing: 10px;
+}
+
+.section-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #E8507A;
+    -fx-padding: 5 0 10 0;
+}
+
+/* ========== 标签样式 ========== */
+.label {
+    -fx-text-fill: #333333;
+    -fx-font-size: 13px;
+}
+
+.info-label {
+    -fx-text-fill: #666666;
+    -fx-font-size: 13px;
+    -fx-font-style: italic;
+}
+
+.message-label {
+    -fx-text-fill: #E8507A;
+    -fx-font-size: 12px;
+    -fx-padding: 5 0;
+}
+
+/* ========== 输入框样式 - 全部使用浅粉色背景 ========== */
+.text-field, .password-field, .text-area {
+    -fx-background-color: rgba(255, 240, 244, 0.85);
+    -fx-background-radius: 4px;
+    -fx-border-color: rgba(255, 182, 193, 0.6);
+    -fx-border-width: 1px;
+    -fx-border-radius: 4px;
+    -fx-padding: 6px 10px;
+    -fx-font-size: 13px;
+    -fx-text-fill: #333333;
+    -fx-prompt-text-fill: #999999;
+    -fx-focus-color: #FF6B9D;
+    -fx-faint-focus-color: rgba(255, 107, 157, 0.2);
+}
+
+.text-field:focused, .password-field:focused, .text-area:focused {
+    -fx-border-color: #FF6B9D;
+    -fx-effect: dropshadow(gaussian, rgba(255,107,157,0.15), 4, 0, 0, 0);
+}
+
+/* 只读输入框 - 浅粉色背景 */
+.readonly-field {
+    -fx-background-color: rgba(255, 240, 244, 0.7);
+    -fx-border-color: rgba(255, 182, 193, 0.5);
+    -fx-text-fill: #666666;
+}
+
+/* Spinner和DatePicker的文本框也要浅粉色 */
+.spinner .text-field,
+.date-picker .text-field,
+.combo-box .text-field {
+    -fx-background-color: rgba(255, 240, 244, 0.85);
+}
+
+/* ========== ComboBox样式 - 浅粉色背景 ========== */
+.combo-box {
+    -fx-background-color: rgba(255, 240, 244, 0.85);
+    -fx-background-radius: 4px;
+    -fx-border-color: rgba(255, 182, 193, 0.6);
+    -fx-border-width: 1px;
+    -fx-border-radius: 4px;
+    -fx-font-size: 13px;
+    -fx-padding: 6 10;
+}
+
+.combo-box:hover {
+    -fx-border-color: #FF6B9D;
+    -fx-background-color: rgba(255, 240, 244, 0.95);
+}
+
+.combo-box:focused {
+    -fx-border-color: #FF6B9D;
+    -fx-effect: dropshadow(gaussian, rgba(255,107,157,0.15), 4, 0, 0, 0);
+}
+
+.combo-box .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #333333;
+}
+
+.combo-box .arrow-button {
+    -fx-background-color: rgba(255, 182, 193, 0.5);
+    -fx-background-radius: 4px;
+}
+
+/* ComboBox下拉弹出列表 */
+.combo-box-popup .list-view {
+    -fx-background-color: rgba(255, 240, 244, 0.95);
+    -fx-border-color: rgba(255, 182, 193, 0.6);
+    -fx-effect: dropshadow(gaussian, rgba(255,107,157,0.15), 8, 0, 0, 2);
+}
+
+.combo-box-popup .list-view .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #333333;
+}
+
+.combo-box-popup .list-view .list-cell:hover {
+    -fx-background-color: rgba(255, 182, 193, 0.3);
+}
+
+.combo-box-popup .list-view .list-cell:selected {
+    -fx-background-color: #FF6B9D;
+    -fx-text-fill: white;
+}
+
+/* ========== Spinner样式 - 浅粉色背景 ========== */
+.spinner {
+    -fx-background-color: rgba(255, 240, 244, 0.85);
+    -fx-background-radius: 4px;
+    -fx-border-color: rgba(255, 182, 193, 0.6);
+    -fx-border-width: 1px;
+    -fx-border-radius: 4px;
+    -fx-font-size: 13px;
+}
+
+.spinner:focused {
+    -fx-border-color: #FF6B9D;
+}
+
+.spinner .text-field {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.spinner .increment-arrow-button,
+.spinner .decrement-arrow-button {
+    -fx-background-color: #FF6B9D;
+    -fx-background-radius: 4px;
+    -fx-border-radius: 4px;
+    -fx-padding: 4px 8px;
+}
+
+.spinner .increment-arrow-button:hover,
+.spinner .decrement-arrow-button:hover {
+    -fx-background-color: #E8507A;
+}
+
+.spinner .increment-arrow-button:pressed,
+.spinner .decrement-arrow-button:pressed {
+    -fx-background-color: #D4456A;
+}
+
+.spinner .increment-arrow-button .arrow,
+.spinner .decrement-arrow-button .arrow {
+    -fx-background-color: white;
+    -fx-shape: "M 0 0 L 4 4 L 8 0 Z";
+}
+
+/* ========== DatePicker样式 - 浅粉色背景 ========== */
+.date-picker {
+    -fx-background-color: rgba(255, 240, 244, 0.85);
+    -fx-background-radius: 4px;
+    -fx-border-color: rgba(255, 182, 193, 0.6);
+    -fx-border-width: 1px;
+    -fx-border-radius: 4px;
+    -fx-font-size: 13px;
+}
+
+.date-picker:focused {
+    -fx-border-color: #FF6B9D;
+}
+
+.date-picker .text-field {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.date-picker .arrow-button {
+    -fx-background-color: #FF6B9D;
+    -fx-background-radius: 4px;
+    -fx-border-radius: 4px;
+    -fx-padding: 4px 8px;
+}
+
+.date-picker .arrow-button:hover {
+    -fx-background-color: #E8507A;
+}
+
+.date-picker .arrow-button:pressed {
+    -fx-background-color: #D4456A;
+}
+
+.date-picker .arrow-button .arrow {
+    -fx-background-color: white;
+}
+
+.date-picker-popup {
+    -fx-background-color: rgba(255, 240, 244, 0.95);
+    -fx-border-color: rgba(255, 182, 193, 0.6);
+}
+
+.date-picker-popup .day-name-cell {
+    -fx-background-color: rgba(255, 182, 193, 0.3);
+    -fx-text-fill: #E8507A;
+}
+
+.date-picker-popup .day-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #333333;
+}
+
+.date-picker-popup .day-cell:hover {
+    -fx-background-color: rgba(255, 182, 193, 0.3);
+}
+
+.date-picker-popup .day-cell:selected {
+    -fx-background-color: #FF6B9D;
+    -fx-text-fill: white;
+}
+
+/* ========== 按钮样式 ========== */
+.btn-primary {
+    -fx-background-color: #FF6B9D;
+    -fx-text-fill: #ffffff;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-padding: 8px 16px;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+    -fx-border-color: transparent;
+}
+
+.btn-primary:hover {
+    -fx-background-color: #E8507A;
+    -fx-effect: dropshadow(gaussian, rgba(255,107,157,0.2), 4, 0, 0, 0);
+}
+
+.btn-primary:pressed {
+    -fx-background-color: #D4456A;
+}
+
+.btn-secondary {
+    -fx-background-color: rgba(255, 182, 193, 0.3);
+    -fx-text-fill: #E8507A;
+    -fx-border-color: rgba(255, 182, 193, 0.6);
+    -fx-border-width: 1px;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-padding: 8px 16px;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+
+.btn-secondary:hover {
+    -fx-background-color: rgba(255, 182, 193, 0.5);
+    -fx-text-fill: #E8507A;
+}
+
+/* ========== 头像圆形 ========== */
+.circle {
+    -fx-stroke: rgba(255, 182, 193, 0.6);
+    -fx-stroke-width: 2px;
+    -fx-fill: rgba(255, 182, 193, 0.3);
+}
+
+/* ========== ScrollPane样式 ========== */
+.scroll-pane {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.scroll-pane .viewport {
+    -fx-background-color: transparent;
+}
+
+.scroll-pane .scroll-bar {
+    -fx-background-color: rgba(255, 182, 193, 0.2);
+}
+
+.scroll-pane .scroll-bar .thumb {
+    -fx-background-color: rgba(255, 182, 193, 0.5);
+    -fx-background-radius: 4px;
+}
+
+.scroll-pane .scroll-bar .track {
+    -fx-background-color: rgba(255, 182, 193, 0.1);
+}
+
+/* ========== 进度指示器 ========== */
+.progress-indicator {
+    -fx-progress-color: #FF6B9D;
+}
