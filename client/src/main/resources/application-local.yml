@@ -1,5 +1,61 @@
+# 本地模式 H2 内嵌数据库配置（覆盖 application.yml 的 MySQL 配置）
+# 客户包使用 H2 文件数据库，数据持久化到 %APPDATA%/Voluntary-AI-Chat/data
 spring:
+  main:
+    lazy-initialization: true
+    banner-mode: off
+
+  jmx:
+    enabled: false
+
+  datasource:
+    url: jdbc:h2:file:${app.data.dir:./data}/voluntary_ai_chat;AUTO_SERVER=TRUE;MODE=MySQL;NON_KEYWORDS=USER
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      initialization-fail-timeout: -1
+      connection-timeout: 5000
+
+  h2:
+    console:
+      enabled: false
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema-h2.sql
+      encoding: UTF-8
+
+  flyway:
+    enabled: false
+
+  data:
+    redis:
+      enabled: false
+
+  jackson:
+    default-property-inclusion: non_null
+
+  management:
+    endpoints:
+      enabled-by-default: false
+
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
       - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+
+# 应用数据目录
+app:
+  data:
+    dir: ${APPDATA:./data}/Voluntary-AI-Chat/data
+
+# 优化日志级别（减少启动输出）
+logging:
+  level:
+    root: WARN
+    com.voluntary.chat: INFO
+    org.springframework.boot.autoconfigure: WARN

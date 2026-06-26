@@ -13,7 +13,6 @@ import com.voluntary.chat.server.mapper.AiMemoryMapper;
 import com.voluntary.chat.server.mapper.MessageMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
@@ -27,7 +26,6 @@ import java.util.stream.Collectors;
  * 实现长期记忆的存储、检索和摘要生成
  */
 @Slf4j
-@Service
 @RequiredArgsConstructor
 public class AiMemoryService {
 

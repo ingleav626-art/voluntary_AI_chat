@@ -211,20 +211,33 @@ public class ServerConnectionManager {
                 }
 
             case LOCAL:
-                // 本地模式：默认使用本地，云端可用时覆盖
-                if (cloudServerAvailable && !privacyModeEnabled) {
-                    LOG.info("本地模式：云端服务器可用，覆盖本地连接");
-                    return cloudServerUrl;
-                } else if (localServerAvailable) {
-                    LOG.info("本地模式：仅使用本地服务器");
+                // 本地模式：默认使用本地，根据异步检查目标决定覆盖策略
+                final String checkTarget = System.getProperty("app.async-check-target", "cloud");
+                if ("hotspot".equals(checkTarget)) {
+                    // 测试包：检查热点服务器，热点可用时覆盖本地
+                    final String hotspot = discoverHotspotServer();
+                    if (hotspot != null) {
+                        LOG.info("测试包模式：发现热点服务器 {}", hotspot);
+                        return hotspot;
+                    }
+                    LOG.info("测试包模式：未发现热点服务器，使用本地服务器");
                     return ServerMode.LOCAL.getDefaultBaseUrl();
                 } else {
-                    LOG.warn("本地服务器不可用，尝试云端服务器");
-                    if (cloudServerAvailable) {
+                    // 客户包/默认：云端可用时覆盖本地
+                    if (cloudServerAvailable && !privacyModeEnabled) {
+                        LOG.info("客户包模式：云端服务器可用，覆盖本地连接");
                         return cloudServerUrl;
-                    } else {
-                        LOG.error("所有服务器不可用，使用本地默认地址");
+                    } else if (localServerAvailable) {
+                        LOG.info("客户包模式：仅使用本地服务器");
                         return ServerMode.LOCAL.getDefaultBaseUrl();
+                    } else {
+                        LOG.warn("本地服务器不可用，尝试云端服务器");
+                        if (cloudServerAvailable) {
+                            return cloudServerUrl;
+                        } else {
+                            LOG.error("所有服务器不可用，使用本地默认地址");
+                            return ServerMode.LOCAL.getDefaultBaseUrl();
+                        }
                     }
                 }
 
@@ -329,6 +342,34 @@ public class ServerConnectionManager {
      */
     public boolean isLocalServerAvailable() {
         return localServerAvailable;
+    }
+
+    /**
+     * 发现热点服务器
+     *
+     * <p>
+     * 先尝试连接环境变量指定的热点服务器，如果未指定或不可用，则自动发现局域网服务器。
+     * </p>
+     *
+     * @return 热点服务器地址，未发现时返回 null
+     */
+    private String discoverHotspotServer() {
+        // 如果环境变量指定了热点服务器，优先使用
+        if (hotspotServerUrl != null && checkServerSync(hotspotServerUrl)) {
+            LOG.info("使用指定的热点服务器 {}", hotspotServerUrl);
+            return hotspotServerUrl;
+        }
+
+        // 未指定或不可用时自动发现
+        LOG.info("开始自动发现热点服务器...");
+        final String discoveredUrl = ServerDiscovery.autoDiscover();
+        if (discoveredUrl != null) {
+            LOG.info("自动发现热点服务器 {}", discoveredUrl);
+            return discoveredUrl;
+        }
+
+        LOG.warn("未发现任何热点服务器");
+        return null;
     }
 
     /**

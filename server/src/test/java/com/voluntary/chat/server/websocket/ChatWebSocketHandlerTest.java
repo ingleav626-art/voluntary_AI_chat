@@ -11,6 +11,7 @@ import com.voluntary.chat.server.service.AiChatService;
 import com.voluntary.chat.server.service.AiGroupConfigService;
 import com.voluntary.chat.server.service.MessageService;
 import com.voluntary.chat.server.service.UserService;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -73,11 +74,11 @@ class ChatWebSocketHandlerTest {
     void setUp() throws Exception {
         objectMapper = new ObjectMapper();
         objectMapper.findAndRegisterModules();
-        handler = new ChatWebSocketHandler(messageService, userService, groupMemberMapper, aiChatService,
-                aiGroupConfigService, objectMapper);
+        handler = new ChatWebSocketHandler(aiChatService, aiGroupConfigService, objectMapper, messageService,
+                userService, groupMemberMapper);
 
         // 重置静态 ONLINE_SESSIONS，避免测试间相互影响
-        Field field = ChatWebSocketHandler.class.getDeclaredField("ONLINE_SESSIONS");
+        Field field = AiWebSocketHandler.class.getDeclaredField("ONLINE_SESSIONS");
         field.setAccessible(true);
         @SuppressWarnings("unchecked")
         ConcurrentHashMap<Long, WebSocketSession> map = (ConcurrentHashMap<Long, WebSocketSession>) field.get(null);

@@ -1,9 +1,21 @@
 package org.example.client;
 
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.Image;
+import java.awt.MenuItem;
+import java.awt.PopupMenu;
+import java.awt.RenderingHints;
+import java.awt.SystemTray;
+import java.awt.Toolkit;
+import java.awt.TrayIcon;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.net.URL;
 import java.util.concurrent.TimeUnit;
 
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -87,6 +99,15 @@ public class App extends Application {
     /** 待跳转的 AI 会话（从 AI 面板跳转到聊天时使用） */
     private static ConversationInfo pendingAiConversation;
 
+    /** 系统托盘图标 */
+    private static TrayIcon trayIcon;
+
+    /** 是否已启用系统托盘 */
+    private static boolean trayEnabled;
+
+    /** 托盘图标资源路径 */
+    private static final String TRAY_ICON_PATH = "/images/icon.png";
+
     @Override
     public void init() {
         // 检查环境变量 CLIENT_CONFIG，支持热点测试环境
@@ -110,7 +131,8 @@ public class App extends Application {
                 LOG.info("服务器连接检查完成，使用服务器: {}", finalServerUrl);
             } catch (final Exception e) {
                 LOG.warn("服务器连接检查超时或失败，使用默认本地服务器", e);
-                ClientConfig.getInstance().setBaseUrl(ServerConnectionManager.getInstance().getCurrentMode().getDefaultBaseUrl());
+                ClientConfig.getInstance()
+                        .setBaseUrl(ServerConnectionManager.getInstance().getCurrentMode().getDefaultBaseUrl());
             }
 
             ClientConfig.getInstance().load();
@@ -124,6 +146,19 @@ public class App extends Application {
     @Override
     public void start(final Stage stage) throws Exception {
         primaryStage = stage;
+
+        // 阻止 JavaFX 在窗口关闭时自动退出（由系统托盘控制生命周期）
+        Platform.setImplicitExit(false);
+
+        // 窗口关闭时最小化到系统托盘，不退出
+        primaryStage.setOnCloseRequest(event -> {
+            event.consume();
+            hideToTray();
+        });
+
+        // 初始化系统托盘（仅支持托盘的桌面环境）
+        initSystemTray();
+
         switchToLogin();
         primaryStage.setResizable(false);
         primaryStage.show();
@@ -384,6 +419,166 @@ public class App extends Application {
 
     @Override
     public void stop() {
-        LOG.info("客户端关闭");
+        LOG.info("客户端关闭，开始清理资源...");
+        // 移除托盘图标
+        removeTrayIcon();
+        // 优雅关闭内嵌后端（释放端口 8080）
+        Launcher.shutdown();
+        LOG.info("客户端已完全关闭");
+    }
+
+    // ==================== 系统托盘 ====================
+
+    /**
+     * 初始化系统托盘
+     *
+     * <p>
+     * 创建托盘图标和右键菜单：显示窗口 / 退出。
+     * 仅在支持系统托盘的桌面环境下启用。
+     * </p>
+     */
+    private static void initSystemTray() {
+        if (!SystemTray.isSupported()) {
+            LOG.info("当前系统不支持系统托盘，窗口关闭将直接退出");
+            // 不支持托盘时，关闭窗口直接退出
+            Platform.setImplicitExit(true);
+            return;
+        }
+
+        try {
+            // 创建弹出菜单
+            final PopupMenu popup = new PopupMenu();
+
+            final MenuItem showItem = new MenuItem("显示窗口");
+            showItem.addActionListener(e -> showWindow());
+
+            final MenuItem exitItem = new MenuItem("退出");
+            exitItem.addActionListener(e -> exitApp());
+
+            popup.add(showItem);
+            popup.addSeparator();
+            popup.add(exitItem);
+
+            // 加载托盘图标（优先使用资源文件，不存在时程序生成）
+            final Image trayImage = loadTrayIcon();
+            trayIcon = new TrayIcon(trayImage, "Voluntary AI Chat", popup);
+            trayIcon.setImageAutoSize(true);
+
+            // 双击托盘图标显示窗口
+            trayIcon.addActionListener(e -> showWindow());
+
+            SystemTray.getSystemTray().add(trayIcon);
+            trayEnabled = true;
+            LOG.info("系统托盘初始化成功");
+        } catch (final Exception e) {
+            LOG.warn("系统托盘初始化失败: {}", e.getMessage());
+            trayEnabled = false;
+            // 托盘初始化失败时，关闭窗口直接退出
+            Platform.setImplicitExit(true);
+        }
+    }
+
+    /**
+     * 最小化窗口到系统托盘
+     */
+    private static void hideToTray() {
+        if (trayEnabled) {
+            LOG.debug("最小化到系统托盘");
+            primaryStage.hide();
+        } else {
+            // 没有托盘时关闭窗口就是退出
+            LOG.info("系统托盘未启用，直接退出");
+            exitApp();
+        }
+    }
+
+    /**
+     * 从系统托盘恢复窗口显示
+     */
+    private static void showWindow() {
+        Platform.runLater(() -> {
+            if (primaryStage != null) {
+                primaryStage.show();
+                primaryStage.toFront();
+                LOG.debug("从托盘恢复窗口显示");
+            }
+        });
+    }
+
+    /**
+     * 完全退出应用（托盘"退出"菜单调用）
+     *
+     * <p>
+     * 清理资源后退出 JVM，确保内嵌后端和 WebSocket 都被关闭。
+     * </p>
+     */
+    private static void exitApp() {
+        LOG.info("用户通过系统托盘退出应用");
+        // 先关闭 JavaFX，会触发 App.stop()
+        Platform.runLater(() -> {
+            removeTrayIcon();
+            Platform.exit();
+        });
+    }
+
+    /**
+     * 移除托盘图标
+     */
+    private static void removeTrayIcon() {
+        if (trayEnabled && trayIcon != null) {
+            try {
+                SystemTray.getSystemTray().remove(trayIcon);
+                trayEnabled = false;
+                LOG.debug("已移除系统托盘图标");
+            } catch (final Exception e) {
+                LOG.warn("移除系统托盘图标失败: {}", e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * 加载托盘图标
+     *
+     * <p>
+     * 优先从资源文件加载图标，找不到时程序生成一个简单的圆角矩形图标。
+     * </p>
+     *
+     * @return 托盘图标 Image
+     */
+    private static Image loadTrayIcon() {
+        final URL iconUrl = App.class.getResource(TRAY_ICON_PATH);
+        if (iconUrl != null) {
+            return Toolkit.getDefaultToolkit().getImage(iconUrl);
+        }
+        // 资源文件不存在时程序生成一个 32x32 的蓝色圆角图标
+        LOG.info("托盘图标资源未找到，使用程序生成的图标");
+        return createDefaultTrayIcon();
+    }
+
+    /**
+     * 创建默认托盘图标（32x32 蓝色圆角图标）
+     *
+     * @return 生成的图标 Image
+     */
+    private static Image createDefaultTrayIcon() {
+        final int size = 32;
+        final BufferedImage image = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+        final Graphics2D g2d = image.createGraphics();
+        try {
+            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2d.setColor(new Color(0x2196F3)); // Material Blue
+            g2d.fillRoundRect(2, 2, size - 4, size - 4, 8, 8);
+            // 画个简单的 "AI" 文字
+            g2d.setColor(Color.WHITE);
+            g2d.setFont(g2d.getFont().deriveFont(java.awt.Font.BOLD, 12f));
+            final java.awt.FontMetrics metrics = g2d.getFontMetrics();
+            final String text = "AI";
+            final int x = (size - metrics.stringWidth(text)) / 2;
+            final int y = ((size - metrics.getHeight()) / 2) + metrics.getAscent();
+            g2d.drawString(text, x, y);
+        } finally {
+            g2d.dispose();
+        }
+        return image;
     }
 }

@@ -14,6 +14,10 @@
     <packaging>jar</packaging>
     <name>Voluntary AI Chat - Client</name>
 
+    <properties>
+        <app.jar-classifier>exec</app.jar-classifier>
+    </properties>
+
     <build>
         <plugins>
             <!-- Maven Compiler Plugin - 确保 Lombok 注解处理器正确配置 -->
@@ -47,7 +51,7 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
                     <mainClass>org.example.client.Launcher</mainClass>
-                    <classifier>exec</classifier>
+                    <classifier>${app.jar-classifier}</classifier>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>
@@ -67,11 +71,17 @@
     </build>
 
     <dependencies>
-        <!-- Server 模块（内嵌启动） -->
+        <!-- AI Core 模块（内嵌 AI 引擎） -->
         <dependency>
             <groupId>com.voluntary</groupId>
-            <artifactId>voluntary-ai-chat-server</artifactId>
-            <version>${project.version}</version>
+            <artifactId>voluntary-ai-chat-ai-core</artifactId>
+        </dependency>
+
+        <!-- H2 数据库（本地模式） -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
         </dependency>
 
         <!-- JavaFX -->
@@ -128,4 +138,45 @@
             </exclusions>
         </dependency>
     </dependencies>
+
+    <!-- 三包 Profile：客户包(默认)/测试包/云端包 -->
+    <profiles>
+        <!-- 客户包（默认）：启动本地 + 异步查云端 -->
+        <profile>
+            <id>client</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <app.async-check-target>cloud</app.async-check-target>
+                <app.jar-classifier>client-exec</app.jar-classifier>
+                <app.installer.suffix></app.installer.suffix>
+                <app.installer.name>Voluntary-AI-Chat-Setup</app.installer.name>
+            </properties>
+        </profile>
+        <!-- 测试包：启动本地 + 异步查热点(UDP广播)，包含 server 全量模块 -->
+        <profile>
+            <id>test</id>
+            <dependencies>
+                <dependency>
+                    <groupId>com.voluntary</groupId>
+                    <artifactId>voluntary-ai-chat-server</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+            </dependencies>
+            <properties>
+                <app.async-check-target>hotspot</app.async-check-target>
+                <app.jar-classifier>test-exec</app.jar-classifier>
+                <app.installer.suffix>-Test</app.installer.suffix>
+                <app.installer.name>Voluntary-AI-Chat-Test-Setup</app.installer.name>
+            </properties>
+        </profile>
+        <!-- 云端包：跳过 client 打包，只打 server -->
+        <profile>
+            <id>cloud</id>
+            <properties>
+                <app.installer.skip>true</app.installer.skip>
+            </properties>
+        </profile>
+    </profiles>
 </project>

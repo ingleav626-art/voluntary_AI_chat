@@ -135,10 +135,23 @@ public final class Launcher {
                 // 本地模式使用精简配置（H2数据库，仅AI组件）
                 final String profile = "local";
 
-                serverContext = SpringApplication.run(
-                        org.example.client.server.EmbeddedServerStarter.class,
-                        "--spring.profiles.active=" + profile,
-                        "--server.port=" + SERVER_PORT);
+                // 程序化设置启动属性（比 YAML 优先级更高，确保生效）
+                final SpringApplication app = new SpringApplication(
+                        org.example.client.server.EmbeddedServerStarter.class);
+                final java.util.Properties props = new java.util.Properties();
+                props.setProperty("spring.profiles.active", profile);
+                props.setProperty("server.port", String.valueOf(SERVER_PORT));
+                // 懒加载：不急于创建所有 Bean，用到才创建
+                props.setProperty("spring.main.lazy-initialization", "true");
+                // Tomcat 最小化：客户包不需要高并发
+                props.setProperty("server.tomcat.threads.max", "2");
+                props.setProperty("server.tomcat.threads.min-spare", "1");
+                props.setProperty("server.tomcat.accept-count", "5");
+                // 禁用 devtools 文件系统扫描
+                props.setProperty("spring.devtools.restart.enabled", "false");
+                app.setDefaultProperties(props);
+
+                serverContext = app.run();
                 LOG.info("内嵌后端服务启动成功，端口: {}, 配置: {}", SERVER_PORT, profile);
             } catch (final Exception e) {
                 LOG.error("内嵌后端服务启动失败", e);
@@ -217,6 +230,34 @@ public final class Launcher {
             dataDir = appdata != null ? appdata + "/Voluntary-AI-Chat/data" : "./data";
         }
         return Path.of(dataDir);
+    }
+
+    /**
+     * 优雅关闭内嵌后端
+     *
+     * <p>
+     * 关闭 Spring 上下文，释放端口 8080。
+     * 可以被 App.stop() 或系统托盘"退出"菜单调用。
+     * 多次调用安全（幂等）。
+     * </p>
+     */
+    public static void shutdown() {
+        if (serverContext != null && serverContext.isRunning()) {
+            LOG.info("正在关闭内嵌后端服务...");
+            try {
+                serverContext.close();
+                LOG.info("内嵌后端服务已关闭");
+            } catch (final Exception e) {
+                LOG.error("关闭内嵌后端服务时出错", e);
+            } finally {
+                serverContext = null;
+            }
+        } else {
+            LOG.debug("内嵌后端服务未运行，无需关闭");
+        }
+
+        // 关闭服务器连接管理器线程池
+        ServerConnectionManager.getInstance().shutdown();
     }
 
     /**
