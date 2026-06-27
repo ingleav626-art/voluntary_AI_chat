@@ -4,12 +4,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.voluntary.chat.common.constant.MessageTypes;
 import com.voluntary.chat.common.model.WebSocketMessage;
 import com.voluntary.chat.server.dto.request.SendMessageRequest;
+import com.voluntary.chat.server.dto.response.MessageResponse;
 import com.voluntary.chat.server.dto.response.SendMessageResponse;
 import com.voluntary.chat.server.entity.User;
 import com.voluntary.chat.server.mapper.GroupMemberMapper;
 import com.voluntary.chat.server.service.AiChatService;
 import com.voluntary.chat.server.service.AiGroupConfigService;
+import com.voluntary.chat.server.service.ConversationCacheService;
+import com.voluntary.chat.server.service.GroupCacheService;
 import com.voluntary.chat.server.service.MessageService;
+import com.voluntary.chat.server.service.OnlineStatusService;
 import com.voluntary.chat.server.service.UserService;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -58,6 +62,15 @@ class ChatWebSocketHandlerTest {
     @Mock
     private AiGroupConfigService aiGroupConfigService;
 
+    @Mock
+    private OnlineStatusService onlineStatusService;
+
+    @Mock
+    private ConversationCacheService conversationCacheService;
+
+    @Mock
+    private GroupCacheService groupCacheService;
+
     private ObjectMapper objectMapper;
 
     @Mock
@@ -75,7 +88,7 @@ class ChatWebSocketHandlerTest {
         objectMapper = new ObjectMapper();
         objectMapper.findAndRegisterModules();
         handler = new ChatWebSocketHandler(aiChatService, aiGroupConfigService, objectMapper, messageService,
-                userService, groupMemberMapper);
+                userService, groupMemberMapper, onlineStatusService, conversationCacheService, groupCacheService);
 
         // 重置静态 ONLINE_SESSIONS，避免测试间相互影响
         Field field = AiWebSocketHandler.class.getDeclaredField("ONLINE_SESSIONS");
@@ -330,5 +343,445 @@ class ChatWebSocketHandlerTest {
         // 断开后应返回离线
         handler.afterConnectionClosed(session1, CloseStatus.NORMAL);
         assertFalse(handler.isUserOnline(USER_ID_1));
+    }
+
+    // ==================== 离线消息转发 ====================
+
+    @Test
+    @DisplayName("私聊消息 - 目标离线时存入离线队列")
+    void forwardPrivateMessage_shouldStoreOffline_whenTargetOffline() throws Exception {
+        createSession(USER_ID_1, session1);
+
+        User sender = new User();
+        sender.setId(USER_ID_1);
+        sender.setUsername("张三");
+
+        SendMessageResponse sendResponse = SendMessageResponse.builder()
+                .messageId(10001L)
+                .createTime(LocalDateTime.now())
+                .build();
+
+        String payload = """
+                {
+                    "id": "550e8400-e29b-41d4-a716-446655440000",
+                    "type": "SEND_MESSAGE",
+                    "data": {
+                        "sessionId": "p_1001_1002",
+                        "msgType": "TEXT",
+                        "content": "离线消息测试"
+                    }
+                }
+                """;
+
+        when(messageService.sendMessage(eq(USER_ID_1), any(SendMessageRequest.class)))
+                .thenReturn(sendResponse);
+        when(userService.findById(USER_ID_1)).thenReturn(sender);
+        // 目标 USER_ID_2 不在线
+        when(onlineStatusService.isOnline(USER_ID_2)).thenReturn(false);
+
+        TextMessage textMessage = new TextMessage(payload);
+        handler.handleTextMessage(session1, textMessage);
+
+        // 应存入离线队列
+        verify(conversationCacheService).pushOfflineMessage(eq(USER_ID_2), anyString());
+        // 应增加未读数
+        verify(conversationCacheService).incrementUnread(USER_ID_2, "p_1001_1002");
+    }
+
+    @Test
+    @DisplayName("私聊消息 - 目标在线时直接推送")
+    void forwardPrivateMessage_shouldSendDirectly_whenTargetOnline() throws Exception {
+        createSession(USER_ID_1, session1);
+        createSession(USER_ID_2, session2);
+
+        User sender = new User();
+        sender.setId(USER_ID_1);
+        sender.setUsername("张三");
+
+        SendMessageResponse sendResponse = SendMessageResponse.builder()
+                .messageId(10001L)
+                .createTime(LocalDateTime.now())
+                .build();
+
+        String payload = """
+                {
+                    "id": "550e8400-e29b-41d4-a716-446655440000",
+                    "type": "SEND_MESSAGE",
+                    "data": {
+                        "sessionId": "p_1001_1002",
+                        "msgType": "TEXT",
+                        "content": "在线消息测试"
+                    }
+                }
+                """;
+
+        when(messageService.sendMessage(eq(USER_ID_1), any(SendMessageRequest.class)))
+                .thenReturn(sendResponse);
+        when(userService.findById(USER_ID_1)).thenReturn(sender);
+        // 目标在线
+        when(onlineStatusService.isOnline(USER_ID_2)).thenReturn(true);
+
+        TextMessage textMessage = new TextMessage(payload);
+        handler.handleTextMessage(session1, textMessage);
+
+        // 不应存入离线队列
+        verify(conversationCacheService, never()).pushOfflineMessage(anyLong(), anyString());
+        // 应增加未读数
+        verify(conversationCacheService).incrementUnread(USER_ID_2, "p_1001_1002");
+    }
+
+    // ==================== 断线重连 ====================
+
+    @Test
+    @DisplayName("处理 RECONNECT - 成功补发")
+    void handleReconnect_shouldSendMissedMessages() throws Exception {
+        createSession(USER_ID_1, session1);
+
+        // 模拟离线消息
+        MessageResponse msg = MessageResponse.builder()
+                .messageId(10001L)
+                .sessionId("p_1001_1002")
+                .senderId(USER_ID_2)
+                .senderName("李四")
+                .type("TEXT")
+                .content("你好")
+                .createTime(LocalDateTime.now())
+                .build();
+
+        String payload = """
+                {
+                    "id": "reconnect-001",
+                    "type": "RECONNECT",
+                    "data": {
+                        "lastMessageId": 9999
+                    }
+                }
+                """;
+
+        when(messageService.getOfflineMessages(USER_ID_1, 9999L)).thenReturn(List.of(msg));
+
+        TextMessage textMessage = new TextMessage(payload);
+        handler.handleTextMessage(session1, textMessage);
+
+        // 应补发离线消息
+        ArgumentCaptor<TextMessage> captor = ArgumentCaptor.forClass(TextMessage.class);
+        verify(session1, atLeast(2)).sendMessage(captor.capture());
+        String allSent = captor.getAllValues().stream()
+                .map(TextMessage::getPayload)
+                .reduce("", (a, b) -> a + b);
+        assertTrue(allSent.contains("RECONNECT_ACK"));
+        assertTrue(allSent.contains(MessageTypes.RECEIVE_MESSAGE));
+    }
+
+    @Test
+    @DisplayName("处理 RECONNECT - 缺少 lastMessageId 不抛异常")
+    void handleReconnect_shouldHandle_missingLastMessageId() throws Exception {
+        createSession(USER_ID_1, session1);
+
+        String payload = """
+                {
+                    "id": "reconnect-002",
+                    "type": "RECONNECT",
+                    "data": {}
+                }
+                """;
+
+        TextMessage textMessage = new TextMessage(payload);
+        assertDoesNotThrow(() -> handler.handleTextMessage(session1, textMessage));
+    }
+
+    @Test
+    @DisplayName("处理 RECONNECT - lastMessageId 格式错误不抛异常")
+    void handleReconnect_shouldHandle_invalidLastMessageId() throws Exception {
+        createSession(USER_ID_1, session1);
+
+        String payload = """
+                {
+                    "id": "reconnect-003",
+                    "type": "RECONNECT",
+                    "data": {
+                        "lastMessageId": "not-a-number"
+                    }
+                }
+                """;
+
+        TextMessage textMessage = new TextMessage(payload);
+        assertDoesNotThrow(() -> handler.handleTextMessage(session1, textMessage));
+    }
+
+    // ==================== 群相关广播 ====================
+
+    @Test
+    @DisplayName("broadcastToGroupExcept - 排除指定用户")
+    void broadcastToGroupExcept_shouldExcludeUser() throws Exception {
+        createSession(USER_ID_1, session1);
+        createSession(USER_ID_2, session2);
+
+        WebSocketMessage msg = WebSocketMessage.builder()
+                .id("broadcast-001")
+                .type("GROUP_INFO_CHANGE")
+                .data(Map.of())
+                .build();
+
+        // 模拟群成员缓存命中
+        when(groupCacheService.getMemberIds(GROUP_ID)).thenReturn(java.util.Set.of(USER_ID_1, USER_ID_2));
+
+        handler.broadcastToGroupExcept("g_2001", USER_ID_1, msg);
+
+        // USER_ID_2 应收到（USER_ID_1 被排除）
+        verify(session2).sendMessage(any(TextMessage.class));
+        verify(session1, never()).sendMessage(any(TextMessage.class));
+    }
+
+    @Test
+    @DisplayName("broadcastToGroup - 全部发送")
+    void broadcastToGroup_shouldSendToAll() throws Exception {
+        createSession(USER_ID_1, session1);
+        createSession(USER_ID_2, session2);
+
+        WebSocketMessage msg = WebSocketMessage.builder()
+                .id("broadcast-002")
+                .type("GROUP_MEMBER_JOIN")
+                .data(Map.of())
+                .build();
+
+        when(groupCacheService.getMemberIds(GROUP_ID)).thenReturn(java.util.Set.of(USER_ID_1, USER_ID_2));
+
+        handler.broadcastToGroup("g_2001", msg);
+
+        verify(session1).sendMessage(any(TextMessage.class));
+        verify(session2).sendMessage(any(TextMessage.class));
+    }
+
+    @Test
+    @DisplayName("broadcastToGroup - 非群 sessionId 跳过")
+    void broadcastToGroup_shouldSkip_whenNotGroupSession() {
+        WebSocketMessage msg = WebSocketMessage.builder()
+                .id("broadcast-003")
+                .type("GROUP_MEMBER_JOIN")
+                .data(Map.of())
+                .build();
+
+        handler.broadcastToGroup("p_1001_1002", msg);
+
+        verify(groupCacheService, never()).getMemberIds(anyLong());
+    }
+
+    @Test
+    @DisplayName("broadcastMemberJoin - 发送入群通知")
+    void broadcastMemberJoin_shouldSend() throws Exception {
+        createSession(USER_ID_1, session1);
+        when(groupCacheService.getMemberIds(GROUP_ID)).thenReturn(java.util.Set.of(USER_ID_1));
+
+        handler.broadcastMemberJoin(GROUP_ID, USER_ID_2, "新成员", null);
+
+        ArgumentCaptor<TextMessage> captor = ArgumentCaptor.forClass(TextMessage.class);
+        verify(session1).sendMessage(captor.capture());
+        assertTrue(captor.getValue().getPayload().contains("GROUP_MEMBER_JOIN"));
+    }
+
+    @Test
+    @DisplayName("broadcastMemberLeave - 发送离群通知")
+    void broadcastMemberLeave_shouldSend() throws Exception {
+        createSession(USER_ID_1, session1);
+        when(groupCacheService.getMemberIds(GROUP_ID)).thenReturn(java.util.Set.of(USER_ID_1));
+
+        handler.broadcastMemberLeave(GROUP_ID, USER_ID_2, "离开者", "KICK");
+
+        ArgumentCaptor<TextMessage> captor = ArgumentCaptor.forClass(TextMessage.class);
+        verify(session1).sendMessage(captor.capture());
+        assertTrue(captor.getValue().getPayload().contains("GROUP_MEMBER_LEAVE"));
+    }
+
+    @Test
+    @DisplayName("broadcastRoleChange - 发送角色变更通知")
+    void broadcastRoleChange_shouldSend() throws Exception {
+        createSession(USER_ID_1, session1);
+        when(groupCacheService.getMemberIds(GROUP_ID)).thenReturn(java.util.Set.of(USER_ID_1));
+
+        handler.broadcastRoleChange(GROUP_ID, USER_ID_2, "新管理", "ADMIN");
+
+        ArgumentCaptor<TextMessage> captor = ArgumentCaptor.forClass(TextMessage.class);
+        verify(session1).sendMessage(captor.capture());
+        assertTrue(captor.getValue().getPayload().contains("GROUP_MEMBER_ROLE_CHANGE"));
+    }
+
+    @Test
+    @DisplayName("broadcastGroupInfoChange - 发送群信息变更通知")
+    void broadcastGroupInfoChange_shouldSend() throws Exception {
+        createSession(USER_ID_1, session1);
+        when(groupCacheService.getMemberIds(GROUP_ID)).thenReturn(java.util.Set.of(USER_ID_1));
+
+        handler.broadcastGroupInfoChange(GROUP_ID, "新群名", "新公告");
+
+        ArgumentCaptor<TextMessage> captor = ArgumentCaptor.forClass(TextMessage.class);
+        verify(session1).sendMessage(captor.capture());
+        assertTrue(captor.getValue().getPayload().contains("GROUP_INFO_CHANGE"));
+    }
+
+    @Test
+    @DisplayName("broadcastGroupDismiss - 发送解散通知")
+    void broadcastGroupDismiss_shouldSend() throws Exception {
+        createSession(USER_ID_1, session1);
+        when(groupCacheService.getMemberIds(GROUP_ID)).thenReturn(java.util.Set.of(USER_ID_1));
+
+        handler.broadcastGroupDismiss(GROUP_ID);
+
+        ArgumentCaptor<TextMessage> captor = ArgumentCaptor.forClass(TextMessage.class);
+        verify(session1).sendMessage(captor.capture());
+        assertTrue(captor.getValue().getPayload().contains("GROUP_DISMISSED"));
+    }
+
+    // ==================== 上线补发离线消息 ====================
+
+    @Test
+    @DisplayName("连接建立时补发离线消息 - 有离线消息")
+    void afterConnectionEstablished_shouldReplayOfflineMessages() throws Exception {
+        when(session1.getAttributes()).thenReturn(Map.of(JwtHandshakeInterceptor.USER_ID_KEY, USER_ID_1));
+        when(session1.isOpen()).thenReturn(true);
+        // 模拟 2 条离线消息
+        String offlineMsg1 = "{\"id\":\"off-1\",\"type\":\"RECEIVE_MESSAGE\",\"data\":{\"content\":\"msg1\"}}";
+        String offlineMsg2 = "{\"id\":\"off-2\",\"type\":\"RECEIVE_MESSAGE\",\"data\":{\"content\":\"msg2\"}}";
+        when(conversationCacheService.popOfflineMessage(USER_ID_1))
+                .thenReturn(offlineMsg1)
+                .thenReturn(offlineMsg2)
+                .thenReturn(null);
+
+        handler.afterConnectionEstablished(session1);
+
+        // 应补发 2 条消息
+        verify(session1, atLeast(2)).sendMessage(any(TextMessage.class));
+    }
+
+    @Test
+    @DisplayName("连接建立时补发离线消息 - 无离线消息")
+    void afterConnectionEstablished_shouldNotSend_whenNoOfflineMessages() throws Exception {
+        when(session1.getAttributes()).thenReturn(Map.of(JwtHandshakeInterceptor.USER_ID_KEY, USER_ID_1));
+        when(session1.isOpen()).thenReturn(true);
+        when(conversationCacheService.popOfflineMessage(USER_ID_1)).thenReturn(null);
+
+        // 只清除 TEXT_MESSAGE 的 sendMessage 调用（PING 等）
+        handler.afterConnectionEstablished(session1);
+
+        // 不应发送额外消息（但 sendMessage 可能由其他逻辑调用）
+        verify(conversationCacheService).popOfflineMessage(USER_ID_1);
+    }
+
+    @Test
+    @DisplayName("补发离线消息 - JSON 解析失败不中断")
+    void replayOfflineMessages_shouldHandleInvalidJson() throws Exception {
+        // createSession 注册 USER_ID_1 -> session1 到 userSessions 映射
+        createSession(USER_ID_1, session1);
+        when(session1.isOpen()).thenReturn(true);
+        // 先返回非法 JSON，再返回正常 JSON
+        when(conversationCacheService.popOfflineMessage(USER_ID_1))
+                .thenReturn("not-valid-json")
+                .thenReturn("{\"id\":\"off-1\",\"type\":\"RECEIVE_MESSAGE\",\"data\":{\"content\":\"msg1\"}}")
+                .thenReturn(null);
+
+        // 调用 sendToUser 触发的 sendMessage
+        handler.afterConnectionEstablished(session1);
+        verify(session1, atLeastOnce()).sendMessage(any(TextMessage.class));
+    }
+
+    // ==================== getGroupMemberIds ====================
+
+    @Test
+    @DisplayName("getGroupMemberIds - 缓存命中返回缓存")
+    void getGroupMemberIds_shouldReturnCached() throws Exception {
+        createSession(USER_ID_1, session1);
+        when(groupCacheService.getMemberIds(GROUP_ID)).thenReturn(java.util.Set.of(USER_ID_1, USER_ID_2));
+
+        // 触发群消息
+        User sender = new User();
+        sender.setId(USER_ID_1);
+        sender.setUsername("张三");
+
+        SendMessageResponse sendResponse = SendMessageResponse.builder()
+                .messageId(10001L)
+                .createTime(LocalDateTime.now())
+                .build();
+
+        String payload = """
+                {
+                    "id": "group-msg-001",
+                    "type": "SEND_MESSAGE",
+                    "data": {
+                        "sessionId": "g_2001",
+                        "msgType": "TEXT",
+                        "content": "群消息",
+                        "groupId": 2001
+                    }
+                }
+                """;
+
+        when(messageService.sendMessage(eq(USER_ID_1), any(SendMessageRequest.class)))
+                .thenReturn(sendResponse);
+        when(userService.findById(USER_ID_1)).thenReturn(sender);
+
+        TextMessage textMessage = new TextMessage(payload);
+        handler.handleTextMessage(session1, textMessage);
+
+        // 缓存命中，不应查库
+        verify(groupMemberMapper, never()).selectGroupMemberUserIds(anyLong());
+    }
+
+    @Test
+    @DisplayName("getGroupMemberIds - 缓存未命中查库回填")
+    void getGroupMemberIds_shouldQueryDbAndBackfill() throws Exception {
+        createSession(USER_ID_1, session1);
+        // 缓存未命中
+        when(groupCacheService.getMemberIds(GROUP_ID)).thenReturn(null);
+        when(groupMemberMapper.selectGroupMemberUserIds(GROUP_ID))
+                .thenReturn(List.of(USER_ID_1, USER_ID_2));
+
+        // 触发群消息
+        User sender = new User();
+        sender.setId(USER_ID_1);
+        sender.setUsername("张三");
+
+        SendMessageResponse sendResponse = SendMessageResponse.builder()
+                .messageId(10001L)
+                .createTime(LocalDateTime.now())
+                .build();
+
+        String payload = """
+                {
+                    "id": "group-msg-002",
+                    "type": "SEND_MESSAGE",
+                    "data": {
+                        "sessionId": "g_2001",
+                        "msgType": "TEXT",
+                        "content": "群消息"
+                    }
+                }
+                """;
+
+        when(messageService.sendMessage(eq(USER_ID_1), any(SendMessageRequest.class)))
+                .thenReturn(sendResponse);
+        when(userService.findById(USER_ID_1)).thenReturn(sender);
+
+        TextMessage textMessage = new TextMessage(payload);
+        handler.handleTextMessage(session1, textMessage);
+
+        // 应查库并回填
+        verify(groupMemberMapper).selectGroupMemberUserIds(GROUP_ID);
+        verify(groupCacheService).setMemberIds(eq(GROUP_ID), anyList());
+    }
+
+    // ==================== 传输错误处理 ====================
+
+    @Test
+    @DisplayName("传输错误 - 无 userId 不抛异常")
+    void handleTransportError_shouldNotThrow_withoutUserId() {
+        when(session1.getAttributes()).thenReturn(Map.of());
+        assertDoesNotThrow(() -> handler.handleTransportError(session1, new IOException()));
+    }
+
+    @Test
+    @DisplayName("传输错误 - 记录日志不中断")
+    void handleTransportError_shouldLogAndContinue() {
+        when(session1.getAttributes()).thenReturn(Map.of(JwtHandshakeInterceptor.USER_ID_KEY, USER_ID_1));
+        assertDoesNotThrow(() -> handler.handleTransportError(session1, new IOException("连接中断")));
     }
 }

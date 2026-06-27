@@ -149,26 +149,28 @@ public final class MainViewModel {
 
         ChatService.getInstance().getConversations()
                 .thenAccept(response -> {
-                    loading.set(false);
+                    Platform.runLater(() -> {
+                        loading.set(false);
 
-                    if (response != null && response.isSuccess()) {
-                        final List<ConversationInfo> list = response.getData() != null
-                                ? response.getData().getList()
-                                : new ArrayList<>();
-                        allConversations.setAll(list);
-                        // 如果有搜索关键词，应用过滤；否则显示全部
-                        final String kw = searchKeyword.get();
-                        if (kw != null && !kw.trim().isEmpty()) {
-                            filterConversations(kw);
+                        if (response != null && response.isSuccess()) {
+                            final List<ConversationInfo> list = response.getData() != null
+                                    ? response.getData().getList()
+                                    : new ArrayList<>();
+                            allConversations.setAll(list);
+                            // 如果有搜索关键词，应用过滤；否则显示全部
+                            final String kw = searchKeyword.get();
+                            if (kw != null && !kw.trim().isEmpty()) {
+                                filterConversations(kw);
+                            } else {
+                                conversations.setAll(list);
+                            }
+                            LOG.info("会话列表加载成功: count={}", list.size());
                         } else {
-                            conversations.setAll(list);
+                            final String msg = response != null ? response.getMessage() : "加载会话列表失败";
+                            errorMessage.set(msg);
+                            LOG.warn("会话列表加载失败: {}", msg);
                         }
-                        LOG.info("会话列表加载成功: count={}", list.size());
-                    } else {
-                        final String msg = response != null ? response.getMessage() : "加载会话列表失败";
-                        errorMessage.set(msg);
-                        LOG.warn("会话列表加载失败: {}", msg);
-                    }
+                    });
                 });
     }
 
@@ -483,7 +485,7 @@ public final class MainViewModel {
         newConv.setSessionId(sessionId);
         newConv.setTargetId(groupId);
         newConv.setTargetType("GROUP");
-        newConv.setTargetName("群聊");  // 临时占位，立即刷新获取真实名称
+        newConv.setTargetName("群聊"); // 临时占位，立即刷新获取真实名称
         newConv.setTargetAvatar(avatar);
         newConv.setLastMessage(content);
         newConv.setLastMessageType("SYSTEM");

@@ -1,15 +1,16 @@
 package com.voluntary.chat.server.config;
 
 import lombok.Data;
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Configuration;
 
 /**
- * AI 模块配置
+ * AI 模块配置（POJO，无 Spring 依赖）
+ *
+ * <p>
+ * 客户包直接 new() 使用；server 模块通过 {@code AiConfigProperties} 子类接入 Spring
+ * {@code @ConfigurationProperties}。
+ * </p>
  */
 @Data
-@Configuration
-@ConfigurationProperties(prefix = "ai")
 public class AiConfig {
 
     /** API Key 加密密钥（32字节，必须通过配置或环境变量提供） */

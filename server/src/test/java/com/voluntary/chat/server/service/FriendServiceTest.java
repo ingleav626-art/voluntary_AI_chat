@@ -2,6 +2,7 @@ package com.voluntary.chat.server.service;
 
 import com.voluntary.chat.common.exception.BusinessException;
 import com.voluntary.chat.common.exception.ErrorCode;
+import com.voluntary.chat.server.config.CacheProperties;
 import com.voluntary.chat.server.dto.request.FriendApplyRequest;
 import com.voluntary.chat.server.dto.response.FriendApplyResponse;
 import com.voluntary.chat.server.dto.response.FriendResponse;
@@ -18,6 +19,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -37,6 +41,7 @@ import static org.mockito.Mockito.*;
  * @since 1.0.0
  */
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("FriendService 单元测试")
 class FriendServiceTest {
 
@@ -52,6 +57,15 @@ class FriendServiceTest {
     @Mock
     private MessageMapper messageMapper;
 
+    @Mock
+    private OnlineStatusService onlineStatusService;
+
+    @Mock
+    private StringRedisTemplate redisTemplate;
+
+    @Mock
+    private CacheProperties cacheProperties;
+
     @InjectMocks
     private FriendService friendService;
 
@@ -63,6 +77,9 @@ class FriendServiceTest {
 
     @BeforeEach
     void setUp() {
+        // 禁用缓存，确保现有测试走查库逻辑
+        when(cacheProperties.isEnabled()).thenReturn(false);
+
         mockTargetUser = new User();
         mockTargetUser.setId(1002L);
         mockTargetUser.setUsername("李四");
@@ -339,6 +356,7 @@ class FriendServiceTest {
 
         when(friendMapper.selectList(any())).thenReturn(List.of(friend));
         when(userService.findByIds(Set.of(1002L))).thenReturn(Map.of(1002L, mockTargetUser));
+        when(onlineStatusService.filterOnline(Set.of(1002L))).thenReturn(Set.of());
 
         List<FriendResponse> result = friendService.getFriendList(1001L);
 

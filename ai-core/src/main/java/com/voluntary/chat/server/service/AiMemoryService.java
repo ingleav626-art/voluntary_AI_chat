@@ -38,7 +38,7 @@ public class AiMemoryService {
 
   private final AiMemoryMapper aiMemoryMapper;
   private final MessageMapper messageMapper;
-  private final AiService aiService;
+  private final BaseAiService aiService;
   private final EmbeddingClient embeddingClient;
   private final VectorStoreClient vectorStoreClient;
   private final OpenAiClient openAiClient;

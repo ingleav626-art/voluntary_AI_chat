@@ -2,7 +2,10 @@
 
 > 目标：将 server 中的 AI 模块拆分为独立 Maven 模块 `ai-core`，供 server 和未来 client 共享
 > 日期：2026-06-25
-> 状态：待执行
+> 状态：**已完成**（2026-06-27）
+>
+> ai-core 模块已成功从 server 模块提取。包名保持 `com.voluntary.chat.server`，server 模块导入无需修改。
+> 当前 ai-core 包含 38 个源文件：实体、Mapper、LLM 客户端、安全组件、WebSocket 处理器、AES 加密工具等。
 
 ---
 

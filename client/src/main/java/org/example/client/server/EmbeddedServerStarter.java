@@ -15,23 +15,19 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration;
 import org.springframework.boot.autoconfigure.jmx.JmxAutoConfiguration;
 import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
 import org.springframework.boot.autoconfigure.dao.PersistenceExceptionTranslationAutoConfiguration;
 import org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration;
 import org.springframework.boot.autoconfigure.liquibase.LiquibaseAutoConfiguration;
 import org.springframework.boot.autoconfigure.cache.CacheAutoConfiguration;
-import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
-import org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration;
-import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
 import org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
@@ -66,11 +62,6 @@ import java.util.concurrent.ThreadPoolExecutor;
                 // JMX（已禁用）
                 JmxAutoConfiguration.class,
 
-                // 安全（客户包使用自定义 SecurityConfig，不需要 Spring Boot 默认安全）
-                SecurityAutoConfiguration.class,
-                SecurityFilterAutoConfiguration.class,
-                UserDetailsServiceAutoConfiguration.class,
-
                 // 任务调度（未使用）
                 TaskExecutionAutoConfiguration.class,
                 TaskSchedulingAutoConfiguration.class
@@ -87,22 +78,11 @@ public class EmbeddedServerStarter {
         }
 
         /**
-         * AI 任务执行器（AiChatService 异步 AI 对话需要）
-         * server 模块的 AsyncConfig 不在客户包内，因此在本启动器中声明。
+         * 密码编码器（ai-core 的 SecurityConfig 未提供此 Bean，需要在此补充）
          */
-        @Bean("aiTaskExecutor")
-        public TaskExecutor aiTaskExecutor() {
-                final ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-                executor.setCorePoolSize(2);
-                executor.setMaxPoolSize(4);
-                executor.setQueueCapacity(50);
-                executor.setKeepAliveSeconds(60);
-                executor.setThreadNamePrefix("ai-task-");
-                executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-                executor.setWaitForTasksToCompleteOnShutdown(true);
-                executor.setAwaitTerminationSeconds(10);
-                executor.initialize();
-                return executor;
+        @Bean
+        public PasswordEncoder passwordEncoder() {
+                return new BCryptPasswordEncoder();
         }
 
         /**
@@ -126,23 +106,5 @@ public class EmbeddedServerStarter {
         @ConditionalOnMissingBean(JwtHandshakeInterceptor.class)
         public JwtHandshakeInterceptor jwtHandshakeInterceptor(final JwtTokenProvider jwtTokenProvider) {
                 return new JwtHandshakeInterceptor(jwtTokenProvider);
-        }
-
-        /**
-         * ⚠️ TODO: 临时排除 Redis 自动配置（后续启用 Redis 后需删除此内部类）
-         *
-         * <p>
-         * 当前 H2 模式下没有运行 Redis 服务，因此排除 Redis 自动配置，
-         * 避免启动时因连不上 Redis 而报错。
-         * </p>
-         */
-        @Configuration
-        @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "false", matchIfMissing = false)
-        @ImportAutoConfiguration(exclude = {
-                        RedisAutoConfiguration.class,
-                        RedisReactiveAutoConfiguration.class,
-                        RedisRepositoriesAutoConfiguration.class
-        })
-        public static class RedisExclusionConfig {
         }
 }

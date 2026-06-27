@@ -19,10 +19,6 @@ spring:
     baseline-version: 0
     validate-on-migrate: false
     encoding: UTF-8
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
-      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
   main:
     allow-bean-definition-overriding: true
 

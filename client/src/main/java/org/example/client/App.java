@@ -1,6 +1,7 @@
 package org.example.client;
 
 import java.awt.Color;
+import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.MenuItem;
@@ -9,6 +10,9 @@ import java.awt.RenderingHints;
 import java.awt.SystemTray;
 import java.awt.Toolkit;
 import java.awt.TrayIcon;
+import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.net.URL;
@@ -17,10 +21,14 @@ import java.util.concurrent.TimeUnit;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.layout.VBox;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 import org.example.client.config.ClientConfig;
 import org.example.client.config.ServerConnectionManager;
 import org.example.client.controller.MainController;
@@ -401,6 +409,19 @@ public class App extends Application {
     }
 
     /**
+     * 被其他实例唤醒时调用（单例检测信号），唤出窗口到前台。
+     */
+    public static void showExistingWindow() {
+        Platform.runLater(() -> {
+            if (primaryStage != null) {
+                primaryStage.show();
+                primaryStage.toFront();
+                LOG.info("收到其他实例信号，已唤醒窗口");
+            }
+        });
+    }
+
+    /**
      * 创建场景并应用样式
      *
      * @param root   根节点
@@ -433,21 +454,27 @@ public class App extends Application {
      * 初始化系统托盘
      *
      * <p>
-     * 创建托盘图标和右键菜单：显示窗口 / 退出。
-     * 仅在支持系统托盘的桌面环境下启用。
+     * 设置托盘图标 + AWT PopupMenu 右键菜单（自动定位到图标旁）。
+     * 左键单击唤出窗口。
      * </p>
      */
     private static void initSystemTray() {
         if (!SystemTray.isSupported()) {
             LOG.info("当前系统不支持系统托盘，窗口关闭将直接退出");
-            // 不支持托盘时，关闭窗口直接退出
             Platform.setImplicitExit(true);
             return;
         }
 
         try {
-            // 创建弹出菜单
+            // 加载托盘图标
+            final Image trayImage = loadTrayIcon();
+            trayIcon = new TrayIcon(trayImage, "Voluntary AI Chat");
+            trayIcon.setImageAutoSize(true);
+
+            // 创建右键弹出菜单（AWT PopupMenu 自动出现在图标旁）
             final PopupMenu popup = new PopupMenu();
+            // 设置中文字体
+            popup.setFont(new Font("微软雅黑", Font.PLAIN, 12));
 
             final MenuItem showItem = new MenuItem("显示窗口");
             showItem.addActionListener(e -> showWindow());
@@ -456,16 +483,18 @@ public class App extends Application {
             exitItem.addActionListener(e -> exitApp());
 
             popup.add(showItem);
-            popup.addSeparator();
             popup.add(exitItem);
+            trayIcon.setPopupMenu(popup);
 
-            // 加载托盘图标（优先使用资源文件，不存在时程序生成）
-            final Image trayImage = loadTrayIcon();
-            trayIcon = new TrayIcon(trayImage, "Voluntary AI Chat", popup);
-            trayIcon.setImageAutoSize(true);
-
-            // 双击托盘图标显示窗口
-            trayIcon.addActionListener(e -> showWindow());
+            // 鼠标事件：左键单击→显示窗口
+            trayIcon.addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseClicked(final MouseEvent e) {
+                    if (e.getButton() == MouseEvent.BUTTON1) {
+                        showWindow();
+                    }
+                }
+            });
 
             SystemTray.getSystemTray().add(trayIcon);
             trayEnabled = true;
@@ -473,7 +502,6 @@ public class App extends Application {
         } catch (final Exception e) {
             LOG.warn("系统托盘初始化失败: {}", e.getMessage());
             trayEnabled = false;
-            // 托盘初始化失败时，关闭窗口直接退出
             Platform.setImplicitExit(true);
         }
     }
@@ -509,16 +537,20 @@ public class App extends Application {
      * 完全退出应用（托盘"退出"菜单调用）
      *
      * <p>
-     * 清理资源后退出 JVM，确保内嵌后端和 WebSocket 都被关闭。
+     * 移除托盘图标 → 清理资源 → 退出 JVM。
+     * 确保进程完全终止。
      * </p>
      */
     private static void exitApp() {
         LOG.info("用户通过系统托盘退出应用");
-        // 先关闭 JavaFX，会触发 App.stop()
-        Platform.runLater(() -> {
+        try {
             removeTrayIcon();
-            Platform.exit();
-        });
+            Launcher.shutdown();
+        } finally {
+            javafx.application.Platform.exit();
+            // 强制退出 JVM（兜底，确保进程终止）
+            java.lang.System.exit(0);
+        }
     }
 
     /**

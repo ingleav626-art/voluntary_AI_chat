@@ -22,28 +22,35 @@
             <artifactId>voluntary-ai-chat-common</artifactId>
         </dependency>
 
+        <!-- ===== Spring 依赖（全部 optional，仅在 Spring 模式下需要） ===== -->
+        <!-- 客户包 POJO 模式不加载 Spring 容器，不会触发这些依赖 -->
+
         <!-- Spring Boot Starter（@Service, @Component, @ConfigurationProperties） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
+            <optional>true</optional>
         </dependency>
 
-        <!-- Spring Web（OpenAiClient 使用 HttpHeaders/MediaType） -->
+        <!-- Spring Web（ResponseEntity, HttpMethod 等） -->
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-web</artifactId>
+            <optional>true</optional>
         </dependency>
 
         <!-- Spring Tx（@Transactional） -->
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-tx</artifactId>
+            <optional>true</optional>
         </dependency>
 
         <!-- MyBatis-Plus（实体注解、BaseMapper、LambdaQueryWrapper） -->
         <dependency>
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <optional>true</optional>
         </dependency>
 
         <!-- Jackson JSON -->
@@ -73,30 +80,35 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
+            <optional>true</optional>
         </dependency>
 
         <!-- Spring Web（@RestController, @RestControllerAdvice） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+            <optional>true</optional>
         </dependency>
 
         <!-- Spring Validation（@Valid） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
+            <optional>true</optional>
         </dependency>
 
         <!-- Spring WebSocket（AiWebSocketHandler） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-websocket</artifactId>
+            <optional>true</optional>
         </dependency>
 
         <!-- Spring Data Redis（AiGroupConfigService 冷却时间） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
+            <optional>true</optional>
         </dependency>
 
         <!-- JWT（jjwt） -->
@@ -104,18 +116,28 @@
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>
             <version>0.12.6</version>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-impl</artifactId>
             <version>0.12.6</version>
             <scope>runtime</scope>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-jackson</artifactId>
             <version>0.12.6</version>
             <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- H2（测试用） -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
         </dependency>
 
         <!-- 测试 -->

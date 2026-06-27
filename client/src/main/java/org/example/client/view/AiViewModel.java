@@ -1,10 +1,18 @@
 package org.example.client.view;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
+import org.example.client.config.ServerConnectionManager;
+import org.example.client.config.ServerMode;
+import org.example.client.engine.LocalAiEngine;
 import org.example.client.model.AiMemory;
 import org.example.client.model.AiProfile;
+import org.example.client.model.ApiResponse;
 import org.example.client.model.PageResult;
 import org.example.client.service.AiService;
 import org.example.client.service.WebSocketClient;
@@ -12,10 +20,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.voluntary.chat.common.constant.MessageTypes;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
 
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
@@ -31,7 +35,9 @@ import javafx.collections.FXCollections;
 /**
  * AI 模块视图模型（MVVM）
  *
- * <p>管理 AI 角色列表、创建/编辑/删除 AI 角色、查看 AI 记忆。</p>
+ * <p>
+ * 管理 AI 角色列表、创建/编辑/删除 AI 角色、查看 AI 记忆。
+ * </p>
  */
 public final class AiViewModel {
 
@@ -82,11 +88,86 @@ public final class AiViewModel {
     }
 
     /**
+     * 判断当前是否处于本地模式（使用 LocalAiEngine）
+     */
+    private boolean isLocalMode() {
+        return ServerConnectionManager.getInstance().getCurrentMode() == ServerMode.LOCAL;
+    }
+
+    /**
+     * 获取当前用户 ID
+     */
+    private Long getCurrentUserId() {
+        final org.example.client.util.TokenStorage storage = null;
+        final org.example.client.model.LoginResponse login = org.example.client.util.TokenStorage.load();
+        if (login != null && login.getUser() != null) {
+            return login.getUser().getUserId();
+        }
+        return 0L;
+    }
+
+    /**
+     * 将 ai-core 实体转换为客户端模型
+     */
+    private AiProfile toClientProfile(com.voluntary.chat.server.entity.AiProfile entity) {
+        return new AiProfile(
+                entity.getId(),
+                entity.getName(),
+                entity.getAvatar(),
+                null, // openingMessage
+                entity.getPersona(),
+                entity.getModelProvider(),
+                entity.getModel(),
+                entity.getIsGroup(),
+                entity.getSystemPrompt(),
+                null, // apiKey (不返回加密密钥)
+                entity.getTemperature(),
+                entity.getMaxTokens());
+    }
+
+    /**
+     * 将 ai-core 记忆实体转换为客户端模型
+     */
+    private AiMemory toClientMemory(com.voluntary.chat.server.entity.AiMemory entity) {
+        return new AiMemory(
+                entity.getId(),
+                entity.getSummary(),
+                entity.getKeywords(),
+                entity.getImportance(),
+                entity.getCreateTime() != null ? entity.getCreateTime().toString() : null);
+    }
+
+    /**
      * 加载 AI 角色列表
      */
     public void loadAiList() {
         loading.set(true);
         errorMessage.set("");
+
+        if (isLocalMode()) {
+            try {
+                final Long userId = getCurrentUserId();
+                final List<com.voluntary.chat.server.entity.AiProfile> entities = LocalAiEngine.getInstance()
+                        .listAiProfiles(userId);
+                final List<AiProfile> list = new ArrayList<>();
+                for (com.voluntary.chat.server.entity.AiProfile entity : entities) {
+                    list.add(toClientProfile(entity));
+                }
+                Platform.runLater(() -> {
+                    loading.set(false);
+                    aiList.setAll(list);
+                    totalCount = list.size();
+                    LOG.info("AI角色列表加载成功（本地）: count={}", list.size());
+                });
+            } catch (final Exception ex) {
+                LOG.error("加载AI角色列表异常（本地）", ex);
+                Platform.runLater(() -> {
+                    loading.set(false);
+                    errorMessage.set("加载AI列表失败: " + ex.getMessage());
+                });
+            }
+            return;
+        }
 
         AiService.getInstance().getAiList(currentPage, PAGE_SIZE)
                 .thenAccept(response -> {
@@ -126,6 +207,42 @@ public final class AiViewModel {
         errorMessage.set("");
         successMessage.set("");
 
+        if (isLocalMode()) {
+            try {
+                final Long userId = getCurrentUserId();
+                final Long aiId = LocalAiEngine.getInstance().createAiProfile(
+                        userId,
+                        profile.getName(),
+                        profile.getAvatar(),
+                        profile.getPersona(),
+                        profile.getSystemPrompt(),
+                        profile.getModelProvider(),
+                        profile.getModel(),
+                        profile.getApiKey(),
+                        profile.getIsGroup(),
+                        profile.getTemperature(),
+                        profile.getMaxTokens());
+                Platform.runLater(() -> {
+                    loading.set(false);
+                    successMessage.set("AI角色创建成功");
+                    LOG.info("AI角色创建成功（本地）: aiId={}", aiId);
+                    loadAiList();
+
+                    // 创建成功后自动发送开场白
+                    if (openingMessage != null && !openingMessage.trim().isEmpty()) {
+                        sendOpeningMessage(aiId, openingMessage.trim());
+                    }
+                });
+            } catch (final Exception ex) {
+                LOG.error("创建AI角色异常（本地）", ex);
+                Platform.runLater(() -> {
+                    loading.set(false);
+                    errorMessage.set("创建AI角色失败: " + ex.getMessage());
+                });
+            }
+            return;
+        }
+
         AiService.getInstance().createAiProfile(profile)
                 .thenAccept(response -> {
                     Platform.runLater(() -> {
@@ -164,6 +281,28 @@ public final class AiViewModel {
      * @param content 消息内容
      */
     private void sendOpeningMessage(final Long aiId, final String content) {
+        if (isLocalMode()) {
+            // 本地模式：直接使用 LocalAiEngine 发送开场白
+            final Long userId = getCurrentUserId();
+            LocalAiEngine.getInstance().chat(aiId, userId, content, new org.example.client.engine.AiStreamCallback() {
+                @Override
+                public void onChunk(String chunk) {
+                    // 开场白不需要实时显示
+                }
+
+                @Override
+                public void onComplete(String fullContent, Long messageId) {
+                    LOG.info("[开场白] AI回复完成（本地）: aiId={}, messageId={}", aiId, messageId);
+                }
+
+                @Override
+                public void onError(String error) {
+                    LOG.warn("[开场白] AI回复失败（本地）: aiId={}, error={}", aiId, error);
+                }
+            });
+            return;
+        }
+
         final String sessionId = "a_" + aiId;
         final String messageId = UUID.randomUUID().toString();
 
@@ -186,6 +325,36 @@ public final class AiViewModel {
         loading.set(true);
         errorMessage.set("");
         successMessage.set("");
+
+        if (isLocalMode()) {
+            try {
+                final Long userId = getCurrentUserId();
+                LocalAiEngine.getInstance().updateAiProfile(
+                        aiId, userId,
+                        profile.getName(),
+                        profile.getAvatar(),
+                        profile.getPersona(),
+                        profile.getSystemPrompt(),
+                        profile.getModel(),
+                        profile.getApiKey(),
+                        profile.getIsGroup(),
+                        profile.getTemperature(),
+                        profile.getMaxTokens());
+                Platform.runLater(() -> {
+                    loading.set(false);
+                    successMessage.set("AI角色修改成功");
+                    LOG.info("AI角色修改成功（本地）: aiId={}", aiId);
+                    loadAiList();
+                });
+            } catch (final Exception ex) {
+                LOG.error("修改AI角色异常（本地）", ex);
+                Platform.runLater(() -> {
+                    loading.set(false);
+                    errorMessage.set("修改AI角色失败: " + ex.getMessage());
+                });
+            }
+            return;
+        }
 
         AiService.getInstance().updateAiProfile(aiId, profile)
                 .thenAccept(response -> {
@@ -222,6 +391,27 @@ public final class AiViewModel {
         errorMessage.set("");
         successMessage.set("");
 
+        if (isLocalMode()) {
+            try {
+                final Long userId = getCurrentUserId();
+                LocalAiEngine.getInstance().deleteAiProfile(aiId, userId);
+                Platform.runLater(() -> {
+                    loading.set(false);
+                    successMessage.set("AI角色已删除");
+                    LOG.info("AI角色已删除（本地）: aiId={}", aiId);
+                    selectedAi.set(null);
+                    loadAiList();
+                });
+            } catch (final Exception ex) {
+                LOG.error("删除AI角色异常（本地）", ex);
+                Platform.runLater(() -> {
+                    loading.set(false);
+                    errorMessage.set("删除AI角色失败: " + ex.getMessage());
+                });
+            }
+            return;
+        }
+
         AiService.getInstance().deleteAiProfile(aiId)
                 .thenAccept(response -> {
                     Platform.runLater(() -> {
@@ -256,6 +446,26 @@ public final class AiViewModel {
     public void loadMemories(final Long aiId) {
         if (aiId == null) {
             memories.clear();
+            return;
+        }
+
+        if (isLocalMode()) {
+            try {
+                final Long userId = getCurrentUserId();
+                final List<com.voluntary.chat.server.entity.AiMemory> entities = LocalAiEngine.getInstance()
+                        .listMemories(aiId, userId);
+                final List<AiMemory> list = new ArrayList<>();
+                for (com.voluntary.chat.server.entity.AiMemory entity : entities) {
+                    list.add(toClientMemory(entity));
+                }
+                Platform.runLater(() -> {
+                    memories.setAll(list);
+                    LOG.info("AI记忆加载成功（本地）: aiId={}, count={}", aiId, list.size());
+                });
+            } catch (final Exception ex) {
+                LOG.error("加载AI记忆异常（本地）: aiId={}", aiId, ex);
+                Platform.runLater(() -> memories.clear());
+            }
             return;
         }
 

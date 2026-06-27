@@ -23,11 +23,11 @@ public interface AiStreamSender {
     /**
      * 推送 AI 流式回复（完成块，带 AI 消息 ID）
      *
-     * @param userId       目标用户 ID
-     * @param messageId    消息 ID
-     * @param content      完整回复内容
-     * @param done         是否完成
-     * @param aiMessageId  AI 消息 ID（用于后续查询）
+     * @param userId      目标用户 ID
+     * @param messageId   消息 ID
+     * @param content     完整回复内容
+     * @param done        是否完成
+     * @param aiMessageId AI 消息 ID（用于后续查询）
      */
     void sendAiStream(Long userId, String messageId, String content, boolean done, Long aiMessageId);
 }

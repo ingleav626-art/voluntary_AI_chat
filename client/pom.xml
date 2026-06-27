@@ -44,29 +44,6 @@
                     <mainClass>org.example.client.Launcher</mainClass>
                 </configuration>
             </plugin>
-
-            <!-- Spring Boot 打包插件：生成可执行 fat JAR -->
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <mainClass>org.example.client.Launcher</mainClass>
-                    <classifier>${app.jar-classifier}</classifier>
-                    <excludes>
-                        <exclude>
-                            <groupId>org.projectlombok</groupId>
-                            <artifactId>lombok</artifactId>
-                        </exclude>
-                    </excludes>
-                </configuration>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>repackage</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
         </plugins>
     </build>
 
@@ -125,23 +102,65 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- 测试 -->
+        <!-- ===== Spring Boot 依赖（provided scope：编译可用，不打入客户包 JAR） ===== -->
+        <!-- EmbeddedServerStarter.java 需要这些类编译，但客户包运行时不需要 Spring 容器 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
+            <artifactId>spring-boot-starter</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.annotation</groupId>
+            <artifactId>jakarta.annotation-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- JUnit 5（客户包独立测试需要） -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter</artifactId>
-                </exclusion>
-            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
     <!-- 三包 Profile：客户包(默认)/测试包/云端包 -->
     <profiles>
-        <!-- 客户包（默认）：启动本地 + 异步查云端 -->
+        <!-- 客户包（默认）：纯前端 + 本地 AI 引擎，无 Spring Boot -->
         <profile>
             <id>client</id>
             <activation>
@@ -154,7 +173,7 @@
                 <app.installer.name>Voluntary-AI-Chat-Setup</app.installer.name>
             </properties>
         </profile>
-        <!-- 测试包：启动本地 + 异步查热点(UDP广播)，包含 server 全量模块 -->
+        <!-- 测试包：前端 + 内嵌完整 Spring Boot 后端，使用 spring-boot-maven-plugin -->
         <profile>
             <id>test</id>
             <dependencies>
@@ -163,7 +182,51 @@
                     <artifactId>voluntary-ai-chat-server</artifactId>
                     <version>${project.version}</version>
                 </dependency>
+                <!-- 测试包模式：Redis 依赖必须为 compile scope 以确保打包进 fat JAR -->
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-data-redis</artifactId>
+                    <scope>compile</scope>
+                </dependency>
+                <!-- Spring Boot 测试依赖（仅在测试包中需要） -->
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-test</artifactId>
+                    <scope>test</scope>
+                    <exclusions>
+                        <exclusion>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter</artifactId>
+                        </exclusion>
+                    </exclusions>
+                </dependency>
             </dependencies>
+            <build>
+                <plugins>
+                    <!-- Spring Boot 打包插件：生成可执行 fat JAR -->
+                    <plugin>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-maven-plugin</artifactId>
+                        <configuration>
+                            <mainClass>org.example.client.Launcher</mainClass>
+                            <classifier>${app.jar-classifier}</classifier>
+                            <excludes>
+                                <exclude>
+                                    <groupId>org.projectlombok</groupId>
+                                    <artifactId>lombok</artifactId>
+                                </exclude>
+                            </excludes>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>repackage</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
             <properties>
                 <app.async-check-target>hotspot</app.async-check-target>
                 <app.jar-classifier>test-exec</app.jar-classifier>

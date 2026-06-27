@@ -14,21 +14,21 @@ import java.util.Map;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.voluntary.chat.server.config.AiConfig;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 
 /**
  * 向量存储客户端
  * 支持 Milvus 和 Qdrant 向量数据库
  */
 @Slf4j
-@Component
-@RequiredArgsConstructor
 public class VectorStoreClient {
 
     private final AiConfig aiConfig;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public VectorStoreClient(final AiConfig aiConfig) {
+        this.aiConfig = aiConfig;
+    }
 
     private static final int CONNECT_TIMEOUT_SECONDS = 10;
     private static final int REQUEST_TIMEOUT_SECONDS = 30;

@@ -13,21 +13,21 @@ import java.util.Map;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.voluntary.chat.server.config.AiConfig;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 
 /**
  * Embedding 向量生成客户端
  * 支持 OpenAI 兼容的 Embedding API
  */
 @Slf4j
-@Component
-@RequiredArgsConstructor
 public class EmbeddingClient {
 
     private final AiConfig aiConfig;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public EmbeddingClient(final AiConfig aiConfig) {
+        this.aiConfig = aiConfig;
+    }
 
     private static final int CONNECT_TIMEOUT_SECONDS = 10;
     private static final int REQUEST_TIMEOUT_SECONDS = 30;

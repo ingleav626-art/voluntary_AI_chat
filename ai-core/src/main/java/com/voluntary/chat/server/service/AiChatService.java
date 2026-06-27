@@ -32,7 +32,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AiChatService {
 
-    private final AiService aiService;
+    private final BaseAiService aiService;
     private final OpenAiClient openAiClient;
     private final AiConfig aiConfig;
     private final MessageMapper messageMapper;

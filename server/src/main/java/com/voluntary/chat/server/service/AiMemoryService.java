@@ -6,6 +6,7 @@ import com.voluntary.chat.server.client.EmbeddingClient;
 import com.voluntary.chat.server.client.OpenAiClient;
 import com.voluntary.chat.server.client.VectorStoreClient;
 import com.voluntary.chat.server.config.AiConfig;
+import com.voluntary.chat.server.config.CacheProperties;
 import com.voluntary.chat.server.entity.AiMemory;
 import com.voluntary.chat.server.entity.AiProfile;
 import com.voluntary.chat.server.entity.Message;
@@ -13,7 +14,9 @@ import com.voluntary.chat.server.mapper.AiMemoryMapper;
 import com.voluntary.chat.server.mapper.MessageMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -44,6 +47,10 @@ public class AiMemoryService {
     private final VectorStoreClient vectorStoreClient;
     private final OpenAiClient openAiClient;
     private final AiConfig aiConfig;
+    private final StringRedisTemplate redisTemplate;
+    private final CacheProperties cacheProperties;
+
+    private static final String AI_MEMORY_PREFIX = "ai_memory:";
 
     /**
      * 获取 AI 记忆列表
@@ -71,10 +78,58 @@ public class AiMemoryService {
 
     /**
      * 检索相关记忆（向量检索 + 关键词降级）
+     *
+     * <p>
+     * 优先查 Redis 缓存，命中则直接返回；未命中查库并回填。
+     * </p>
      */
     public List<String> searchRelevantMemories(final Long aiId, final Long userId, final String query) {
+        // 1. 先查缓存
+        if (cacheProperties.isEnabled()) {
+            try {
+                final String cacheKey = aiMemoryKey(aiId, userId);
+                final List<String> cached = redisTemplate.opsForList()
+                        .range(cacheKey, 0, -1);
+                if (!CollectionUtils.isEmpty(cached)) {
+                    log.debug("AI 记忆缓存命中: aiId={}, userId={}", aiId, userId);
+                    return cached;
+                }
+            } catch (Exception e) {
+                log.warn("AI 记忆缓存查询失败，降级查库: aiId={}, userId={}", aiId, userId, e);
+            }
+        }
+
+        // 2. 查库（向量检索 + 关键词降级）
         final AiProfile profile = aiService.getAiProfileById(aiId);
         final String apiKey = aiService.decryptApiKey(profile);
+
+        final List<String> results = searchFromDatabase(aiId, userId, query, apiKey);
+
+        // 3. 回填缓存
+        if (!CollectionUtils.isEmpty(results) && cacheProperties.isEnabled()) {
+            try {
+                final String cacheKey = aiMemoryKey(aiId, userId);
+                redisTemplate.delete(cacheKey);
+                for (final String summary : results) {
+                    redisTemplate.opsForList().rightPush(cacheKey, summary);
+                }
+                final long ttl = cacheProperties.getAiMemory().getTtl();
+                if (ttl > 0) {
+                    redisTemplate.expire(cacheKey, ttl, java.util.concurrent.TimeUnit.SECONDS);
+                }
+            } catch (Exception e) {
+                log.warn("AI 记忆缓存回填失败: aiId={}, userId={}", aiId, userId, e);
+            }
+        }
+
+        return results;
+    }
+
+    /**
+     * 从数据库检索相关记忆（向量检索优先，关键词降级）
+     */
+    private List<String> searchFromDatabase(final Long aiId, final Long userId, final String query,
+            final String apiKey) {
 
         // 1. 尝试向量检索
         final List<Double> queryVector = embeddingClient.createEmbedding(query, apiKey);
@@ -135,6 +190,10 @@ public class AiMemoryService {
 
     /**
      * 检查并生成记忆摘要
+     *
+     * <p>
+     * 生成新摘要后，清除该 AI+用户的缓存。
+     * </p>
      */
     @Transactional
     public void summarizeIfNeeded(final Long aiId, final Long userId, final String sessionId) {
@@ -218,6 +277,27 @@ public class AiMemoryService {
         }
 
         log.info("记忆摘要生成成功: aiId={}, userId={}, memoryId={}", aiId, userId, memory.getId());
+
+        // 清除缓存，下次检索将重新加载最新记忆
+        invalidateMemoryCache(aiId, userId);
+    }
+
+    /**
+     * 清除 AI 记忆缓存
+     */
+    private void invalidateMemoryCache(final Long aiId, final Long userId) {
+        if (!cacheProperties.isEnabled()) {
+            return;
+        }
+        try {
+            redisTemplate.delete(aiMemoryKey(aiId, userId));
+        } catch (Exception e) {
+            log.warn("AI 记忆缓存清除失败: aiId={}, userId={}", aiId, userId, e);
+        }
+    }
+
+    private String aiMemoryKey(final Long aiId, final Long userId) {
+        return AI_MEMORY_PREFIX + aiId + ":" + userId;
     }
 
     /**
@@ -305,5 +385,8 @@ public class AiMemoryService {
         aiMemoryMapper.deleteById(memoryId);
 
         log.info("记忆删除成功: memoryId={}", memoryId);
+
+        // 清除缓存
+        invalidateMemoryCache(memory.getAiId(), userId);
     }
 }

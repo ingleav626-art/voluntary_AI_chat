@@ -9,6 +9,10 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.example.client.config.ServerConnectionManager;
+import org.example.client.config.ServerMode;
+import org.example.client.engine.AiStreamCallback;
+import org.example.client.engine.LocalAiEngine;
 import org.example.client.model.ConversationInfo;
 import org.example.client.model.ImageUploadResponse;
 import org.example.client.model.MarkReadRequest;
@@ -34,11 +38,14 @@ import javafx.collections.ObservableList;
 /**
  * 聊天区域视图模型（MVVM）
  *
- * <p>管理当前会话的消息列表、消息发送和历史记录加载。</p>
+ * <p>
+ * 管理当前会话的消息列表、消息发送和历史记录加载。
+ * </p>
  *
  * <p>
  * <b>TODO:⚠️ 类长度接近限制警告：当前379行，接近Service限制（400行）</b>
- * <br>请谨慎添加新功能，避免超限。如需扩展，应考虑拆分为：
+ * <br>
+ * 请谨慎添加新功能，避免超限。如需扩展，应考虑拆分为：
  * <ul>
  * <li>MessageSender（消息发送逻辑）</li>
  * <li>MessageListManager（消息列表管理）</li>
@@ -65,8 +72,7 @@ public final class ChatViewModel {
     private final ConversationInfo conversation;
 
     /** 消息列表 */
-    private final ListProperty<MessageInfo> messages =
-            new SimpleListProperty<>(FXCollections.observableArrayList());
+    private final ListProperty<MessageInfo> messages = new SimpleListProperty<>(FXCollections.observableArrayList());
 
     /** 输入框文本 */
     private final StringProperty inputText = new SimpleStringProperty("");
@@ -220,9 +226,88 @@ public final class ChatViewModel {
         data.put("content", text.trim());
 
         if ("AI".equals(conversation.getTargetType())) {
-            // AI 对话使用 AI_CHAT 消息类型
-            data.put("aiId", conversation.getTargetId());
-            WebSocketClient.getInstance().send(MessageTypes.AI_CHAT, data);
+            if (ServerConnectionManager.getInstance().getCurrentMode() == ServerMode.LOCAL) {
+                // 本地模式：直接调用 LocalAiEngine，无需 WebSocket
+                final Long aiId = conversation.getTargetId();
+                final Long userId = currentUser != null ? currentUser.getUserId() : 0L;
+                final String sessionId = conversation.getSessionId();
+                final String content = text.trim();
+
+                LocalAiEngine.getInstance().chat(aiId, userId, content, new AiStreamCallback() {
+                    private final StringBuilder fullContent = new StringBuilder();
+
+                    @Override
+                    public void onChunk(String chunk) {
+                        fullContent.append(chunk);
+                        // 流式更新最后一条 AI 消息
+                        Platform.runLater(() -> {
+                            // 查找是否已有 AI 回复消息
+                            MessageInfo lastAiMsg = null;
+                            for (MessageInfo msg : messages) {
+                                if (msg.getMessageId() != null && msg.getMessageId() < 0
+                                        && msg.getSenderType() != null && "AI".equals(msg.getSenderType())) {
+                                    lastAiMsg = msg;
+                                    break;
+                                }
+                            }
+                            if (lastAiMsg != null) {
+                                lastAiMsg.setContent(fullContent.toString());
+                                final int idx = messages.indexOf(lastAiMsg);
+                                if (idx >= 0) {
+                                    messages.set(idx, lastAiMsg);
+                                }
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onComplete(String fullResponse, Long messageId) {
+                        Platform.runLater(() -> {
+                            // 创建完整的 AI 回复消息
+                            final MessageInfo aiMsg = new MessageInfo();
+                            aiMsg.setMessageId(messageId != null ? messageId : -1L);
+                            aiMsg.setSessionId(sessionId);
+                            aiMsg.setSenderId(aiId);
+                            aiMsg.setSenderName(conversation.getTargetName());
+                            aiMsg.setSenderType("AI");
+                            aiMsg.setType(MSG_TYPE_TEXT);
+                            aiMsg.setContent(fullResponse);
+                            aiMsg.setCreateTime(LocalDateTime.now());
+                            aiMsg.setSentByMe(false);
+
+                            // 移除占位消息
+                            messages.removeIf(msg -> msg.getMessageId() != null
+                                    && msg.getMessageId() < 0 && "AI".equals(msg.getSenderType()));
+
+                            messages.add(aiMsg);
+                            LOG.info("AI 回复完成（本地）: aiId={}, sessionId={}", aiId, sessionId);
+                        });
+                    }
+
+                    @Override
+                    public void onError(String error) {
+                        Platform.runLater(() -> {
+                            LOG.warn("AI 回复失败（本地）: error={}", error);
+                            // 更新占位消息为错误提示
+                            for (MessageInfo msg : messages) {
+                                if (msg.getMessageId() != null && msg.getMessageId() < 0
+                                        && "AI".equals(msg.getSenderType())) {
+                                    msg.setContent("AI 回复失败: " + error);
+                                    final int idx = messages.indexOf(msg);
+                                    if (idx >= 0) {
+                                        messages.set(idx, msg);
+                                    }
+                                    break;
+                                }
+                            }
+                        });
+                    }
+                });
+            } else {
+                // 云端/热点模式：使用 WebSocket 转发
+                data.put("aiId", conversation.getTargetId());
+                WebSocketClient.getInstance().send(MessageTypes.AI_CHAT, data);
+            }
         } else {
             WebSocketClient.getInstance().send(MessageTypes.SEND_MESSAGE, data);
         }
@@ -257,12 +342,12 @@ public final class ChatViewModel {
     /**
      * 更新消息确认
      *
-     * @param clientId 客户端消息ID
-     * @param messageId 服务端消息ID
+     * @param clientId   客户端消息ID
+     * @param messageId  服务端消息ID
      * @param createTime 创建时间
      */
     public void updateMessageAck(final String clientId, final Long messageId,
-                                  final java.time.LocalDateTime createTime) {
+            final java.time.LocalDateTime createTime) {
         final MessageInfo pending = pendingMessages.remove(clientId);
         if (pending != null) {
             pending.setMessageId(messageId);
@@ -729,7 +814,7 @@ public final class ChatViewModel {
      * @param aiMessageId     AI 消息的服务端ID（仅 done=true 时有值）
      */
     public void handleAiStream(final String streamMessageId, final String content,
-                                 final boolean done, final Long aiMessageId) {
+            final boolean done, final Long aiMessageId) {
         if (content == null) {
             return;
         }

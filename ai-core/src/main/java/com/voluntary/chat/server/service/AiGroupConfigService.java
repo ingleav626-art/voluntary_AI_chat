@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
 public class AiGroupConfigService {
 
     private final AiGroupConfigMapper aiGroupConfigMapper;
-    private final AiService aiService;
+    private final BaseAiService aiService;
 
     @Autowired(required = false)
     private StringRedisTemplate redisTemplate;

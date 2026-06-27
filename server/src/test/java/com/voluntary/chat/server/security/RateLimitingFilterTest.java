@@ -21,7 +21,6 @@ class RateLimitingFilterTest {
     @Test
     @DisplayName("新建令牌桶应满容量")
     void tokenBucket_shouldBeFull_whenCreated() {
-        RateLimitingFilter bucket = new RateLimitingFilter();
         RateLimitingFilter.TokenBucket tb = new RateLimitingFilter.TokenBucket(10, 5);
         assertEquals(10, tb.availableTokens());
     }
@@ -86,11 +85,18 @@ class RateLimitingFilterTest {
 
     // ==================== 过滤器单元测试 ====================
 
+    private RateLimitingFilter createFilter(boolean enabled, int capacity, int refillRate) {
+        RateLimitingFilter filter = new RateLimitingFilter();
+        ReflectionTestUtils.setField(filter, "enabled", enabled);
+        ReflectionTestUtils.setField(filter, "capacity", capacity);
+        ReflectionTestUtils.setField(filter, "refillRate", refillRate);
+        return filter;
+    }
+
     @Test
     @DisplayName("禁用限流时所有请求放行")
     void doFilterInternal_shouldPassThrough_whenDisabled() throws Exception {
-        RateLimitingFilter filter = new RateLimitingFilter();
-        ReflectionTestUtils.setField(filter, "enabled", false);
+        RateLimitingFilter filter = createFilter(false, 20, 10);
 
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
@@ -107,8 +113,7 @@ class RateLimitingFilterTest {
     @Test
     @DisplayName("白名单路径（/ws）不限流")
     void doFilterInternal_shouldNotRateLimit_whenWhitelistPath() throws Exception {
-        RateLimitingFilter filter = new RateLimitingFilter();
-        ReflectionTestUtils.setField(filter, "enabled", true);
+        RateLimitingFilter filter = createFilter(true, 20, 10);
 
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
@@ -126,8 +131,7 @@ class RateLimitingFilterTest {
     @Test
     @DisplayName("白名单路径（/files/）不限流")
     void doFilterInternal_shouldNotRateLimit_whenFilesPath() throws Exception {
-        RateLimitingFilter filter = new RateLimitingFilter();
-        ReflectionTestUtils.setField(filter, "enabled", true);
+        RateLimitingFilter filter = createFilter(true, 20, 10);
 
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
@@ -145,11 +149,7 @@ class RateLimitingFilterTest {
     @Test
     @DisplayName("超限请求返回429")
     void doFilterInternal_shouldReturn429_whenExceeded() throws Exception {
-        RateLimitingFilter filter = new RateLimitingFilter();
-        // 容量=2（最多2次突发）
-        ReflectionTestUtils.setField(filter, "enabled", true);
-        ReflectionTestUtils.setField(filter, "capacity", 2);
-        ReflectionTestUtils.setField(filter, "refillRate", 1);
+        RateLimitingFilter filter = createFilter(true, 2, 1);
 
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
@@ -176,10 +176,7 @@ class RateLimitingFilterTest {
     @Test
     @DisplayName("不同IP的限流互不影响")
     void doFilterInternal_shouldTrackIpIndependently() throws Exception {
-        RateLimitingFilter filter = new RateLimitingFilter();
-        ReflectionTestUtils.setField(filter, "enabled", true);
-        ReflectionTestUtils.setField(filter, "capacity", 1);
-        ReflectionTestUtils.setField(filter, "refillRate", 5);
+        RateLimitingFilter filter = createFilter(true, 1, 5);
 
         HttpServletRequest request1 = mock(HttpServletRequest.class);
         HttpServletRequest request2 = mock(HttpServletRequest.class);
@@ -215,10 +212,7 @@ class RateLimitingFilterTest {
     @Test
     @DisplayName("X-Forwarded-For 获取真实IP")
     void resolveClientIp_shouldUseXForwardedFor_whenAvailable() throws Exception {
-        RateLimitingFilter filter = new RateLimitingFilter();
-        ReflectionTestUtils.setField(filter, "enabled", true);
-        ReflectionTestUtils.setField(filter, "capacity", 10);
-        ReflectionTestUtils.setField(filter, "refillRate", 10);
+        RateLimitingFilter filter = createFilter(true, 10, 10);
 
         // 模拟Nginx代理：X-Forwarded-For 有多级代理IP
         HttpServletRequest request = mock(HttpServletRequest.class);

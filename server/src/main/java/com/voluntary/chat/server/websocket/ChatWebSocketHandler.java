@@ -12,15 +12,20 @@ import com.voluntary.chat.server.entity.User;
 import com.voluntary.chat.server.mapper.GroupMemberMapper;
 import com.voluntary.chat.server.service.AiChatService;
 import com.voluntary.chat.server.service.AiGroupConfigService;
+import com.voluntary.chat.server.service.ConversationCacheService;
+import com.voluntary.chat.server.service.GroupCacheService;
 import com.voluntary.chat.server.service.MessageService;
+import com.voluntary.chat.server.service.OnlineStatusService;
 import com.voluntary.chat.server.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * WebSocket 消息处理器（server 全量版）
@@ -36,6 +41,9 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
     private final MessageService messageService;
     private final UserService userService;
     private final GroupMemberMapper groupMemberMapper;
+    private final OnlineStatusService onlineStatusService;
+    private final ConversationCacheService conversationCacheService;
+    private final GroupCacheService groupCacheService;
 
     public ChatWebSocketHandler(
             final AiChatService aiChatService,
@@ -43,11 +51,56 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
             final ObjectMapper objectMapper,
             final MessageService messageService,
             final UserService userService,
-            final GroupMemberMapper groupMemberMapper) {
+            final GroupMemberMapper groupMemberMapper,
+            final OnlineStatusService onlineStatusService,
+            final ConversationCacheService conversationCacheService,
+            final GroupCacheService groupCacheService) {
         super(aiChatService, aiGroupConfigService, objectMapper);
         this.messageService = messageService;
         this.userService = userService;
         this.groupMemberMapper = groupMemberMapper;
+        this.onlineStatusService = onlineStatusService;
+        this.conversationCacheService = conversationCacheService;
+        this.groupCacheService = groupCacheService;
+    }
+
+    @Override
+    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+        super.afterConnectionEstablished(session);
+        final Long userId = getUserId(session);
+        if (userId != null) {
+            onlineStatusService.markOnline(userId);
+            log.debug("用户上线: userId={}", userId);
+            // 补发离线消息
+            replayOfflineMessages(userId);
+        }
+    }
+
+    /**
+     * 补发离线消息 — 从 Redis 队列中消费并发送给用户
+     */
+    private void replayOfflineMessages(Long userId) {
+        int count = 0;
+        try {
+            String msgJson;
+            while ((msgJson = conversationCacheService.popOfflineMessage(userId)) != null) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> msgData = objectMapper.readValue(msgJson, Map.class);
+                String type = (String) msgData.get("type");
+                WebSocketMessage message = WebSocketMessage.builder()
+                        .id((String) msgData.get("id"))
+                        .type(type)
+                        .data(msgData)
+                        .build();
+                sendToUser(userId, message);
+                count++;
+            }
+        } catch (Exception e) {
+            log.warn("离线消息补发解析失败: userId={}", userId, e);
+        }
+        if (count > 0) {
+            log.info("离线消息补发完成: userId={}, count={}", userId, count);
+        }
     }
 
     @Override
@@ -72,6 +125,16 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
 
         final SendMessageResponse response = messageService.sendMessage(senderId, request);
 
+        // 更新会话缓存：最后一条消息 + 会话列表排序
+        conversationCacheService.setLastMessage(request.getSessionId(),
+                new ConversationCacheService.LastMessageCache(
+                        request.getContent(),
+                        java.util.Objects.requireNonNullElse(
+                                com.voluntary.chat.common.enums.MessageType.valueOf(request.getType()).ordinal(), 0),
+                        response.getCreateTime(),
+                        senderId));
+        conversationCacheService.updateSessionList(senderId, request.getSessionId(), response.getCreateTime());
+
         // MESSAGE_ACK
         final WebSocketMessage ackMsg = WebSocketMessage.builder()
                 .id(String.valueOf(response.getMessageId()))
@@ -92,12 +155,32 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
         }
     }
 
+    /**
+     * 获取群成员 ID 列表（优先读缓存，缓存未命中则查库并回填）
+     */
+    private List<Long> getGroupMemberIds(Long groupId) {
+        Set<Long> cached = groupCacheService.getMemberIds(groupId);
+        if (cached != null && !cached.isEmpty()) {
+            log.debug("群成员缓存命中: groupId={}, count={}", groupId, cached.size());
+            return List.copyOf(cached);
+        }
+        // 缓存未命中，查库
+        List<Long> memberIds = groupMemberMapper.selectGroupMemberUserIds(groupId);
+        // 异步回填缓存
+        try {
+            groupCacheService.setMemberIds(groupId, memberIds);
+        } catch (Exception e) {
+            log.warn("群成员缓存回填失败: groupId={}", groupId, e);
+        }
+        return memberIds;
+    }
+
     private void broadcastGroupMessage(final Long senderId, final User sender,
             final SendMessageRequest request, final SendMessageResponse response) {
         final String[] parts = request.getSessionId().split("_");
         final Long groupId = Long.parseLong(parts[1]);
 
-        final List<Long> groupMembers = groupMemberMapper.selectGroupMemberUserIds(groupId);
+        final List<Long> groupMembers = getGroupMemberIds(groupId);
 
         final WebSocketMessage groupMsg = WebSocketMessage.builder()
                 .id(String.valueOf(response.getMessageId()))
@@ -118,6 +201,7 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
         for (final Long memberId : groupMembers) {
             if (!memberId.equals(senderId)) {
                 sendToUser(memberId, groupMsg);
+                conversationCacheService.incrementUnread(memberId, request.getSessionId());
             }
         }
 
@@ -128,24 +212,42 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
 
     private void forwardPrivateMessage(final Long senderId, final User sender,
             final SendMessageRequest request, final SendMessageResponse response) {
+        final Map<String, Object> msgData = new LinkedHashMap<>();
+        msgData.put("messageId", response.getMessageId());
+        msgData.put("sessionId", request.getSessionId());
+        msgData.put("senderId", senderId);
+        msgData.put("senderName", sender.getUsername());
+        msgData.put("senderAvatar", sender.getAvatar() != null ? sender.getAvatar() : "");
+        msgData.put("senderType", SenderType.USER.name());
+        msgData.put("msgType", request.getType());
+        msgData.put("content", request.getContent());
+        msgData.put("createTime", response.getCreateTime().toString());
+
         final WebSocketMessage receiveMsg = WebSocketMessage.builder()
                 .id(String.valueOf(response.getMessageId()))
                 .type(MessageTypes.RECEIVE_MESSAGE)
-                .data(Map.of(
-                        "messageId", response.getMessageId(),
-                        "sessionId", request.getSessionId(),
-                        "senderId", senderId,
-                        "senderName", sender.getUsername(),
-                        "senderAvatar", sender.getAvatar() != null ? sender.getAvatar() : "",
-                        "senderType", SenderType.USER.name(),
-                        "msgType", request.getType(),
-                        "content", request.getContent(),
-                        "createTime", response.getCreateTime().toString()))
+                .data(msgData)
                 .build();
 
         final Long targetUserId = resolveTargetUserId(senderId, request.getSessionId());
         if (targetUserId != null) {
-            sendToUser(targetUserId, receiveMsg);
+            // 检查目标是否在线
+            if (onlineStatusService.isOnline(targetUserId)) {
+                sendToUser(targetUserId, receiveMsg);
+            } else {
+                // 离线：存入 Redis 队列
+                try {
+                    Map<String, Object> offlineData = new LinkedHashMap<>(msgData);
+                    offlineData.put("type", MessageTypes.RECEIVE_MESSAGE);
+                    offlineData.put("id", receiveMsg.getId());
+                    String json = objectMapper.writeValueAsString(offlineData);
+                    conversationCacheService.pushOfflineMessage(targetUserId, json);
+                    log.debug("离线消息已存储: targetUserId={}, messageId={}", targetUserId, response.getMessageId());
+                } catch (JsonProcessingException e) {
+                    log.warn("离线消息序列化失败: targetUserId={}", targetUserId, e);
+                }
+            }
+            conversationCacheService.incrementUnread(targetUserId, request.getSessionId());
         }
 
         log.info("私聊消息转发: senderId={}, targetUserId={}, sessionId={}",
@@ -244,7 +346,7 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
             return;
         }
         final Long groupId = Long.parseLong(sessionId.split("_")[1]);
-        final List<Long> memberIds = groupMemberMapper.selectGroupMemberUserIds(groupId);
+        final List<Long> memberIds = getGroupMemberIds(groupId);
         for (final Long memberId : memberIds) {
             if (!memberId.equals(excludeUserId)) {
                 sendToUser(memberId, message);
@@ -257,7 +359,7 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
             return;
         }
         final Long groupId = Long.parseLong(sessionId.split("_")[1]);
-        final List<Long> memberIds = groupMemberMapper.selectGroupMemberUserIds(groupId);
+        final List<Long> memberIds = getGroupMemberIds(groupId);
         log.debug("[WS-BROADCAST] 广播到群: groupId={}, type={}, memberCount={}",
                 groupId, message.getType(), memberIds.size());
         for (final Long memberId : memberIds) {
@@ -343,6 +445,7 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
             ONLINE_SESSIONS.remove(userId, session);
             if (!ONLINE_SESSIONS.containsKey(userId)) {
                 log.info("WebSocket 连接关闭: userId={}, status={}", userId, status);
+                onlineStatusService.markOffline(userId);
                 try {
                     broadcastStatusChange(userId, false);
                 } catch (final Exception e) {

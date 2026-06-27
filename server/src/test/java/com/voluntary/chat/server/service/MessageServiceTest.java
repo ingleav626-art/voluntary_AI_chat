@@ -53,6 +53,9 @@ class MessageServiceTest {
     @Mock
     private GroupMemberMapper groupMemberMapper;
 
+    @Mock
+    private ConversationCacheService conversationCacheService;
+
     @InjectMocks
     private MessageService messageService;
 

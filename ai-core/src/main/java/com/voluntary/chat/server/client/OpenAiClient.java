@@ -15,23 +15,21 @@ import java.util.function.Consumer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.voluntary.chat.server.config.AiConfig;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.stereotype.Component;
 
 /**
  * OpenAI 兼容 API 客户端
  * 支持 OpenAI / DeepSeek / 通义千问 / 智谱等模型
  */
 @Slf4j
-@Component
-@RequiredArgsConstructor
 public class OpenAiClient {
 
     private final AiConfig aiConfig;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public OpenAiClient(final AiConfig aiConfig) {
+        this.aiConfig = aiConfig;
+    }
 
     private static final int SUCCESS_STATUS_CODE = 200;
 
@@ -102,8 +100,8 @@ public class OpenAiClient {
             final URL url = new URL(config.getBaseUrl() + "/chat/completions");
             final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
-            conn.setRequestProperty(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
-            conn.setRequestProperty(HttpHeaders.AUTHORIZATION, "Bearer " + config.getApiKey());
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("Authorization", "Bearer " + config.getApiKey());
             conn.setDoOutput(true);
 
             final String requestBody = objectMapper.writeValueAsString(request);
@@ -212,9 +210,9 @@ public class OpenAiClient {
             final URL url = new URL(config.getBaseUrl() + "/chat/completions");
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
-            conn.setRequestProperty(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
-            conn.setRequestProperty(HttpHeaders.AUTHORIZATION, "Bearer " + config.getApiKey());
-            conn.setRequestProperty(HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM_VALUE);
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("Authorization", "Bearer " + config.getApiKey());
+            conn.setRequestProperty("Accept", "text/event-stream");
             conn.setDoOutput(true);
 
             final String requestBody = objectMapper.writeValueAsString(request);
