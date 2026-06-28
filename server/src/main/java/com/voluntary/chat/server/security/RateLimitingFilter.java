@@ -6,8 +6,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -22,6 +24,8 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * <p>
  * 基于令牌桶算法实现IP级别的请求限流，防止暴力攻击和DDoS。
+ * 当 Redis 可用时使用 Redis 计数实现多实例共享的分布式限流，
+ * Redis 不可用时自动降级为本地令牌桶。
  * 云端模式下启用，本地/热点模式默认关闭。
  * </p>
  *
@@ -34,6 +38,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *   enabled: true
  *   capacity: 20       # 令牌桶容量
  *   refill-rate: 10    # 每秒补充的令牌数
+ *   redis-enabled: true # 使用 Redis 分布式限流
  * </pre>
  *
  * @author voluntary-ai-chat
@@ -45,8 +50,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
     private static final Logger LOG = LoggerFactory.getLogger(RateLimitingFilter.class);
 
-    /** 令牌桶容器 */
-    private final Map<String, TokenBucket> buckets = new ConcurrentHashMap<>();
+    /** 本地令牌桶容器（Redis 降级时使用） */
+    private final Map<String, TokenBucket> localBuckets = new ConcurrentHashMap<>();
 
     /** 是否启用限流（云端模式启用） */
     @Value("${rate-limit.enabled:false}")
@@ -60,6 +65,16 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     @Value("${rate-limit.refill-rate:10}")
     private int refillRate;
 
+    /** 是否使用 Redis 分布式限流 */
+    @Value("${rate-limit.redis-enabled:false}")
+    private boolean redisEnabled;
+
+    @Autowired(required = false)
+    private StringRedisTemplate redisTemplate;
+
+    private static final String RATE_LIMIT_PREFIX = "rate_limit:";
+    /** Redis 滑动窗口大小（秒） */
+    private static final long REDIS_WINDOW_SECONDS = 1;
     /** HTTP 429 状态码 */
     private static final int TOO_MANY_REQUESTS = 429;
 
@@ -68,6 +83,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             "/ws", // WebSocket 握手
             "/files/" // 静态文件
     };
+
+    public RateLimitingFilter() {
+    }
 
     @Override
     protected void doFilterInternal(final HttpServletRequest request,
@@ -92,22 +110,59 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
         // 获取客户端IP
         final String clientIp = resolveClientIp(request);
-        final TokenBucket bucket = buckets.computeIfAbsent(clientIp,
-                k -> new TokenBucket(capacity, refillRate));
 
-        if (bucket.tryConsume()) {
-            // 未超限，放行
+        boolean allowed;
+        if (redisEnabled) {
+            allowed = tryConsumeRedis(clientIp, path);
+        } else {
+            allowed = tryConsumeLocal(clientIp);
+        }
+
+        if (allowed) {
             LOG.debug("请求放行: ip={}, path={}", clientIp, path);
             filterChain.doFilter(request, response);
         } else {
-            // 超限，返回429
-            LOG.warn("请求被限流: ip={}, path={}, bucket={}/{}",
-                    clientIp, path, bucket.availableTokens(), capacity);
+            LOG.warn("请求被限流: ip={}, path={}", clientIp, path);
             response.setStatus(TOO_MANY_REQUESTS);
             response.setContentType("application/json;charset=utf-8");
             response.getWriter().write(
                     "{\"code\":429,\"message\":\"请求过于频繁，请稍后重试\"}");
         }
+    }
+
+    /**
+     * 使用 Redis 分布式限流（滑动窗口计数器）
+     *
+     * <p>
+     * Key: {@code rate_limit:{path}:{ip}}，TTL: 1秒。
+     * 每秒允许的请求数不超过 capacity。
+     * </p>
+     */
+    private boolean tryConsumeRedis(String clientIp, String path) {
+        try {
+            String endpoint = path.replaceAll("/api/", "").replaceAll("/\\d+", "/{id}");
+            String key = RATE_LIMIT_PREFIX + endpoint + ":" + clientIp;
+            Long count = redisTemplate.opsForValue().increment(key);
+            if (count == null) {
+                count = 1L;
+            }
+            if (count == 1) {
+                redisTemplate.expire(key, REDIS_WINDOW_SECONDS, TimeUnit.SECONDS);
+            }
+            return count <= capacity;
+        } catch (Exception e) {
+            LOG.warn("Redis 限流失败，降级为本地限流: ip={}", clientIp, e);
+            return tryConsumeLocal(clientIp);
+        }
+    }
+
+    /**
+     * 使用本地令牌桶限流（Redis 降级方案）
+     */
+    private boolean tryConsumeLocal(String clientIp) {
+        final TokenBucket bucket = localBuckets.computeIfAbsent(clientIp,
+                k -> new TokenBucket(capacity, refillRate));
+        return bucket.tryConsume();
     }
 
     /**
@@ -120,7 +175,6 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     private String resolveClientIp(final HttpServletRequest request) {
         String ip = request.getHeader("X-Forwarded-For");
         if (ip != null && !ip.isBlank() && !"unknown".equalsIgnoreCase(ip)) {
-            // X-Forwarded-For 可能有多级代理，取第一个
             return ip.split(",")[0].trim();
         }
         ip = request.getHeader("X-Real-IP");
@@ -131,20 +185,16 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
 
     /**
-     * 令牌桶
+     * 令牌桶（本地限流用）
      *
      * <p>
      * 基于时间戳的令牌补充算法，线程安全。
      * </p>
      */
     static class TokenBucket {
-        /** 当前可用令牌数（最多到capacity） */
         private final AtomicLong tokens;
-        /** 令牌桶容量 */
         private final int capacity;
-        /** 每秒补充令牌数 */
         private final int refillRate;
-        /** 上次补充时间戳（纳秒） */
         private final AtomicLong lastRefillNanos;
 
         TokenBucket(final int capacity, final int refillRate) {
@@ -154,11 +204,6 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             this.lastRefillNanos = new AtomicLong(System.nanoTime());
         }
 
-        /**
-         * 尝试消耗一个令牌
-         *
-         * @return true 如果成功消耗，false 如果令牌不足
-         */
         boolean tryConsume() {
             refill();
             while (true) {
@@ -172,39 +217,27 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             }
         }
 
-        /**
-         * 获取当前可用令牌数
-         */
         long availableTokens() {
             refill();
             return Math.max(0, tokens.get());
         }
 
-        /**
-         * 根据时间差补充令牌
-         */
         private void refill() {
             final long now = System.nanoTime();
             final long last = lastRefillNanos.get();
             final long elapsed = now - last;
 
-            // 每秒钟最多补充一次
             if (elapsed < TimeUnit.SECONDS.toNanos(1)) {
                 return;
             }
 
-            // CAS更新上次补充时间，防止多线程重复补充
             if (!lastRefillNanos.compareAndSet(last, now)) {
                 return;
             }
 
-            // 计算应补充的令牌数
-            final long seconds = elapsed / TimeUnit.SECONDS.toNanos(1);
-            final long toAdd = seconds * refillRate;
-
-            if (toAdd > 0) {
-                tokens.updateAndGet(current -> Math.min(capacity, current + toAdd));
-            }
+            long current = tokens.get();
+            long newTokens = Math.min(capacity, current + refillRate * (elapsed / TimeUnit.SECONDS.toNanos(1)));
+            tokens.set(newTokens);
         }
     }
 }

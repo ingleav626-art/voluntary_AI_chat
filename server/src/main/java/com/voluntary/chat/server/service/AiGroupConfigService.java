@@ -12,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -23,7 +22,6 @@ import java.util.stream.Collectors;
  * AI 群配置服务
  */
 @Slf4j
-@Service
 @RequiredArgsConstructor
 public class AiGroupConfigService {
 
@@ -233,7 +231,6 @@ public class AiGroupConfigService {
                 key,
                 String.valueOf(System.currentTimeMillis()),
                 cooldownSeconds + EXTRA_EXPIRE_SECONDS,
-                TimeUnit.SECONDS
-        );
+                TimeUnit.SECONDS);
     }
 }

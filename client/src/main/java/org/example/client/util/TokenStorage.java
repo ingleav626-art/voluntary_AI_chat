@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Base64;
 import java.util.Objects;
 
 import org.example.client.model.LoginResponse;
@@ -12,21 +11,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Token 持久化工具
+ * Token 持久化工具（AES-256-GCM 加密）
  *
- * <p>Token 加密存储在本地文件中，避免明文泄露。</p>
+ * <p>
+ * LoginResponse（包括 accessToken、refreshToken、用户信息）加密存储在本地文件中。
+ * </p>
  *
- * @author voluntary-ai-chat
- * @since 1.0.0
+ * <p>
+ * 加密方式：AES-256-GCM，密钥自动生成并存储在 {@code ~/.ai-chat/.storage-key}。
+ * </p>
  */
 public final class TokenStorage {
 
     private static final Logger LOG = LoggerFactory.getLogger(TokenStorage.class);
 
-    /**
-     * Token 存储目录，支持通过系统属性 {@code app.token.dir} 覆盖，默认为 {@code ~/.ai-chat}。
-     * 测试时可通过 {@code -Dapp.token.dir=...} 指定临时目录，避免污染用户主目录。
-     */
+    /** Token 存储目录 */
     private static Path getTokenFile() {
         return Paths.get(
                 System.getProperty("app.token.dir",
@@ -34,10 +33,7 @@ public final class TokenStorage {
                 "token.dat");
     }
 
-    /** Token 数据分隔符数量 */
-    private static final int TOKEN_PARTS_COUNT = 2;
-
-    /** 内存缓存的 Token，即使不勾选"记住我"也会保存，保证当前会话可用 */
+    /** 内存缓存的 Token，保证当前会话可用 */
     private static LoginResponse cachedToken;
 
     private TokenStorage() {
@@ -74,12 +70,22 @@ public final class TokenStorage {
         try {
             Files.createDirectories(tokenFile.getParent());
 
-            // 保存完整的 LoginResponse（包括用户信息）
+            // 序列化为 JSON
             final String data = JsonUtils.toJson(response);
-            final String encrypted = Base64.getEncoder().encodeToString(data.getBytes());
+            if (data == null) {
+                LOG.error("序列化 LoginResponse 失败");
+                return;
+            }
+
+            // AES-256-GCM 加密
+            final String encrypted = SecureStorage.encrypt(data);
+            if (encrypted == null) {
+                LOG.error("加密 Token 失败");
+                return;
+            }
 
             Files.writeString(tokenFile, encrypted);
-            LOG.debug("Token 已保存到 {}", tokenFile);
+            LOG.debug("Token 已加密保存到 {}", tokenFile);
         } catch (final IOException e) {
             LOG.error("保存 Token 失败", e);
         }
@@ -88,9 +94,11 @@ public final class TokenStorage {
     /**
      * 加载 Token
      *
-     * <p>优先从内存缓存加载，不存在时再从文件加载。</p>
+     * <p>
+     * 优先从内存缓存加载，不存在时从文件加载并解密。
+     * </p>
      *
-     * @return 登录响应，不存在时返回 null
+     * @return 登录响应，不存在或解密失败时返回 null
      */
     public static LoginResponse load() {
         // 优先从内存缓存加载
@@ -106,9 +114,15 @@ public final class TokenStorage {
 
         try {
             final String encrypted = Files.readString(tokenFile);
-            final String data = new String(Base64.getDecoder().decode(encrypted));
 
-            // 解析完整的 LoginResponse
+            // AES-256-GCM 解密
+            final String data = SecureStorage.decrypt(encrypted);
+            if (data == null) {
+                LOG.warn("Token 文件解密失败，数据可能已损坏");
+                return null;
+            }
+
+            // 解析 LoginResponse
             final LoginResponse response = JsonUtils.fromJson(data, LoginResponse.class);
             if (response == null || response.getAccessToken() == null || response.getRefreshToken() == null) {
                 LOG.warn("Token 文件格式错误");
@@ -118,7 +132,7 @@ public final class TokenStorage {
             // 缓存到内存，避免重复读取文件
             cachedToken = response;
             return response;
-        } catch (final IOException e) {
+        } catch (final Exception e) {
             LOG.error("加载 Token 失败", e);
             return null;
         }
@@ -140,4 +154,3 @@ public final class TokenStorage {
         }
     }
 }
-

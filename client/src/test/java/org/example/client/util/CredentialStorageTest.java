@@ -4,17 +4,19 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Base64;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * CredentialStorage 单元测试
+ * CredentialStorage 单元测试（AES-256-GCM 加密版）
  *
  * @author voluntary-ai-chat
  * @since 1.0.0
@@ -22,17 +24,27 @@ import static org.junit.jupiter.api.Assertions.*;
 @DisplayName("CredentialStorage 测试")
 class CredentialStorageTest {
 
+    /** 临时测试目录，隔离密钥和凭证文件 */
+    @TempDir
+    static Path tempTestDir;
+
     private Path credentialFile;
+
+    @BeforeAll
+    static void setupClass() {
+        // 用临时目录隔离，避免与用户本机 ~/.ai-chat 冲突
+        System.setProperty("app.token.dir", tempTestDir.toAbsolutePath().toString());
+    }
 
     @BeforeEach
     void setUp() throws Exception {
         // 获取凭证文件路径
-        credentialFile = Paths.get(
-                System.getProperty("app.token.dir",
-                        Paths.get(System.getProperty("user.home"), ".ai-chat").toString()),
-                "credential.dat");
+        credentialFile = tempTestDir.resolve("credential.dat");
         // 确保测试前文件不存在
         Files.deleteIfExists(credentialFile);
+        // 清理密钥文件，确保每次测试使用新密钥
+        final Path keyFile = tempTestDir.resolve(".storage-key");
+        Files.deleteIfExists(keyFile);
     }
 
     @AfterEach
@@ -46,47 +58,18 @@ class CredentialStorageTest {
     @DisplayName("save - 正确保存凭证到文件")
     void save_shouldWriteCredentialFile() throws Exception {
         CredentialStorage.save("13800138000", "password123");
-
         assertTrue(Files.exists(credentialFile));
 
-        // 验证文件内容可以正确解码
-        final String encoded = Files.readString(credentialFile);
-        final String data = new String(Base64.getDecoder().decode(encoded));
-        assertTrue(data.startsWith("13800138000|"));
-    }
-
-    @Test
-    @DisplayName("save - 密码经过 Base64 编码")
-    void save_shouldEncodePasswordWithBase64() throws Exception {
-        CredentialStorage.save("13800138000", "mypassword");
-
-        final String encoded = Files.readString(credentialFile);
-        final String data = new String(Base64.getDecoder().decode(encoded));
-        final String[] parts = data.split("\\|", 2);
-
-        assertEquals("13800138000", parts[0]);
-        // 密码部分是 Base64 编码的
-        final String decodedPassword = new String(Base64.getDecoder().decode(parts[1]));
-        assertEquals("mypassword", decodedPassword);
-    }
-
-    @Test
-    @DisplayName("save - 整体内容经过 Base64 编码")
-    void save_shouldDoubleEncodeContent() throws Exception {
-        CredentialStorage.save("13900139000", "testpass");
-
-        final String encoded = Files.readString(credentialFile);
-        // 第一层解码
-        final String data = new String(Base64.getDecoder().decode(encoded));
-        // 验证格式：手机号|密码Base64
-        assertTrue(data.contains("|"));
-        assertTrue(data.startsWith("13900139000"));
+        // 文件内容是 AES-GCM 加密的，不可直接解码；验证 load 可以正常读取
+        final String[] loaded = CredentialStorage.load();
+        assertNotNull(loaded);
+        assertEquals("13800138000", loaded[0]);
+        assertEquals("password123", loaded[1]);
     }
 
     @Test
     @DisplayName("save - 创建父目录")
     void save_shouldCreateParentDirectories() throws Exception {
-        // 确保目录存在
         CredentialStorage.save("13800138000", "password123");
         assertTrue(Files.exists(credentialFile.getParent()));
     }
@@ -169,22 +152,10 @@ class CredentialStorageTest {
     }
 
     @Test
-    @DisplayName("load - 文件内容格式错误时返回 null")
-    void load_shouldReturnNullWhenFileFormatIsWrong() throws Exception {
-        // 写入格式错误的内容（没有分隔符）
+    @DisplayName("load - 文件内容被篡改时返回 null")
+    void load_shouldReturnNullWhenFileIsCorrupted() throws Exception {
         Files.createDirectories(credentialFile.getParent());
-        final String wrongData = Base64.getEncoder().encodeToString("no_separator".getBytes());
-        Files.writeString(credentialFile, wrongData);
-
-        final String[] result = CredentialStorage.load();
-        assertNull(result);
-    }
-
-    @Test
-    @DisplayName("load - 文件内容不是有效 Base64 时返回 null")
-    void load_shouldReturnNullWhenNotBase64() throws Exception {
-        Files.createDirectories(credentialFile.getParent());
-        Files.writeString(credentialFile, "这不是有效的Base64内容!!!");
+        Files.writeString(credentialFile, "this-is-not-valid-aes-gcm-data");
 
         final String[] result = CredentialStorage.load();
         assertNull(result);
@@ -276,9 +247,8 @@ class CredentialStorageTest {
     }
 
     @Test
-    @DisplayName("load - 文件包含多个分隔符时正确解析")
+    @DisplayName("load - 密码中包含 | 字符时正确解析")
     void load_shouldHandleMultipleSeparators() {
-        // 密码中包含 | 字符
         final String passwordWithPipe = "pass|word|123";
         CredentialStorage.save("13800138000", passwordWithPipe);
 

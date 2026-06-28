@@ -4,20 +4,22 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Base64;
 import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * 记住我 - 凭证持久化工具
+ * 记住我 - 凭证持久化工具（AES-256-GCM 加密）
  *
- * <p>当用户勾选"记住我"登录后，将手机号和密码（Base64 编码）保存到本地文件，
- * 下次打开登录界面时自动预填表单。</p>
+ * <p>
+ * 当用户勾选"记住我"登录后，将手机号和密码加密保存到本地文件，
+ * 下次打开登录界面时自动预填表单。
+ * </p>
  *
- * @author voluntary-ai-chat
- * @since 1.0.0
+ * <p>
+ * 加密方式：AES-256-GCM，密钥自动生成并存储在 {@code ~/.ai-chat/.storage-key}。
+ * </p>
  */
 public final class CredentialStorage {
 
@@ -36,7 +38,7 @@ public final class CredentialStorage {
     }
 
     /**
-     * 保存凭证
+     * 保存凭证（AES-256-GCM 加密）
      *
      * @param phone    手机号
      * @param password 密码
@@ -46,25 +48,31 @@ public final class CredentialStorage {
         Objects.requireNonNull(password, "password 不能为 null");
 
         final Path file = getCredentialFile();
-        LOG.info("[记住我-保存] 保存凭证到文件: path={}, phone={}", file.toAbsolutePath(), phone);
+        LOG.info("[记住我-保存] 保存凭证到文件: path={}", file.toAbsolutePath());
         try {
             Files.createDirectories(file.getParent());
 
-            // 手机号明文 + "|" + 密码 Base64（非加密，仅防一眼看穿）
-            final String data = phone + "|" + Base64.getEncoder().encodeToString(password.getBytes());
-            final String encoded = Base64.getEncoder().encodeToString(data.getBytes());
+            // 数据格式: "phone|password"
+            final String data = phone + "|" + password;
 
-            Files.writeString(file, encoded);
-            LOG.info("[记住我-保存] 凭证写入成功: path={}, size={}", file.toAbsolutePath(), encoded.length());
+            // AES-256-GCM 加密
+            final String encrypted = SecureStorage.encrypt(data);
+            if (encrypted == null) {
+                LOG.error("[记住我-保存] 加密失败");
+                return;
+            }
+
+            Files.writeString(file, encrypted);
+            LOG.info("[记住我-保存] 凭证加密写入成功: path={}, size={}", file.toAbsolutePath(), encrypted.length());
         } catch (final IOException e) {
             LOG.error("[记住我-保存] 保存凭证失败: path={}", file.toAbsolutePath(), e);
         }
     }
 
     /**
-     * 加载凭证
+     * 加载凭证（AES-256-GCM 解密）
      *
-     * @return [手机号, 密码] 数组，不存在时返回 null
+     * @return [手机号, 密码] 数组，不存在或解密失败时返回 null
      */
     public static String[] load() {
         final Path file = getCredentialFile();
@@ -74,9 +82,15 @@ public final class CredentialStorage {
         }
 
         try {
-            final String encoded = Files.readString(file);
-            LOG.info("[记住我-加载] 读取文件成功: size={}", encoded.length());
-            final String data = new String(Base64.getDecoder().decode(encoded));
+            final String encrypted = Files.readString(file);
+            LOG.info("[记住我-加载] 读取文件成功: size={}", encrypted.length());
+
+            // AES-256-GCM 解密
+            final String data = SecureStorage.decrypt(encrypted);
+            if (data == null) {
+                LOG.warn("[记住我-加载] 解密失败，凭证可能已损坏");
+                return null;
+            }
 
             final String[] parts = data.split("\\|", 2);
             if (parts.length != 2) {
@@ -84,10 +98,8 @@ public final class CredentialStorage {
                 return null;
             }
 
-            final String phone = parts[0];
-            final String password = new String(Base64.getDecoder().decode(parts[1]));
-            LOG.info("[记住我-加载] 凭证解析成功: phone={}, passwordLength={}", phone, password.length());
-            return new String[]{phone, password};
+            LOG.info("[记住我-加载] 凭证解析成功");
+            return new String[]{parts[0], parts[1]};
         } catch (final Exception e) {
             LOG.error("[记住我-加载] 加载凭证失败", e);
             return null;

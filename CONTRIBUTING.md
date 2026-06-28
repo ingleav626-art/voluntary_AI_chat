@@ -84,7 +84,7 @@ Get-ChildItem -Path "server\src\main\java\com\voluntary\chat\server\service" -Fi
 
 ### 1. 接口先行
 - 在开发新功能前，先定义好接口契约
-- 使用 Swagger/OpenAPI 文档化 API
+- 使用 `docs/API.md` 文档化 API
 - 客户端和服务端并行开发时，先对齐接口
 
 ### 2. 模块隔离

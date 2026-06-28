@@ -22,6 +22,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.util.Collections;
 import java.util.List;
@@ -40,6 +42,7 @@ import static org.mockito.Mockito.*;
  * @since 1.0.0
  */
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("GroupService 单元测试")
 class GroupServiceTest {
 
@@ -54,6 +57,9 @@ class GroupServiceTest {
 
     @Mock
     private MessageMapper messageMapper;
+
+    @Mock
+    private GroupCacheService groupCacheService;
 
     @InjectMocks
     private GroupService groupService;

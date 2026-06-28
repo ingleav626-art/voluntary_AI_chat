@@ -6,6 +6,7 @@ import com.voluntary.chat.common.enums.SenderType;
 import com.voluntary.chat.common.enums.TargetType;
 import com.voluntary.chat.common.exception.BusinessException;
 import com.voluntary.chat.common.exception.ErrorCode;
+import com.voluntary.chat.server.config.CacheProperties;
 import com.voluntary.chat.server.dto.request.FriendApplyRequest;
 import com.voluntary.chat.server.dto.response.FriendApplyResponse;
 import com.voluntary.chat.server.dto.response.FriendResponse;
@@ -16,8 +17,10 @@ import com.voluntary.chat.server.entity.User;
 import com.voluntary.chat.server.mapper.FriendApplyMapper;
 import com.voluntary.chat.server.mapper.FriendMapper;
 import com.voluntary.chat.server.mapper.MessageMapper;
+import com.voluntary.chat.server.service.OnlineStatusService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,13 +28,14 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
  * 好友服务
  *
- * <p>处理好友申请、好友关系管理。</p>
+ * <p>
+ * 处理好友申请、好友关系管理。
+ * </p>
  *
  * @author voluntary-ai-chat
  * @since 1.0.0
@@ -45,6 +49,11 @@ public class FriendService {
     private final FriendMapper friendMapper;
     private final MessageMapper messageMapper;
     private final UserService userService;
+    private final OnlineStatusService onlineStatusService;
+    private final StringRedisTemplate redisTemplate;
+    private final CacheProperties cacheProperties;
+
+    private static final String FRIEND_LIST_PREFIX = "friend:list:";
 
     /** 申请状态：待处理 */
     private static final int STATUS_PENDING = 0;
@@ -64,7 +73,9 @@ public class FriendService {
     /**
      * 发送好友申请
      *
-     * <p>通过手机号查找目标用户。如果对方已发送过申请且待处理，自动接受并建立好友关系。</p>
+     * <p>
+     * 通过手机号查找目标用户。如果对方已发送过申请且待处理，自动接受并建立好友关系。
+     * </p>
      *
      * @param userId  当前用户ID
      * @param request 申请请求
@@ -144,9 +155,9 @@ public class FriendService {
     /**
      * 处理好友申请
      *
-     * @param userId   当前用户ID
-     * @param applyId  申请ID
-     * @param action   处理动作：ACCEPT / REJECT
+     * @param userId  当前用户ID
+     * @param applyId 申请ID
+     * @param action  处理动作：ACCEPT / REJECT
      */
     @Transactional
     public void handleApply(Long userId, Long applyId, String action) {
@@ -199,16 +210,21 @@ public class FriendService {
                 .collect(Collectors.toSet());
         Map<Long, User> userMap = userService.findByIds(friendIds);
 
+        // 批量查询在线状态
+        Set<Long> onlineUserIds = onlineStatusService.filterOnline(friendIds);
+
         return friends.stream()
-                .map(friend -> toFriendResponse(friend, userMap))
+                .map(friend -> toFriendResponse(friend, userMap, onlineUserIds))
                 .toList();
     }
 
     /**
      * 删除好友
      *
-     * <p>双向删除好友关系记录，并逻辑删除双方之间的所有消息记录，
-     * 使主界面会话列表不再展示已删除好友的会话。</p>
+     * <p>
+     * 双向删除好友关系记录，并逻辑删除双方之间的所有消息记录，
+     * 使主界面会话列表不再展示已删除好友的会话。
+     * </p>
      *
      * @param userId   当前用户ID
      * @param friendId 好友ID
@@ -236,19 +252,60 @@ public class FriendService {
         messageMapper.delete(messageWrapper);
 
         log.info("好友关系已删除并清理会话: user1={}, user2={}, sessionId={}", userId, friendId, sessionId);
+
+        // 清除缓存
+        if (cacheProperties.isEnabled()) {
+            try {
+                redisTemplate.opsForSet().remove(friendListKey(userId), String.valueOf(friendId));
+                redisTemplate.opsForSet().remove(friendListKey(friendId), String.valueOf(userId));
+            } catch (Exception e) {
+                log.warn("好友缓存清除失败: userId={}, friendId={}", userId, friendId, e);
+            }
+        }
     }
 
     /**
      * 判断是否为好友关系
      *
-     * @param userId   用户ID
-     * @param friendId 好友ID
-     * @return 是否好友
+     * <p>
+     * 优先查 Redis Set（SISMEMBER），缓存未命中则查库。
+     * </p>
      */
     public boolean isFriend(Long userId, Long friendId) {
+        // 优先查缓存
+        if (cacheProperties.isEnabled()) {
+            try {
+                Boolean cached = redisTemplate.opsForSet().isMember(friendListKey(userId), String.valueOf(friendId));
+                if (Boolean.TRUE.equals(cached)) {
+                    return true;
+                }
+                // 缓存有值且不是成员 → 确认不是好友
+                if (Boolean.FALSE.equals(cached)) {
+                    // 但需要确认为空是因为 Set 存在且不包含，而非缓存不存在
+                    Boolean exists = redisTemplate.hasKey(friendListKey(userId));
+                    if (Boolean.TRUE.equals(exists)) {
+                        return false;
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("好友缓存查询失败，降级查库: userId={}, friendId={}", userId, friendId, e);
+            }
+        }
+
+        // 查库
         LambdaQueryWrapper<Friend> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Friend::getUserId, userId).eq(Friend::getFriendId, friendId);
-        return friendMapper.selectCount(wrapper) > 0;
+        boolean result = friendMapper.selectCount(wrapper) > 0;
+
+        // 回填缓存
+        if (result && cacheProperties.isEnabled()) {
+            try {
+                redisTemplate.opsForSet().add(friendListKey(userId), String.valueOf(friendId));
+            } catch (Exception e) {
+                log.warn("好友缓存回填失败: userId={}, friendId={}", userId, friendId, e);
+            }
+        }
+        return result;
     }
 
     /**
@@ -265,7 +322,9 @@ public class FriendService {
     /**
      * 接受申请并建立双向好友关系
      *
-     * <p>建立好友关系后，向双方各发送一条"你好"消息，作为会话初始消息。</p>
+     * <p>
+     * 建立好友关系后，向双方各发送一条"你好"消息，作为会话初始消息。
+     * </p>
      */
     private void acceptApplyAndCreateFriendship(FriendApply apply) {
         apply.setStatus(STATUS_ACCEPTED);
@@ -286,9 +345,11 @@ public class FriendService {
     /**
      * 发送欢迎消息
      *
-     * <p>加好友成功后，由发送方给对方发一条"你好"文本消息。</p>
+     * <p>
+     * 加好友成功后，由发送方给对方发一条"你好"文本消息。
+     * </p>
      *
-     * @param senderId 发送者ID
+     * @param senderId   发送者ID
      * @param receiverId 接收者ID
      */
     private void sendWelcomeMessage(Long senderId, Long receiverId) {
@@ -310,7 +371,9 @@ public class FriendService {
     /**
      * 构建单聊会话ID
      *
-     * <p>格式：p_{min(userId1,userId2)}_{max(userId1,userId2)}</p>
+     * <p>
+     * 格式：p_{min(userId1,userId2)}_{max(userId1,userId2)}
+     * </p>
      */
     private String buildSessionId(Long userId1, Long userId2) {
         long min = Math.min(userId1, userId2);
@@ -321,8 +384,10 @@ public class FriendService {
     /**
      * 若不存在则创建好友关系
      *
-     * <p>好友表使用逻辑删除 + 唯一索引 (user_id, friend_id)，
-     * 当好友被删除后重新添加时，需先恢复已删除记录，否则唯一索引冲突。</p>
+     * <p>
+     * 好友表使用逻辑删除 + 唯一索引 (user_id, friend_id)，
+     * 当好友被删除后重新添加时，需先恢复已删除记录，否则唯一索引冲突。
+     * </p>
      */
     private void createFriendIfNotExists(Long userId, Long friendId) {
         if (isFriend(userId, friendId)) {
@@ -336,6 +401,19 @@ public class FriendService {
         friend.setUserId(userId);
         friend.setFriendId(friendId);
         friendMapper.insert(friend);
+
+        // 更新缓存
+        if (cacheProperties.isEnabled()) {
+            try {
+                redisTemplate.opsForSet().add(friendListKey(userId), String.valueOf(friendId));
+            } catch (Exception e) {
+                log.warn("好友缓存更新失败: userId={}, friendId={}", userId, friendId, e);
+            }
+        }
+    }
+
+    private String friendListKey(Long userId) {
+        return FRIEND_LIST_PREFIX + userId;
     }
 
     /**
@@ -357,15 +435,17 @@ public class FriendService {
     /**
      * 转换好友为响应
      */
-    private FriendResponse toFriendResponse(Friend friend, Map<Long, User> userMap) {
+    private FriendResponse toFriendResponse(Friend friend, Map<Long, User> userMap,
+            Set<Long> onlineUserIds) {
         User user = userMap.get(friend.getFriendId());
+        boolean online = onlineUserIds != null && onlineUserIds.contains(friend.getFriendId());
         return FriendResponse.builder()
                 .userId(friend.getFriendId())
                 .username(user != null ? user.getUsername() : null)
                 .avatar(user != null ? user.getAvatar() : null)
                 .bio(user != null ? user.getBio() : null)
                 .remark(friend.getRemark())
-                .online(false)
+                .online(online)
                 .build();
     }
 

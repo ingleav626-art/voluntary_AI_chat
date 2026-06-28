@@ -17,6 +17,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -29,6 +31,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("ConversationService 单元测试")
 class ConversationServiceTest {
 
@@ -43,6 +46,9 @@ class ConversationServiceTest {
 
     @Mock
     private AiProfileMapper aiProfileMapper;
+
+    @Mock
+    private ConversationCacheService conversationCacheService;
 
     @InjectMocks
     private ConversationService conversationService;
@@ -66,6 +72,10 @@ class ConversationServiceTest {
         mockMessage.setContent("你好");
         mockMessage.setCreateTime(LocalDateTime.now());
         mockMessage.setIsDeleted(0);
+
+        // 默认让缓存未命中，走 DB 回退逻辑（保持与原行为一致）
+        when(conversationCacheService.getLastMessage(anyString())).thenReturn(null);
+        when(conversationCacheService.getUnread(anyLong(), anyString())).thenReturn(-1L);
     }
 
     @Test

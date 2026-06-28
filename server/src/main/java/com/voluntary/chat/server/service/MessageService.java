@@ -19,6 +19,7 @@ import com.voluntary.chat.server.entity.User;
 import com.voluntary.chat.server.mapper.GroupMemberMapper;
 import com.voluntary.chat.server.mapper.MessageMapper;
 import com.voluntary.chat.server.mapper.MessageReadMapper;
+import com.voluntary.chat.server.service.ConversationCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -40,6 +41,7 @@ public class MessageService {
     private final MessageReadMapper messageReadMapper;
     private final UserService userService;
     private final GroupMemberMapper groupMemberMapper;
+    private final ConversationCacheService conversationCacheService;
 
     /** 消息撤回时间限制：2分钟 */
     private static final long RECALL_TIMEOUT_MINUTES = 2;
@@ -194,6 +196,10 @@ public class MessageService {
                 read.setSessionId(request.getSessionId());
                 messageReadMapper.insert(read);
             }
+        }
+        // 清零未读缓存
+        if (request.getSessionId() != null) {
+            conversationCacheService.clearUnread(userId, request.getSessionId());
         }
     }
 

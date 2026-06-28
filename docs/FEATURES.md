@@ -21,12 +21,13 @@
 ```
 POST /api/auth/register
 Request: { phone, code, username, password }
-Response: { success, message, userId }
+Response: { accessToken, refreshToken, expiresIn, user: { userId, phone, username, avatar } }
 ```
 
 **实现要点**：
-- 密码使用 BCrypt 加密存储
-- 验证码有效期5分钟
+- 注册成功后自动登录，返回完整登录态（Token + 用户信息）
+- 密码使用 PBKDF2 + 随机盐值哈希存储
+- 验证码有效期 5 分钟
 - 用户名唯一性检查
 - 手机号唯一性检查
 
@@ -58,15 +59,15 @@ Response: { success, token, refreshToken, user }
 
 **需求描述**：
 - 用户可以查看和修改个人信息
-- 支持修改头像、昵称、签名
+- 支持修改头像、昵称、签名、性别、年龄、生日、详细说明
 
 **接口定义**：
 ```
 GET /api/user/profile
-Response: { userId, username, avatar, bio, createTime }
+Response: { userId, phone, username, avatar, bio, gender, age, birthday, detailBio }
 
 PUT /api/user/profile
-Request: { username, avatar, bio }
+Request: { username, avatar, bio, gender, age, birthday, detailBio }  // 所有字段可选
 Response: { success, message }
 ```
 
@@ -160,9 +161,11 @@ Response: { success, message }
 - 图片预览弹窗
 
 **实现要点**：
-- 图片上传到 MinIO
-- 生成缩略图
-- 图片压缩（最大宽度1080px）
+- 图片上传到服务器本地磁盘（`uploads/chat/images/`）
+- 自动生成缩略图
+- 图片压缩（最大宽度 1080px）
+- 支持格式：JPG、PNG、GIF、WebP
+- 最大大小：10MB
 
 ### 3.3 消息撤回
 
@@ -270,16 +273,23 @@ Response: { success, message }
 - 流式输出效果
 
 **接口定义**：
-```
-POST /api/ai/chat
-Request: { aiId, content, conversationId }
-Response: { success, content, conversationId }
 
-WebSocket: /ws/ai/stream
-Message: { type: "AI_STREAM", content: "partial...", done: false }
+AI 对话通过 WebSocket 实时通信，不走 REST API：
+
+```
+WebSocket 消息（客户端 → 服务端）：
+{ type: "AI_CHAT", payload: { aiId, content, sessionId } }
+
+WebSocket 消息（服务端 → 客户端，流式分块）：
+{ type: "AI_STREAM", payload: { aiId, content, done: false, messageId } }
+
+最后一个分块：
+{ type: "AI_STREAM", payload: { aiId, content: "", done: true, messageId } }
 ```
 
-### 5.2 AI主动聊天（特色功能）
+测试包/云端包中也可通过 REST API 管理 AI 角色（CRUD），但对话本身走 WebSocket 流式通道。
+
+### 5.2 AI主动聊天（特色功能，规划中）
 
 **需求描述**：
 - AI可以主动发起聊天
@@ -317,10 +327,12 @@ ai:
 ```
 聊天达到阈值(20条)
 → 异步任务总结为"日记"
-→ 存储MySQL(摘要) + Milvus(向量)
-→ 下次对话时检索相关记忆
-→ 拼入Prompt生成回复
+→ 存储 MySQL(摘要 + 关键词)
+→ 下次对话时通过关键词匹配检索相关记忆
+→ 拼入 Prompt 生成回复
 ```
+
+> 当前通过 MySQL 关键词匹配实现记忆检索。后续计划接入向量数据库（Milvus/Qdrant）实现语义检索，`ai_memory` 表的 `vector_id` 字段已预留。
 
 **记忆数据结构**：
 ```json
@@ -336,7 +348,9 @@ ai:
 
 ---
 
-## 六、本地模型（特色功能）
+## 六、本地模型（特色功能，规划中）
+
+> 以下功能已纳入技术路线图，当前未实现。计划使用 DJL + ONNX 在客户端运行轻量级本地模型。
 
 ### 6.1 句子完整性检测
 
@@ -384,8 +398,11 @@ public boolean isComplete(String text) {
 
 ### 7.2 消息加密
 
-**需求描述**：
-- WebSocket通信加密（WSS）
+**已实现**：
+- WebSocket 通信加密（WSS，云端部署时通过 Nginx HTTPS 代理）
+- API Key AES-256-GCM 加密存储
+
+**规划中**：
 - 敏感消息端到端加密（可选）
 - 消息存储加密
 
@@ -406,5 +423,7 @@ public boolean isComplete(String text) {
 
 ### 8.3 资源占用
 - 客户端内存：< 500MB
-- 客户端安装包：< 200MB
-- 本地模型大小：< 50MB
+- 客户端安装包（客户端包）：~44MB
+- 测试包安装包：~84MB
+- 云端包（Fat JAR）：~49MB
+- 本地模型大小：< 50MB（规划中）
