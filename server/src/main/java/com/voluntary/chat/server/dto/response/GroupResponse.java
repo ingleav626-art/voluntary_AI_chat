@@ -18,4 +18,6 @@ public class GroupResponse {
     private String avatar;
     private Integer memberCount;
     private Long ownerId;
+    private String announcement;
+    private Boolean announcementPinned;
 }

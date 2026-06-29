@@ -16,8 +16,10 @@ import org.slf4j.LoggerFactory;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ListProperty;
+import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleListProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
@@ -89,13 +91,16 @@ public final class GroupListViewModel {
     private final StringProperty groupName = new SimpleStringProperty("");
 
     /** 当前选中群组 */
-    private GroupInfo selectedGroup;
+    private final ObjectProperty<GroupInfo> selectedGroup = new SimpleObjectProperty<>();
 
     /** 当前登录用户ID */
     private Long currentUserId;
 
     /** 当前用户在选中群组中的角色 */
     private String currentUserRole;
+
+    /** 待选中的群组ID（用于跳转后自动选中） */
+    private Long pendingSelectGroupId;
 
     public GroupListViewModel() {
         // 从登录响应中获取当前用户ID，用于判断是否为群主
@@ -121,12 +126,30 @@ public final class GroupListViewModel {
                         groups.setAll(list);
 
                         // 刷新后同步更新 selectedGroup，确保 ownerId 等字段为最新值
-                        if (selectedGroup != null) {
+                        if (selectedGroup.get() != null) {
                             for (final GroupInfo g : list) {
-                                if (selectedGroup.getGroupId().equals(g.getGroupId())) {
-                                    selectedGroup = g;
+                                if (selectedGroup.get().getGroupId().equals(g.getGroupId())) {
+                                    selectedGroup.set(g);
                                     break;
                                 }
+                            }
+                        }
+
+                        // 检查是否有待选中的群组ID，如果有则自动选中
+                        if (pendingSelectGroupId != null) {
+                            for (final GroupInfo g : list) {
+                                if (g.getGroupId().equals(pendingSelectGroupId)) {
+                                    selectedGroup.set(g);
+                                    // 清除待选中ID
+                                    pendingSelectGroupId = null;
+                                    LOG.info("自动选中群组: groupId={}, groupName={}", g.getGroupId(), g.getName());
+                                    break;
+                                }
+                            }
+                            // 如果未找到，清除待选中ID并记录警告
+                            if (pendingSelectGroupId != null) {
+                                LOG.warn("未找到待选中的群组ID: {}", pendingSelectGroupId);
+                                pendingSelectGroupId = null;
                             }
                         }
 
@@ -137,6 +160,16 @@ public final class GroupListViewModel {
                         LOG.warn("群组列表加载失败: {}", msg);
                     }
                 }));
+    }
+
+    /**
+     * 设置待选中的群组ID（用于跳转后自动选中）
+     *
+     * @param groupId 群组ID
+     */
+    public void setPendingSelectGroupId(final Long groupId) {
+        this.pendingSelectGroupId = groupId;
+        LOG.info("设置待选中群组ID: {}", groupId);
     }
 
     /**
@@ -279,9 +312,11 @@ public final class GroupListViewModel {
      * @param name         新群名称
      * @param announcement 新群公告
      * @param announcementPinned 是否置顶公告
+     * @param avatar       群头像URL
      */
     public void updateGroupInfo(final Long groupId, final String name,
-                                 final String announcement, final boolean announcementPinned) {
+                                 final String announcement, final boolean announcementPinned,
+                                 final String avatar) {
         if (groupId == null) {
             return;
         }
@@ -289,7 +324,7 @@ public final class GroupListViewModel {
         loading.set(true);
         errorMessage.set("");
 
-        GroupService.getInstance().updateGroup(groupId, name, announcement, announcementPinned)
+        GroupService.getInstance().updateGroup(groupId, name, announcement, announcementPinned, avatar)
                 .thenAccept(response -> Platform.runLater(() -> {
                     loading.set(false);
 
@@ -312,9 +347,9 @@ public final class GroupListViewModel {
      * @return true 表示当前用户是群主
      */
     public boolean isOwnerOfSelectedGroup() {
-        return selectedGroup != null
+        return selectedGroup.get() != null
                 && currentUserId != null
-                && currentUserId.equals(selectedGroup.getOwnerId());
+                && currentUserId.equals(selectedGroup.get().getOwnerId());
     }
 
     /**
@@ -433,10 +468,10 @@ public final class GroupListViewModel {
                                         groups.setAll(list);
 
                                         // 同步更新 selectedGroup
-                                        if (selectedGroup != null) {
+                                        if (selectedGroup.get() != null) {
                                             for (final GroupInfo g : list) {
-                                                if (selectedGroup.getGroupId().equals(g.getGroupId())) {
-                                                    selectedGroup = g;
+                                                if (selectedGroup.get().getGroupId().equals(g.getGroupId())) {
+                                                    selectedGroup.set(g);
                                                     break;
                                                 }
                                             }
@@ -505,7 +540,7 @@ public final class GroupListViewModel {
      * @param group 群组
      */
     public void setSelectedGroup(final GroupInfo group) {
-        this.selectedGroup = group;
+        this.selectedGroup.set(group);
     }
 
     /**
@@ -514,6 +549,15 @@ public final class GroupListViewModel {
      * @return 群组信息
      */
     public GroupInfo getSelectedGroup() {
+        return selectedGroup.get();
+    }
+
+    /**
+     * 获取选中群组属性（用于监听选中变化）
+     *
+     * @return 选中群组属性
+     */
+    public ObjectProperty<GroupInfo> selectedGroupProperty() {
         return selectedGroup;
     }
 

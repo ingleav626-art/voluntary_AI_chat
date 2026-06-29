@@ -13,11 +13,14 @@ import com.voluntary.chat.server.dto.response.GroupMemberResponse;
 import com.voluntary.chat.server.dto.response.GroupResponse;
 import com.voluntary.chat.server.entity.User;
 import com.voluntary.chat.server.security.SecurityUtils;
-import com.voluntary.chat.server.service.GroupService;
+import com.voluntary.chat.server.service.GroupCoreService;
+import com.voluntary.chat.server.service.GroupMemberService;
+import com.voluntary.chat.server.service.GroupRoleService;
 import com.voluntary.chat.server.service.UserService;
 import com.voluntary.chat.server.websocket.ChatWebSocketHandler;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,12 +39,32 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/group")
-@RequiredArgsConstructor
 public class GroupController {
 
-    private final GroupService groupService;
-    private final ChatWebSocketHandler webSocketHandler;
+    private final GroupCoreService groupCoreService;
+    private final GroupMemberService groupMemberService;
+    private final GroupRoleService groupRoleService;
     private final UserService userService;
+
+    /**
+     * WebSocket 处理器，懒注入以避免依赖链初始化失败。
+     * ChatWebSocketHandler → AiChatService → OpenAiClient 链断裂时，
+     * 会导致 GroupController 无法创建，进而 GET /list 等无需 WebSocket 的接口也返回 500。
+     */
+    @Autowired
+    @Lazy
+    private ChatWebSocketHandler webSocketHandler;
+
+    public GroupController(
+            final GroupCoreService groupCoreService,
+            final GroupMemberService groupMemberService,
+            final GroupRoleService groupRoleService,
+            final UserService userService) {
+        this.groupCoreService = groupCoreService;
+        this.groupMemberService = groupMemberService;
+        this.groupRoleService = groupRoleService;
+        this.userService = userService;
+    }
 
     /**
      * 创建群组
@@ -50,7 +73,7 @@ public class GroupController {
     @PostMapping("/create")
     public ApiResult<CreateGroupResponse> createGroup(@Valid @RequestBody CreateGroupRequest request) {
         Long userId = SecurityUtils.getCurrentUserId();
-        CreateGroupResponse result = groupService.createGroup(userId, request);
+        CreateGroupResponse result = groupCoreService.createGroup(userId, request);
         Long groupId = result.getGroupId();
 
         // 广播创建者加入
@@ -82,7 +105,17 @@ public class GroupController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
         Long userId = SecurityUtils.getCurrentUserId();
-        PageResult<GroupResponse> result = groupService.getGroupList(userId, page, size);
+        PageResult<GroupResponse> result = groupCoreService.getGroupList(userId, page, size);
+        return ApiResult.ok(result);
+    }
+
+    /**
+     * 获取群组详情
+     */
+    @GetMapping("/{groupId}")
+    public ApiResult<GroupResponse> getGroupDetail(@PathVariable Long groupId) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        GroupResponse result = groupCoreService.getGroupDetail(userId, groupId);
         return ApiResult.ok(result);
     }
 
@@ -94,7 +127,7 @@ public class GroupController {
             @PathVariable Long groupId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "50") int size) {
-        PageResult<GroupMemberResponse> result = groupService.getGroupMembers(groupId, page, size);
+        PageResult<GroupMemberResponse> result = groupMemberService.getGroupMembers(groupId, page, size);
         return ApiResult.ok(result);
     }
 
@@ -106,7 +139,7 @@ public class GroupController {
             @PathVariable Long groupId,
             @Valid @RequestBody UpdateGroupRequest request) {
         Long userId = SecurityUtils.getCurrentUserId();
-        groupService.updateGroup(userId, groupId, request);
+        groupCoreService.updateGroup(userId, groupId, request);
         return ApiResult.ok("修改成功", null);
     }
 
@@ -119,7 +152,7 @@ public class GroupController {
             @PathVariable Long groupId,
             @Valid @RequestBody InviteMemberRequest request) {
         Long userId = SecurityUtils.getCurrentUserId();
-        groupService.inviteMembers(userId, groupId, request);
+        groupMemberService.inviteMembers(userId, groupId, request);
 
         // 广播被邀请成员加入通知
         for (Long inviteUserId : request.getUserIds()) {
@@ -137,23 +170,41 @@ public class GroupController {
 
     /**
      * 移除成员
+     * 移除成功后广播群成员离开通知（被踢出）
      */
     @DeleteMapping("/{groupId}/members/{targetUserId}")
     public ApiResult<Void> removeMember(
             @PathVariable Long groupId,
             @PathVariable Long targetUserId) {
         Long userId = SecurityUtils.getCurrentUserId();
-        groupService.removeMember(userId, groupId, targetUserId);
+        groupMemberService.removeMember(userId, groupId, targetUserId);
+
+        // 事务提交后广播被踢出通知
+        User targetUser = userService.findById(targetUserId);
+        if (targetUser != null) {
+            webSocketHandler.broadcastMemberLeave(groupId, targetUserId,
+                    targetUser.getUsername(), "KICKED");
+        }
+
         return ApiResult.ok("已移除", null);
     }
 
     /**
      * 退出群组
+     * 退出成功后广播群成员离开通知（主动退出）
      */
     @PostMapping("/{groupId}/leave")
     public ApiResult<Void> leaveGroup(@PathVariable Long groupId) {
         Long userId = SecurityUtils.getCurrentUserId();
-        groupService.leaveGroup(userId, groupId);
+        groupMemberService.leaveGroup(userId, groupId);
+
+        // 事务提交后广播主动退出通知
+        User leaveUser = userService.findById(userId);
+        if (leaveUser != null) {
+            webSocketHandler.broadcastMemberLeave(groupId, userId,
+                    leaveUser.getUsername(), "LEAVE");
+        }
+
         return ApiResult.ok("已退出", null);
     }
 
@@ -165,7 +216,7 @@ public class GroupController {
             @PathVariable Long groupId,
             @Valid @RequestBody TransferOwnerRequest request) {
         Long userId = SecurityUtils.getCurrentUserId();
-        groupService.transferOwner(userId, groupId, request.getTargetUserId());
+        groupRoleService.transferOwner(userId, groupId, request.getTargetUserId());
         return ApiResult.ok("转让成功", null);
     }
 
@@ -175,7 +226,7 @@ public class GroupController {
     @DeleteMapping("/{groupId}")
     public ApiResult<Void> dismissGroup(@PathVariable Long groupId) {
         Long userId = SecurityUtils.getCurrentUserId();
-        groupService.dismissGroup(userId, groupId);
+        groupCoreService.dismissGroup(userId, groupId);
         return ApiResult.ok("群组已解散", null);
     }
 
@@ -187,7 +238,7 @@ public class GroupController {
             @PathVariable Long groupId,
             @Valid @RequestBody AdminActionRequest request) {
         Long userId = SecurityUtils.getCurrentUserId();
-        groupService.setAdmin(userId, groupId, request.getTargetUserId(), request.getAction());
+        groupRoleService.setAdmin(userId, groupId, request.getTargetUserId(), request.getAction());
         return ApiResult.ok("操作成功", null);
     }
 
@@ -199,7 +250,7 @@ public class GroupController {
             @PathVariable Long groupId,
             @Valid @RequestBody SetNicknameRequest request) {
         Long userId = SecurityUtils.getCurrentUserId();
-        groupService.setNickname(userId, groupId, request.getNickname());
+        groupMemberService.setNickname(userId, groupId, request.getNickname());
         return ApiResult.ok("设置成功", null);
     }
 }

@@ -9,6 +9,7 @@ import com.voluntary.chat.common.enums.MessageType;
 import com.voluntary.chat.common.enums.SenderType;
 import com.voluntary.chat.common.exception.BusinessException;
 import com.voluntary.chat.common.exception.ErrorCode;
+import com.voluntary.chat.server.dto.request.AdminActionRequest;
 import com.voluntary.chat.server.dto.request.CreateGroupRequest;
 import com.voluntary.chat.server.dto.request.InviteMemberRequest;
 import com.voluntary.chat.server.dto.request.UpdateGroupRequest;
@@ -22,11 +23,13 @@ import com.voluntary.chat.server.entity.User;
 import com.voluntary.chat.server.mapper.GroupMapper;
 import com.voluntary.chat.server.mapper.GroupMemberMapper;
 import com.voluntary.chat.server.mapper.MessageMapper;
+import com.voluntary.chat.server.service.GroupCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -34,22 +37,36 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 群组服务
+ * 群组服务（已废弃）
  *
- * <p>处理群组的创建、管理、成员操作等业务逻辑。</p>
+ * <p>
+ * 处理群组的创建、管理、成员操作等业务逻辑。
+ * </p>
  *
+ * <p>原GroupService.java已拆分为三个更小的服务类，符合AGENTS.md的文件规范（≤400行）：</p>
+ * <ul>
+ *   <li><strong>GroupCoreService</strong>：核心群组操作（创建、查询、修改、解散）</li>
+ *   <li><strong>GroupMemberService</strong>：成员管理（邀请、移除、退出、成员列表、昵称）</li>
+ *   <li><strong>GroupRoleService</strong>：权限管理（转让群主、设置管理员、角色验证）</li>
+ * </ul>
+ *
+ * <p>请直接使用上述三个服务类，不要使用GroupService。</p>
+ *
+ * @deprecated 已拆分为 {@link GroupCoreService}、{@link GroupMemberService}、{@link GroupRoleService}
  * @author voluntary-ai-chat
  * @since 1.0.0
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Deprecated
 public class GroupService {
 
     private final GroupMapper groupMapper;
     private final GroupMemberMapper groupMemberMapper;
     private final UserService userService;
     private final MessageMapper messageMapper;
+    private final GroupCacheService groupCacheService;
 
     /** 默认最大成员数 */
     private static final int DEFAULT_MAX_MEMBER_COUNT = 200;
@@ -57,7 +74,9 @@ public class GroupService {
     /**
      * 创建群组
      *
-     * <p>创建者自动成为群主，memberIds 中的用户自动成为普通成员。</p>
+     * <p>
+     * 创建者自动成为群主，memberIds 中的用户自动成为普通成员。
+     * </p>
      *
      * @param userId  创建者ID
      * @param request 创建请求
@@ -81,9 +100,12 @@ public class GroupService {
 
         // 3. 添加初始成员（去重，排除创建者自己），并发送系统消息
         final String groupSessionId = "g_" + group.getId();
-        Set<Long> memberIds = request.getMemberIds().stream()
-                .filter(id -> !id.equals(userId))
-                .collect(Collectors.toSet());
+        List<Long> rawMemberIds = request.getMemberIds();
+        Set<Long> memberIds = rawMemberIds == null
+                ? Collections.emptySet()
+                : rawMemberIds.stream()
+                        .filter(id -> !id.equals(userId))
+                        .collect(Collectors.toSet());
         if (!memberIds.isEmpty()) {
             // 验证用户是否存在
             Map<Long, User> userMap = userService.findByIds(memberIds);
@@ -129,6 +151,13 @@ public class GroupService {
 
         log.info("群组创建成功: groupId={}, name={}, ownerId={}, memberCount={}",
                 group.getId(), request.getName(), userId, memberIds.size() + 1);
+
+        // 缓存群成员列表
+        List<Long> allMembers = new ArrayList<>(memberIds);
+        allMembers.add(userId);
+        groupCacheService.setMemberIds(group.getId(), allMembers);
+        groupCacheService.setMemberCount(group.getId(), allMembers.size());
+
         return CreateGroupResponse.builder()
                 .groupId(group.getId())
                 .name(group.getName())
@@ -151,15 +180,20 @@ public class GroupService {
         }
 
         // 2. 分页查询群组信息
-        LambdaQueryWrapper<GroupEntity> wrapper = new LambdaQueryWrapper<>();
-        wrapper.in(GroupEntity::getId, groupIds)
+        // 注意：count 查询与 list 查询必须使用独立的 wrapper，
+        // 因为 H2 不允许 COUNT(*) 查询带 ORDER BY 子句
+        LambdaQueryWrapper<GroupEntity> countWrapper = new LambdaQueryWrapper<>();
+        countWrapper.in(GroupEntity::getId, groupIds)
+                .eq(GroupEntity::getIsDeleted, 0);
+        long total = groupMapper.selectCount(countWrapper);
+
+        LambdaQueryWrapper<GroupEntity> listWrapper = new LambdaQueryWrapper<>();
+        listWrapper.in(GroupEntity::getId, groupIds)
                 .eq(GroupEntity::getIsDeleted, 0)
                 .orderByDesc(GroupEntity::getCreateTime);
-
-        long total = groupMapper.selectCount(wrapper);
         int offset = (page - 1) * size;
         List<GroupEntity> groups = groupMapper.selectList(
-                wrapper.last("LIMIT " + offset + ", " + size));
+                listWrapper.last("LIMIT " + offset + ", " + size));
 
         // 3. 批量查询成员数量
         List<GroupResponse> list = groups.stream()
@@ -180,16 +214,21 @@ public class GroupService {
     public PageResult<GroupMemberResponse> getGroupMembers(final Long groupId, final int page, final int size) {
         GroupEntity group = findGroupById(groupId);
 
-        LambdaQueryWrapper<GroupMember> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(GroupMember::getGroupId, groupId)
+        // 注意：count 查询与 list 查询必须使用独立的 wrapper，
+        // 因为 H2 不允许 COUNT(*) 查询带 ORDER BY 子句
+        LambdaQueryWrapper<GroupMember> countWrapper = new LambdaQueryWrapper<>();
+        countWrapper.eq(GroupMember::getGroupId, groupId)
+                .eq(GroupMember::getIsDeleted, 0);
+        long total = groupMemberMapper.selectCount(countWrapper);
+
+        LambdaQueryWrapper<GroupMember> listWrapper = new LambdaQueryWrapper<>();
+        listWrapper.eq(GroupMember::getGroupId, groupId)
                 .eq(GroupMember::getIsDeleted, 0)
                 .orderByAsc(GroupMember::getRole)
                 .orderByAsc(GroupMember::getCreateTime);
-
-        long total = groupMemberMapper.selectCount(wrapper);
         int offset = (page - 1) * size;
         List<GroupMember> members = groupMemberMapper.selectList(
-                wrapper.last("LIMIT " + offset + ", " + size));
+                listWrapper.last("LIMIT " + offset + ", " + size));
 
         if (members.isEmpty()) {
             return PageResult.of(Collections.emptyList(), total, page, size);
@@ -211,7 +250,9 @@ public class GroupService {
     /**
      * 修改群信息
      *
-     * <p>仅群主可修改。</p>
+     * <p>
+     * 仅群主可修改。
+     * </p>
      *
      * @param userId  当前用户ID
      * @param groupId 群组ID
@@ -249,7 +290,9 @@ public class GroupService {
     /**
      * 邀请成员加入群组
      *
-     * <p>群成员均可邀请，需检查群成员上限和被邀请人是否已在群中。</p>
+     * <p>
+     * 群成员均可邀请，需检查群成员上限和被邀请人是否已在群中。
+     * </p>
      *
      * @param userId  当前用户ID
      * @param groupId 群组ID
@@ -289,7 +332,8 @@ public class GroupService {
             }
 
             // 检查用户是否曾经加入过群但已退出（is_deleted=1）
-            GroupMember existingMember = groupMemberMapper.selectByGroupIdAndUserIdIncludeDeleted(groupId, inviteUserId);
+            GroupMember existingMember = groupMemberMapper.selectByGroupIdAndUserIdIncludeDeleted(groupId,
+                    inviteUserId);
             if (existingMember != null) {
                 // 恢复已退出的成员记录
                 groupMemberMapper.restoreMember(groupId, inviteUserId);
@@ -319,6 +363,11 @@ public class GroupService {
             }
         }
 
+        // 更新群成员缓存
+        for (Long inviteUserId : inviteUserIds) {
+            groupCacheService.addMember(groupId, inviteUserId);
+        }
+
         log.info("成员邀请成功: groupId={}, inviter={}, invitees={}",
                 groupId, userId, inviteUserIds);
     }
@@ -326,11 +375,13 @@ public class GroupService {
     /**
      * 移除群成员
      *
-     * <p>仅群主和管理员可移除普通成员，群主不可被移除。</p>
+     * <p>
+     * 仅群主和管理员可移除普通成员，群主不可被移除。
+     * </p>
      *
-     * @param userId        当前用户ID
-     * @param groupId       群组ID
-     * @param targetUserId  被移除的用户ID
+     * @param userId       当前用户ID
+     * @param groupId      群组ID
+     * @param targetUserId 被移除的用户ID
      */
     @Transactional
     public void removeMember(final Long userId, final Long groupId, final Long targetUserId) {
@@ -355,11 +406,32 @@ public class GroupService {
             }
         }
 
+        // 获取被移除用户的信息
+        User targetUser = userService.findById(targetUserId);
+        if (targetUser == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
+        }
+
         // 移除成员
         LambdaQueryWrapper<GroupMember> deleteWrapper = new LambdaQueryWrapper<>();
         deleteWrapper.eq(GroupMember::getGroupId, groupId)
                 .eq(GroupMember::getUserId, targetUserId);
         groupMemberMapper.delete(deleteWrapper);
+
+        // 创建系统消息：XXX 已被移出群聊
+        final String groupSessionId = "g_" + groupId;
+        Message sysMsg = new Message();
+        sysMsg.setSessionId(groupSessionId);
+        sysMsg.setSenderId(targetUserId);
+        sysMsg.setSenderType(SenderType.SYSTEM.ordinal());
+        sysMsg.setTargetId(groupId);
+        sysMsg.setTargetType(1); // GROUP
+        sysMsg.setType(MessageType.SYSTEM.ordinal());
+        sysMsg.setContent(targetUser.getUsername() + " 已被移出群聊");
+        messageMapper.insert(sysMsg);
+
+        // 更新缓存
+        groupCacheService.removeMember(groupId, targetUserId);
 
         log.info("成员已移除: groupId={}, targetUserId={}, operatorId={}",
                 groupId, targetUserId, userId);
@@ -368,7 +440,9 @@ public class GroupService {
     /**
      * 退出群组
      *
-     * <p>群主不可退出，需先转让群主或解散群组。</p>
+     * <p>
+     * 群主不可退出，需先转让群主或解散群组。
+     * </p>
      *
      * @param userId  当前用户ID
      * @param groupId 群组ID
@@ -382,11 +456,32 @@ public class GroupService {
             throw new BusinessException(ErrorCode.NO_PERMISSION, "群主不可退出群组，请先转让群主");
         }
 
+        // 获取退出用户的信息
+        User leaveUser = userService.findById(userId);
+        if (leaveUser == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
+        }
+
         // 删除成员记录
         LambdaQueryWrapper<GroupMember> deleteWrapper = new LambdaQueryWrapper<>();
         deleteWrapper.eq(GroupMember::getGroupId, groupId)
                 .eq(GroupMember::getUserId, userId);
         groupMemberMapper.delete(deleteWrapper);
+
+        // 更新缓存
+        groupCacheService.removeMember(groupId, userId);
+
+        // 创建系统消息：XXX 已退出群聊
+        final String groupSessionId = "g_" + groupId;
+        Message sysMsg = new Message();
+        sysMsg.setSessionId(groupSessionId);
+        sysMsg.setSenderId(userId);
+        sysMsg.setSenderType(SenderType.SYSTEM.ordinal());
+        sysMsg.setTargetId(groupId);
+        sysMsg.setTargetType(1); // GROUP
+        sysMsg.setType(MessageType.SYSTEM.ordinal());
+        sysMsg.setContent(leaveUser.getUsername() + " 已退出群聊");
+        messageMapper.insert(sysMsg);
 
         log.info("用户退出群组: groupId={}, userId={}", groupId, userId);
     }
@@ -394,11 +489,13 @@ public class GroupService {
     /**
      * 转让群主
      *
-     * <p>仅群主可操作。转让后原群主自动变为普通成员，被转让者变为群主。</p>
+     * <p>
+     * 仅群主可操作。转让后原群主自动变为普通成员，被转让者变为群主。
+     * </p>
      *
-     * @param userId        当前用户ID（必须是群主）
-     * @param groupId       群组ID
-     * @param targetUserId  目标用户ID
+     * @param userId       当前用户ID（必须是群主）
+     * @param groupId      群组ID
+     * @param targetUserId 目标用户ID
      */
     @Transactional
     public void transferOwner(final Long userId, final Long groupId, final Long targetUserId) {
@@ -440,10 +537,12 @@ public class GroupService {
     /**
      * 解散群组
      *
-     * <p>仅群主可操作。逻辑删除群组及所有成员记录。</p>
+     * <p>
+     * 仅群主可操作。逻辑删除群组及所有成员记录。
+     * </p>
      *
-     * @param userId   当前用户ID（必须是群主）
-     * @param groupId  群组ID
+     * @param userId  当前用户ID（必须是群主）
+     * @param groupId 群组ID
      */
     @Transactional
     public void dismissGroup(final Long userId, final Long groupId) {
@@ -461,18 +560,23 @@ public class GroupService {
         // 逻辑删除所有群成员
         groupMemberMapper.logicalDeleteByGroupId(groupId);
 
+        // 删除群缓存
+        groupCacheService.deleteGroupCache(groupId);
+
         log.info("群组已解散: groupId={}, ownerId={}", groupId, userId);
     }
 
     /**
      * 设置/取消管理员
      *
-     * <p>仅群主可操作。通过 action 参数控制设置或取消。</p>
+     * <p>
+     * 仅群主可操作。通过 action 参数控制设置或取消。
+     * </p>
      *
-     * @param userId        当前用户ID（必须是群主）
-     * @param groupId       群组ID
-     * @param targetUserId  目标用户ID
-     * @param action        SET 设为管理员，REMOVE 取消管理员
+     * @param userId       当前用户ID（必须是群主）
+     * @param groupId      群组ID
+     * @param targetUserId 目标用户ID
+     * @param action       SET 设为管理员，REMOVE 取消管理员
      */
     @Transactional
     public void setAdmin(final Long userId, final Long groupId, final Long targetUserId, final String action) {
@@ -520,9 +624,9 @@ public class GroupService {
     /**
      * 设置群成员昵称
      *
-     * @param userId    当前用户ID
-     * @param groupId   群组ID
-     * @param nickname  群昵称
+     * @param userId   当前用户ID
+     * @param groupId  群组ID
+     * @param nickname 群昵称
      */
     @Transactional
     public void setNickname(final Long userId, final Long groupId, final String nickname) {

@@ -1,25 +1,28 @@
-/* 好友模块样式 - 好友列表、申请列表（温馨主题） */
+/* 好友模块样式 - 好友列表、申请列表（粉白渐变主题） */
 
+/* ========== 好友根容器 - 粉白渐变背景 ========== */
 .friend-root {
-    -fx-background-color: #FFF8F0;
+    -fx-background-color: linear-gradient(from 0% 0% to 0% 100%, #FFF5F8 0%, #FFE0EC 55%, #FFC1D6 100%);
 }
 
+/* ========== 好友标题栏 - 浅粉毛玻璃 ========== */
 .friend-header {
-    -fx-background-color: #FFFEF8;
+    -fx-background-color: rgba(255, 240, 244, 0.95);
     -fx-padding: 15 20;
-    -fx-border-color: #E8D5C4;
+    -fx-border-color: rgba(255, 224, 236, 0.7);
     -fx-border-width: 0 0 1 0;
 }
 
 .friend-title {
     -fx-font-size: 20;
     -fx-font-weight: bold;
-    -fx-text-fill: #D4622A;
+    -fx-text-fill: #E8507A;
 }
 
+/* ========== 好友面板 - 浅粉毛玻璃 ========== */
 .friend-panel {
     -fx-padding: 10;
-    -fx-background-color: #FFFEF8;
+    -fx-background-color: rgba(255, 240, 244, 0.85);
 }
 
 .friend-panel-header {
@@ -29,7 +32,7 @@
 .friend-panel-title {
     -fx-font-size: 16;
     -fx-font-weight: bold;
-    -fx-text-fill: #4A3426;
+    -fx-text-fill: #333333;
 }
 
 .friend-list {
@@ -40,12 +43,12 @@
 .friend-list .list-cell {
     -fx-background-color: transparent;
     -fx-padding: 8 5;
-    -fx-border-color: #FFE8D6;
+    -fx-border-color: #E0E0E0;
     -fx-border-width: 0 0 1 0;
 }
 
 .friend-list .list-cell:filled:hover {
-    -fx-background-color: #FFF8F0;
+    -fx-background-color: #FFE0EC;
 }
 
 .friend-cell {
@@ -59,12 +62,12 @@
 .friend-name {
     -fx-font-size: 14;
     -fx-font-weight: bold;
-    -fx-text-fill: #4A3426;
+    -fx-text-fill: #333333;
 }
 
 .friend-remark {
     -fx-font-size: 12;
-    -fx-text-fill: #B08968;
+    -fx-text-fill: #999999;
 }
 
 .apply-list {
@@ -75,7 +78,7 @@
 .apply-list .list-cell {
     -fx-background-color: transparent;
     -fx-padding: 8 5;
-    -fx-border-color: #FFE8D6;
+    -fx-border-color: #E0E0E0;
     -fx-border-width: 0 0 1 0;
 }
 
@@ -87,69 +90,76 @@
 .apply-name {
     -fx-font-size: 14;
     -fx-font-weight: bold;
-    -fx-text-fill: #4A3426;
+    -fx-text-fill: #333333;
 }
 
 .apply-status {
     -fx-font-size: 12;
-    -fx-text-fill: #B08968;
+    -fx-text-fill: #999999;
 }
 
 .apply-message {
     -fx-font-size: 12;
-    -fx-text-fill: #8B6F47;
+    -fx-text-fill: #999999;
 }
 
+/* ========== 添加好友表单 - 浅粉毛玻璃 ========== */
 .add-friend-form {
     -fx-padding: 10;
-    -fx-background-color: #FFF8F0;
+    -fx-background-color: rgba(255, 240, 244, 0.85);
     -fx-background-radius: 8;
     -fx-spacing: 8;
 }
 
+/* ========== 好友输入框 - 浅粉毛玻璃 ========== */
 .friend-input {
-    -fx-background-color: #FFFEF8;
+    -fx-background-color: rgba(255, 240, 244, 0.9);
     -fx-background-radius: 8;
-    -fx-border-color: #E8D5C4;
+    -fx-border-color: rgba(255, 224, 236, 0.7);
     -fx-border-radius: 8;
     -fx-font-size: 13;
     -fx-padding: 8;
 }
 
 .friend-input:focused {
-    -fx-border-color: #E76F51;
+    -fx-border-color: #FF6B9D;
 }
 
+/* ========== 好友底部栏 - 浅粉毛玻璃 ========== */
 .friend-footer {
-    -fx-background-color: #FFFEF8;
+    -fx-background-color: rgba(255, 240, 244, 0.95);
     -fx-padding: 8 20;
-    -fx-border-color: #E8D5C4;
+    -fx-border-color: rgba(255, 224, 236, 0.7);
     -fx-border-width: 1 0 0 0;
 }
 
-/* 小型按钮 - 温暖珊瑚/暖棕 */
-.btn-success-sm {
-    -fx-background-color: #F4A261;
+/* 小型按钮 - 粉红色（统一宽度，独立类名避免 group.css 覆盖） */
+.btn-accept {
+    -fx-background-color: #FF6B9D;
     -fx-text-fill: white;
-    -fx-font-size: 12;
-    -fx-background-radius: 8;
-    -fx-padding: 4 12;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 4px;
+    -fx-padding: 8px 16px;
+    -fx-min-width: 80px;
     -fx-cursor: hand;
 }
 
-.btn-success-sm:hover {
-    -fx-background-color: #E76F51;
+.btn-accept:hover {
+    -fx-background-color: #E8507A;
 }
 
-.btn-danger-sm {
-    -fx-background-color: #E76F51;
+.btn-reject {
+    -fx-background-color: #FF6B9D;
     -fx-text-fill: white;
-    -fx-font-size: 12;
-    -fx-background-radius: 8;
-    -fx-padding: 4 12;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 4px;
+    -fx-padding: 8px 16px;
+    -fx-min-width: 80px;
     -fx-cursor: hand;
 }
 
-.btn-danger-sm:hover {
-    -fx-background-color: #D4622A;
+.btn-reject:hover {
+    -fx-background-color: #E8507A;
 }

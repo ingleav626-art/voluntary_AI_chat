@@ -238,3 +238,93 @@ public CompletableFuture<ApiResponse<CreateGroupResponse>> createGroup(final Cre
 1. 在其他需要认证的服务类（如 FriendService、UserService）中也添加登录状态检查
 2. 在 ViewModel 中处理未登录错误响应，提示用户跳转到登录页
 3. 实施方案三：在 BaseHttpService 中统一处理401错误，自动跳转登录页
+
+---
+
+## Terminal#962-1014 错误分析
+
+### 错误现象
+
+用户**已登录**（WebSocket 已连接，会话列表加载成功 count=15），但访问群组列表和 AI 列表时返回 500 错误：
+
+```
+ERROR BaseHttpService -- 请求失败: statusCode=500, errorCode=500,
+  backendMsg=No static resource api/ai/list., displayMsg=服务器异常，请稍后重试
+
+ERROR BaseHttpService -- 请求失败: statusCode=500, errorCode=500,
+  backendMsg=No static resource api/group/list., displayMsg=服务器异常，请稍后重试
+```
+
+注意：`/api/conversation/list` 正常工作，但 `/api/group/list` 和 `/api/ai/list` 失败。
+
+### 错误原因
+
+#### 1. 直接原因：GlobalExceptionHandler 错误捕获
+
+[GlobalExceptionHandler.java](file:///c:/Users/OTC/Desktop/demofu/demo/server/src/main/java/com/voluntary/chat/server/common/GlobalExceptionHandler.java) 的 `handleException(Exception e)` 方法捕获了 `NoResourceFoundException`：
+
+```java
+@ExceptionHandler(Exception.class)
+@ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+public ApiResult<Void> handleException(Exception e) {
+    return ApiResult.error(ErrorCode.INTERNAL_ERROR.getCode(), e.getMessage());
+    // 返回 500 + "No static resource api/group/list."
+}
+```
+
+`NoResourceFoundException` 是 Spring 在**找不到匹配的 Controller** 时抛出的异常（回退到静态资源查找也失败）。本应返回 404，却被通用 Exception 处理器捕获返回 500，掩盖了真实问题。
+
+#### 2. 根本原因：Controller 未注册
+
+"No static resource" 错误表明服务端的 `GroupController` 和 `AiController` 未被注册到 Spring 的请求映射中。可能原因：
+- 服务端运行的是旧编译版本，未包含最新的 Controller
+- Bean 依赖链初始化失败导致 Controller 未创建
+- 服务端启动时出现 Bean 创建异常但被忽略
+
+### 解决方案
+
+#### 修复 1：GlobalExceptionHandler 新增 NoResourceFoundException 专用处理器
+
+在 [GlobalExceptionHandler.java](file:///c:/Users/OTC/Desktop/demofu/demo/server/src/main/java/com/voluntary/chat/server/common/GlobalExceptionHandler.java) 中新增：
+
+```java
+@ExceptionHandler(NoResourceFoundException.class)
+@ResponseStatus(HttpStatus.NOT_FOUND)
+public ApiResult<Void> handleNoResourceFoundException(NoResourceFoundException e) {
+    log.warn("接口或资源不存在: {}", e.getMessage());
+    return ApiResult.error(ErrorCode.NOT_FOUND.getCode(), "请求的接口不存在");
+}
+```
+
+同时修改通用 Exception 处理器，不再泄露内部异常细节：
+```java
+@ExceptionHandler(Exception.class)
+@ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+public ApiResult<Void> handleException(Exception e) {
+    log.error("系统异常: {}", e.getMessage(), e);
+    return ApiResult.error(ErrorCode.INTERNAL_ERROR.getCode(), "服务器内部错误，请稍后重试");
+}
+```
+
+#### 修复 2：用户侧排查步骤
+
+如果修复后仍返回 404，说明 Controller 确实未注册，需检查：
+1. **重新编译服务端**：`mvn clean package -pl server -DskipTests`
+2. **检查启动日志**：查看是否有 Bean 创建失败的异常
+3. **验证 Controller 扫描**：确认 `@ComponentScan` 包含 `com.voluntary.chat.server.controller`
+4. **检查依赖链**：`GroupController` → `ChatWebSocketHandler`（@Lazy）→ `AiChatService` → `OpenAiClient` 是否完整
+
+### 测试结果
+
+- GlobalExceptionHandlerTest: ✅ 6 个测试全部通过（含新增的 NoResourceFoundException 测试）
+
+### 相关文件
+
+- [GlobalExceptionHandler.java](file:///c:/Users/OTC/Desktop/demofu/demo/server/src/main/java/com/voluntary/chat/server/common/GlobalExceptionHandler.java) - 新增 NoResourceFoundException 处理器
+- [GlobalExceptionHandlerTest.java](file:///c:/Users/OTC/Desktop/demofu/demo/server/src/test/java/com/voluntary/chat/server/common/GlobalExceptionHandlerTest.java) - 新增对应测试
+- [GroupController.java](file:///c:/Users/OTC/Desktop/demofu/demo/server/src/main/java/com/voluntary/chat/server/controller/GroupController.java) - 群组控制器
+- [AiController.java](file:///c:/Users/OTC/Desktop/demofu/demo/server/src/main/java/com/voluntary/chat/server/controller/AiController.java) - AI 控制器
+
+### 总结
+
+此次修复解决了错误信息误导问题：将 "No static resource" 的 500 错误改为准确的 404 "请求的接口不存在"。如果用户仍遇到此问题，需重新编译并重启服务端，确保 Controller 正确注册。

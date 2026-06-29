@@ -7,9 +7,14 @@ import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
+import org.example.client.config.ServerConnectionManager;
+import org.example.client.config.ServerMode;
+import org.example.client.engine.LocalAiEngine;
+import org.example.client.model.LoginResponse;
 import org.example.client.model.RegisterRequest;
 import org.example.client.model.RegisterResponse;
 import org.example.client.model.SmsSendRequest;
+import org.example.client.model.UserInfo;
 import org.example.client.service.AuthService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -122,6 +127,11 @@ public final class RegisterViewModel {
 
     /**
      * 执行注册
+     *
+     * <p>
+     * 本地模式时优先尝试云端注册（需短信验证码），云端不可用时自动回退到本地 H2 注册（无需短信）。
+     * 热点/云端模式仅走云端注册。
+     * </p>
      */
     public void register() {
         errorMessage.set("");
@@ -133,22 +143,83 @@ public final class RegisterViewModel {
 
         loading.set(true);
 
+        final String phoneValue = phone.get();
+        final String codeValue = code.get();
+        final String usernameValue = username.get();
+        final String passwordValue = password.get();
+
+        // 本地模式时，如果云端不可达，可以跳过短信验证
+        final boolean isLocalMode = ServerConnectionManager.getInstance()
+                .getCurrentMode() == ServerMode.LOCAL;
+
         final RegisterRequest request = new RegisterRequest(
-                phone.get(),
-                code.get(),
-                username.get(),
-                password.get());
+                phoneValue, codeValue, usernameValue, passwordValue);
 
         AuthService.getInstance().register(request)
                 .thenAcceptAsync(response -> {
-                    loading.set(false);
-
-                    if (response != null && response.isSuccess()) {
-                        handleSuccess(response.getData());
+                    Platform.runLater(() -> {
+                        if (response != null && response.isSuccess()) {
+                            loading.set(false);
+                            handleSuccess(response.getData());
+                        } else if (isLocalMode) {
+                            // 云端注册失败 + 本地模式 → 尝试本地注册
+                            tryLocalRegister(phoneValue, usernameValue, passwordValue);
+                        } else {
+                            loading.set(false);
+                            handleFailure(response != null ? response.getMessage() : "注册失败");
+                        }
+                    });
+                })
+                .exceptionally(ex -> {
+                    LOG.warn("云端注册网络异常", ex);
+                    if (isLocalMode) {
+                        tryLocalRegister(phoneValue, usernameValue, passwordValue);
                     } else {
-                        handleFailure(response != null ? response.getMessage() : "注册失败");
+                        Platform.runLater(() -> {
+                            loading.set(false);
+                            handleFailure("网络连接失败，请检查网络");
+                        });
                     }
+                    return null;
                 });
+    }
+
+    /**
+     * 本地注册兜底（无短信验证）
+     */
+    private void tryLocalRegister(final String phone, final String username, final String password) {
+        try {
+            LOG.info("尝试本地 H2 注册兜底: phone={}, username={}", phone, username);
+            final Long userId = LocalAiEngine.getInstance().registerLocal(phone, username, password);
+
+            if (userId != null) {
+                Platform.runLater(() -> {
+                    loading.set(false);
+                    LOG.info("本地注册成功: userId={}", userId);
+
+                    final UserInfo userInfo = new UserInfo();
+                    userInfo.setUserId(userId);
+                    userInfo.setUsername(username);
+                    userInfo.setPhone(phone);
+
+                    final RegisterResponse registerResponse = new RegisterResponse();
+                    registerResponse.setUser(userInfo);
+
+                    handleSuccess(registerResponse);
+                });
+            } else {
+                Platform.runLater(() -> {
+                    loading.set(false);
+                    handleFailure("手机号或用户名已存在");
+                });
+            }
+        } catch (final Exception e) {
+            LOG.error("本地注册异常", e);
+            Platform.runLater(() -> {
+                loading.set(false);
+                handleFailure("本地注册失败，请稍后重试");
+            });
+        }
     }
 
     private boolean validateInput() {

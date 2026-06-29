@@ -32,13 +32,27 @@ public class AiService {
     private final AiConfig aiConfig;
 
     /**
+     * 获取加密密钥，未配置时抛出业务异常
+     *
+     * @return 加密密钥
+     */
+    private String getEncryptionKey() {
+        final String key = aiConfig.getEncryptionKey();
+        if (key == null || key.isEmpty()) {
+            log.error("AI 加密密钥未配置，请设置 ai.encryption-key 或环境变量 AI_ENCRYPTION_KEY");
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "AI 加密密钥未配置");
+        }
+        return key;
+    }
+
+    /**
      * 获取用户的 AI 列表
      */
     public PageResult<AiProfileResponse> listAiProfiles(final Long userId, final Integer page, final Integer size) {
         final LambdaQueryWrapper<AiProfile> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(AiProfile::getUserId, userId)
-               .eq(AiProfile::getStatus, 0)
-               .orderByDesc(AiProfile::getCreateTime);
+                .eq(AiProfile::getStatus, 0)
+                .orderByDesc(AiProfile::getCreateTime);
 
         final Page<AiProfile> pageObj = new Page<>(page, size);
         final Page<AiProfile> result = aiProfileMapper.selectPage(pageObj, wrapper);
@@ -56,7 +70,7 @@ public class AiService {
     @Transactional
     public Long createAiProfile(final Long userId, final CreateAiProfileRequest request) {
         // 加密 API Key
-        final String apiKeyEnc = AesKeyUtil.encrypt(request.getApiKey(), aiConfig.getEncryptionKey());
+        final String apiKeyEnc = AesKeyUtil.encrypt(request.getApiKey(), getEncryptionKey());
 
         final AiProfile profile = new AiProfile();
         profile.setUserId(userId);
@@ -67,8 +81,10 @@ public class AiService {
         profile.setModelProvider(request.getModelProvider());
         profile.setModel(request.getModel());
         profile.setApiKeyEnc(apiKeyEnc);
+        profile.setBaseUrl(request.getBaseUrl());
         profile.setIsGroup(request.getIsGroup() != null ? request.getIsGroup() : false);
-        profile.setTemperature(request.getTemperature() != null ? request.getTemperature() : aiConfig.getDefaultTemperature());
+        profile.setTemperature(
+                request.getTemperature() != null ? request.getTemperature() : aiConfig.getDefaultTemperature());
         profile.setMaxTokens(request.getMaxTokens() != null ? request.getMaxTokens() : aiConfig.getDefaultMaxTokens());
         profile.setStatus(0);
         profile.setIsDeleted(0);
@@ -108,8 +124,11 @@ public class AiService {
             profile.setModel(request.getModel());
         }
         if (request.getApiKey() != null) {
-            final String apiKeyEnc = AesKeyUtil.encrypt(request.getApiKey(), aiConfig.getEncryptionKey());
+            final String apiKeyEnc = AesKeyUtil.encrypt(request.getApiKey(), getEncryptionKey());
             profile.setApiKeyEnc(apiKeyEnc);
+        }
+        if (request.getBaseUrl() != null) {
+            profile.setBaseUrl(request.getBaseUrl());
         }
         if (request.getIsGroup() != null) {
             profile.setIsGroup(request.getIsGroup());
@@ -161,7 +180,7 @@ public class AiService {
      * 解密 API Key
      */
     public String decryptApiKey(final AiProfile profile) {
-        return AesKeyUtil.decrypt(profile.getApiKeyEnc(), aiConfig.getEncryptionKey());
+        return AesKeyUtil.decrypt(profile.getApiKeyEnc(), getEncryptionKey());
     }
 
     /**
@@ -173,9 +192,13 @@ public class AiService {
                 .name(profile.getName())
                 .avatar(profile.getAvatar())
                 .persona(profile.getPersona())
+                .systemPrompt(profile.getSystemPrompt())
                 .modelProvider(profile.getModelProvider())
                 .model(profile.getModel())
+                .baseUrl(profile.getBaseUrl())
                 .isGroup(profile.getIsGroup())
+                .temperature(profile.getTemperature())
+                .maxTokens(profile.getMaxTokens())
                 .build();
     }
 }

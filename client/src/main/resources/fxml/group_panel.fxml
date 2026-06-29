@@ -51,19 +51,31 @@
             <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="group-panel-header">
                 <Label fx:id="groupDetailTitle" styleClass="group-panel-title" text="请选择群组"/>
                 <Region HBox.hgrow="ALWAYS"/>
-                <!-- 操作按钮 -->
-                <Button fx:id="inviteMemberButton" mnemonicParsing="false"
-                        onAction="#handleInviteMembers" styleClass="btn-icon" text="邀请成员"
-                        visible="false" managed="false"/>
-                <Button fx:id="editGroupButton" mnemonicParsing="false"
-                        onAction="#handleEditGroupInfo" styleClass="btn-icon" text="修改群信息"
-                        visible="false" managed="false"/>
-                <Button fx:id="dismissGroupButton" mnemonicParsing="false"
-                        onAction="#handleDismissGroup" styleClass="btn-danger-sm" text="解散群组"
-                        visible="false" managed="false"/>
-                <Button fx:id="leaveGroupButton" mnemonicParsing="false"
-                        onAction="#handleLeaveGroup" styleClass="btn-danger-sm" text="退出群组"
-                        visible="false" managed="false"/>
+                <!-- 操作按钮（分两行显示） -->
+                <VBox spacing="5.0" alignment="CENTER_RIGHT">
+                    <HBox spacing="8.0" alignment="CENTER_RIGHT">
+                        <Button fx:id="inviteMemberButton" mnemonicParsing="false"
+                                onAction="#handleInviteMembers" styleClass="btn-icon" text="邀请成员"
+                                visible="false" managed="false"/>
+                        <Button fx:id="aiConfigButton" mnemonicParsing="false"
+                                onAction="#handleAiConfig" styleClass="btn-icon" text="AI配置"
+                                visible="false" managed="false"/>
+                        <Button fx:id="avatarButton" mnemonicParsing="false"
+                                onAction="#handleEditAvatar" styleClass="btn-icon" text="头像"
+                                visible="false" managed="false"/>
+                    </HBox>
+                    <HBox spacing="8.0" alignment="CENTER_RIGHT">
+                        <Button fx:id="editGroupButton" mnemonicParsing="false"
+                                onAction="#handleEditGroupInfo" styleClass="btn-icon" text="修改群信息"
+                                visible="false" managed="false"/>
+                        <Button fx:id="dismissGroupButton" mnemonicParsing="false"
+                                onAction="#handleDismissGroup" styleClass="btn-icon" text="解散群组"
+                                visible="false" managed="false"/>
+                        <Button fx:id="leaveGroupButton" mnemonicParsing="false"
+                                onAction="#handleLeaveGroup" styleClass="btn-icon" text="退出群组"
+                                visible="false" managed="false"/>
+                    </HBox>
+                </VBox>
             </HBox>
 
             <ListView fx:id="memberList" styleClass="member-list" VBox.vgrow="ALWAYS">

@@ -4,9 +4,11 @@ import com.voluntary.chat.common.dto.PageResult;
 import com.voluntary.chat.common.enums.MessageType;
 import com.voluntary.chat.common.enums.TargetType;
 import com.voluntary.chat.server.dto.response.ConversationResponse;
+import com.voluntary.chat.server.entity.AiProfile;
 import com.voluntary.chat.server.entity.GroupEntity;
 import com.voluntary.chat.server.entity.Message;
 import com.voluntary.chat.server.entity.User;
+import com.voluntary.chat.server.mapper.AiProfileMapper;
 import com.voluntary.chat.server.mapper.GroupMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -15,6 +17,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -27,6 +31,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("ConversationService 单元测试")
 class ConversationServiceTest {
 
@@ -38,6 +43,12 @@ class ConversationServiceTest {
 
     @Mock
     private GroupMapper groupMapper;
+
+    @Mock
+    private AiProfileMapper aiProfileMapper;
+
+    @Mock
+    private ConversationCacheService conversationCacheService;
 
     @InjectMocks
     private ConversationService conversationService;
@@ -61,6 +72,10 @@ class ConversationServiceTest {
         mockMessage.setContent("你好");
         mockMessage.setCreateTime(LocalDateTime.now());
         mockMessage.setIsDeleted(0);
+
+        // 默认让缓存未命中，走 DB 回退逻辑（保持与原行为一致）
+        when(conversationCacheService.getLastMessage(anyString())).thenReturn(null);
+        when(conversationCacheService.getUnread(anyLong(), anyString())).thenReturn(-1L);
     }
 
     @Test
@@ -159,6 +174,12 @@ class ConversationServiceTest {
         when(messageService.getLastMessage("a_3001_1001")).thenReturn(aiMessage);
         when(messageService.getUnreadCount(1001L, "a_3001_1001")).thenReturn(0L);
 
+        AiProfile mockAi = new AiProfile();
+        mockAi.setId(3001L);
+        mockAi.setName("小助手");
+        mockAi.setAvatar("http://example.com/ai.png");
+        when(aiProfileMapper.selectById(3001L)).thenReturn(mockAi);
+
         PageResult<ConversationResponse> result = conversationService.getConversations(1001L, 1, 20);
 
         assertNotNull(result);
@@ -167,8 +188,9 @@ class ConversationServiceTest {
         ConversationResponse conv = result.getList().get(0);
         assertEquals("a_3001_1001", conv.getSessionId());
         assertEquals(3001L, conv.getTargetId());
-        assertEquals(TargetType.USER.name(), conv.getTargetType());
-        assertEquals("AI助手", conv.getTargetName());
+        assertEquals(TargetType.AI.name(), conv.getTargetType());
+        assertEquals("小助手", conv.getTargetName());
+        assertEquals("http://example.com/ai.png", conv.getTargetAvatar());
     }
 
     @Test
@@ -334,5 +356,140 @@ class ConversationServiceTest {
 
         assertEquals("群聊", result.getList().get(0).getTargetName());
         assertNull(result.getList().get(0).getTargetAvatar());
+    }
+
+    @Test
+    @DisplayName("群聊-无消息时展示占位会话")
+    void getConversations_group_shouldShowPlaceholder_whenNoMessage() {
+        GroupEntity mockGroup = new GroupEntity();
+        mockGroup.setId(2001L);
+        mockGroup.setName("新群组");
+        mockGroup.setAvatar("http://example.com/group.jpg");
+        mockGroup.setCreateTime(LocalDateTime.now());
+
+        when(messageService.getUserSessionIds(1001L)).thenReturn(List.of("g_2001"));
+        when(messageService.getLastMessage("g_2001")).thenReturn(null);
+        when(groupMapper.selectById(2001L)).thenReturn(mockGroup);
+
+        PageResult<ConversationResponse> result = conversationService.getConversations(1001L, 1, 20);
+
+        assertEquals(1, result.getTotal());
+        assertEquals(1, result.getList().size());
+        ConversationResponse conv = result.getList().get(0);
+        assertEquals("g_2001", conv.getSessionId());
+        assertEquals(2001L, conv.getTargetId());
+        assertEquals(TargetType.GROUP.name(), conv.getTargetType());
+        assertEquals("新群组", conv.getTargetName());
+        assertEquals("", conv.getLastMessage());
+        assertEquals(0L, conv.getUnreadCount());
+    }
+
+    @Test
+    @DisplayName("群聊-无消息且群组不存在时跳过")
+    void getConversations_group_shouldSkip_whenNoMessageAndGroupNotFound() {
+        when(messageService.getUserSessionIds(1001L)).thenReturn(List.of("g_9999"));
+        when(messageService.getLastMessage("g_9999")).thenReturn(null);
+        when(groupMapper.selectById(9999L)).thenReturn(null);
+
+        PageResult<ConversationResponse> result = conversationService.getConversations(1001L, 1, 20);
+
+        assertEquals(0, result.getTotal());
+        assertTrue(result.getList().isEmpty());
+    }
+
+    @Test
+    @DisplayName("AI会话-AI角色不存在时回退显示名称")
+    void getConversations_ai_shouldFallback_whenAiNotFound() {
+        Message aiMessage = new Message();
+        aiMessage.setId(4001L);
+        aiMessage.setSessionId("a_3001_1001");
+        aiMessage.setSenderId(1001L);
+        aiMessage.setTargetId(3001L);
+        aiMessage.setType(0);
+        aiMessage.setContent("你好AI");
+        aiMessage.setCreateTime(LocalDateTime.now());
+        aiMessage.setIsDeleted(0);
+
+        when(messageService.getUserSessionIds(1001L)).thenReturn(List.of("a_3001_1001"));
+        when(messageService.getLastMessage("a_3001_1001")).thenReturn(aiMessage);
+        when(messageService.getUnreadCount(1001L, "a_3001_1001")).thenReturn(0L);
+        when(aiProfileMapper.selectById(3001L)).thenReturn(null);
+
+        PageResult<ConversationResponse> result = conversationService.getConversations(1001L, 1, 20);
+
+        assertEquals(1, result.getTotal());
+        ConversationResponse conv = result.getList().get(0);
+        assertEquals("AI助手", conv.getTargetName());
+        assertNull(conv.getTargetAvatar());
+    }
+
+    @Test
+    @DisplayName("获取会话列表-空关键词不触发过滤")
+    void getConversations_shouldNotFilter_whenKeywordBlank() {
+        Message msg = new Message();
+        msg.setSessionId("p_1001_1002");
+        msg.setContent("消息");
+        msg.setType(0);
+        msg.setCreateTime(LocalDateTime.now());
+        msg.setIsDeleted(0);
+
+        when(messageService.getUserSessionIds(1001L)).thenReturn(List.of("p_1001_1002"));
+        when(messageService.getLastMessage("p_1001_1002")).thenReturn(msg);
+        when(messageService.getUnreadCount(anyLong(), anyString())).thenReturn(0L);
+        when(userService.findById(1002L)).thenReturn(mockUser);
+
+        PageResult<ConversationResponse> result = conversationService.getConversations(1001L, 1, 20, "   ");
+
+        assertEquals(1, result.getTotal());
+        assertEquals("p_1001_1002", result.getList().get(0).getSessionId());
+    }
+
+    @Test
+    @DisplayName("获取会话列表-单聊中user1为对方时正确解析")
+    void getConversations_shouldParseTarget_whenUserIsFirst() {
+        Message msg = new Message();
+        msg.setSessionId("p_1002_1001");
+        msg.setContent("消息");
+        msg.setType(0);
+        msg.setCreateTime(LocalDateTime.now());
+        msg.setIsDeleted(0);
+
+        User otherUser = new User();
+        otherUser.setId(1002L);
+        otherUser.setUsername("李四");
+        otherUser.setAvatar("http://example.com/avatar2.jpg");
+
+        when(messageService.getUserSessionIds(1001L)).thenReturn(List.of("p_1002_1001"));
+        when(messageService.getLastMessage("p_1002_1001")).thenReturn(msg);
+        when(messageService.getUnreadCount(anyLong(), anyString())).thenReturn(0L);
+        when(userService.findById(1002L)).thenReturn(otherUser);
+
+        PageResult<ConversationResponse> result = conversationService.getConversations(1001L, 1, 20);
+
+        assertEquals(1, result.getTotal());
+        ConversationResponse conv = result.getList().get(0);
+        assertEquals(1002L, conv.getTargetId());
+        assertEquals("李四", conv.getTargetName());
+    }
+
+    @Test
+    @DisplayName("获取会话列表-分页超出范围返回空列表")
+    void getConversations_shouldReturnEmpty_whenPageOutOfRange() {
+        Message msg1 = new Message();
+        msg1.setSessionId("p_1001_1002");
+        msg1.setContent("消息1");
+        msg1.setType(0);
+        msg1.setCreateTime(LocalDateTime.now());
+        msg1.setIsDeleted(0);
+
+        when(messageService.getUserSessionIds(1001L)).thenReturn(List.of("p_1001_1002"));
+        when(messageService.getLastMessage("p_1001_1002")).thenReturn(msg1);
+        when(messageService.getUnreadCount(anyLong(), anyString())).thenReturn(0L);
+        when(userService.findById(1002L)).thenReturn(mockUser);
+
+        PageResult<ConversationResponse> result = conversationService.getConversations(1001L, 5, 20);
+
+        assertEquals(1, result.getTotal());
+        assertTrue(result.getList().isEmpty());
     }
 }

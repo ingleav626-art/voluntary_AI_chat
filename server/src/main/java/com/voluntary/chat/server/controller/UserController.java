@@ -12,6 +12,7 @@ import com.voluntary.chat.server.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -47,6 +48,18 @@ public class UserController {
             @RequestParam(defaultValue = "20") int size) {
         PageResult<UserResponse> result = userService.searchUsers(keyword, page, size);
         return ApiResult.ok(result);
+    }
+
+    /**
+     * 发送验证码（用于密码修改）
+     *
+     * <p>根据当前登录用户自动获取手机号并发送验证码。</p>
+     */
+    @PostMapping("/password/sms")
+    public ApiResult<Void> sendPasswordSms() {
+        Long userId = SecurityUtils.getCurrentUserId();
+        authService.sendSmsCodeForUser(userId);
+        return ApiResult.ok("验证码已发送", null);
     }
 
     /**

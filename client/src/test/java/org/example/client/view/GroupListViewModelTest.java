@@ -294,7 +294,7 @@ class GroupListViewModelTest {
     @Test
     @DisplayName("updateGroupInfo null groupId 不执行")
     void testUpdateGroupInfoNullGroupId() {
-        viewModel.updateGroupInfo(null, "新名称", "公告", false);
+        viewModel.updateGroupInfo(null, "新名称", "公告", false, null);
         assertFalse(viewModel.loadingProperty().get());
     }
 
@@ -436,5 +436,125 @@ class GroupListViewModelTest {
     @DisplayName("loadMembers 调用不崩溃")
     void testLoadMembers_shouldNotCrash() {
         assertDoesNotThrow(() -> viewModel.loadMembers(1L));
+    }
+
+    // ==================== 异步方法调用测试（验证不崩溃） ====================
+
+    @Test
+    @DisplayName("updateGroupInfo 调用不崩溃")
+    void testUpdateGroupInfo_shouldNotCrash() {
+        assertDoesNotThrow(() -> viewModel.updateGroupInfo(1L, "新名称", "新公告", true, null));
+        waitForAsync();
+    }
+
+    @Test
+    @DisplayName("removeMember 调用不崩溃")
+    void testRemoveMember_shouldNotCrash() {
+        assertDoesNotThrow(() -> viewModel.removeMember(1L, 1002L));
+        waitForAsync();
+    }
+
+    @Test
+    @DisplayName("createGroup 有效名称调用不崩溃")
+    void testCreateGroupValidName_shouldNotCrash() {
+        viewModel.groupNameProperty().set("测试群组");
+        assertDoesNotThrow(() -> viewModel.createGroup());
+        waitForAsync();
+    }
+
+    @Test
+    @DisplayName("createGroup 空白名称设置错误")
+    void testCreateGroupBlankName_shouldSetError() {
+        viewModel.groupNameProperty().set("   ");
+        viewModel.createGroup();
+        assertEquals("请输入群名称", viewModel.errorMessageProperty().get());
+    }
+
+    // ==================== isOwnerOfSelectedGroup 边界测试 ====================
+
+    @Test
+    @DisplayName("isOwnerOfSelectedGroup - currentUserId 为 null 时返回 false")
+    void testIsOwnerOfSelectedGroupNullUserId() {
+        TokenStorage.clear();
+        final GroupListViewModel vm = new GroupListViewModel();
+
+        final GroupInfo group = new GroupInfo();
+        group.setGroupId(1L);
+        group.setOwnerId(null);
+        vm.setSelectedGroup(group);
+
+        assertFalse(vm.isOwnerOfSelectedGroup());
+    }
+
+    // ==================== isAdminOrOwnerOfSelectedGroup 角色测试 ====================
+
+    @Test
+    @DisplayName("isAdminOrOwnerOfSelectedGroup - OWNER 角色返回 true")
+    void testIsAdminOrOwnerOfSelectedGroupOwnerRole() throws Exception {
+        // 通过反射设置 currentUserRole
+        final java.lang.reflect.Field roleField = GroupListViewModel.class.getDeclaredField("currentUserRole");
+        roleField.setAccessible(true);
+        roleField.set(viewModel, "OWNER");
+
+        assertTrue(viewModel.isAdminOrOwnerOfSelectedGroup());
+    }
+
+    @Test
+    @DisplayName("isAdminOrOwnerOfSelectedGroup - ADMIN 角色返回 true")
+    void testIsAdminOrOwnerOfSelectedGroupAdminRole() throws Exception {
+        final java.lang.reflect.Field roleField = GroupListViewModel.class.getDeclaredField("currentUserRole");
+        roleField.setAccessible(true);
+        roleField.set(viewModel, "ADMIN");
+
+        assertTrue(viewModel.isAdminOrOwnerOfSelectedGroup());
+    }
+
+    @Test
+    @DisplayName("isAdminOrOwnerOfSelectedGroup - MEMBER 角色返回 false")
+    void testIsAdminOrOwnerOfSelectedGroupMemberRole() throws Exception {
+        final java.lang.reflect.Field roleField = GroupListViewModel.class.getDeclaredField("currentUserRole");
+        roleField.setAccessible(true);
+        roleField.set(viewModel, "MEMBER");
+
+        assertFalse(viewModel.isAdminOrOwnerOfSelectedGroup());
+    }
+
+    // ==================== loadGroups 已登录测试 ====================
+
+    @Test
+    @DisplayName("loadGroups 已登录调用不崩溃")
+    void testLoadGroupsLoggedIn_shouldNotCrash() {
+        assertDoesNotThrow(() -> viewModel.loadGroups());
+        waitForAsync();
+    }
+
+    // ==================== 属性 getter 测试 ====================
+
+    @Test
+    @DisplayName("getGroups 返回可观察列表")
+    void testGetGroups_returnsObservableList() {
+        assertNotNull(viewModel.getGroups());
+        assertTrue(viewModel.getGroups().isEmpty());
+    }
+
+    @Test
+    @DisplayName("getMembers 返回可观察列表")
+    void testGetMembers_returnsObservableList() {
+        assertNotNull(viewModel.getMembers());
+        assertTrue(viewModel.getMembers().isEmpty());
+    }
+
+    @Test
+    @DisplayName("groupNameProperty 正确绑定")
+    void testGroupNameProperty() {
+        viewModel.groupNameProperty().set("测试群名");
+        assertEquals("测试群名", viewModel.groupNameProperty().get());
+    }
+
+    @Test
+    @DisplayName("successMessageProperty 正确绑定")
+    void testSuccessMessageProperty() {
+        viewModel.successMessageProperty().set("操作成功");
+        assertEquals("操作成功", viewModel.successMessageProperty().get());
     }
 }

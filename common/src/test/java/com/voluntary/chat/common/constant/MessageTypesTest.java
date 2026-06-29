@@ -23,6 +23,22 @@ class MessageTypesTest {
         assertNotNull(MessageTypes.PONG);
         assertNotNull(MessageTypes.RECONNECT);
         assertNotNull(MessageTypes.RECONNECT_ACK);
+        assertNotNull(MessageTypes.FORCE_LOGOUT);
+
+        // 群组事件
+        assertNotNull(MessageTypes.GROUP_MEMBER_JOIN);
+        assertNotNull(MessageTypes.GROUP_MEMBER_LEAVE);
+        assertNotNull(MessageTypes.GROUP_MEMBER_ROLE_CHANGE);
+        assertNotNull(MessageTypes.GROUP_INFO_CHANGE);
+        assertNotNull(MessageTypes.GROUP_DISMISSED);
+
+        // 通知消息
+        assertNotNull(MessageTypes.NOTIFICATION);
+        assertNotNull(MessageTypes.NOTIFICATION_NEW_MESSAGE);
+        assertNotNull(MessageTypes.NOTIFICATION_AI_GREETING);
+        assertNotNull(MessageTypes.NOTIFICATION_TODO_REMINDER);
+        assertNotNull(MessageTypes.NOTIFICATION_SYSTEM_EVENT);
+        assertNotNull(MessageTypes.NOTIFICATION_SETTINGS_CHANGED);
     }
 
     @Test

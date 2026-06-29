@@ -31,6 +31,9 @@ public final class GroupInfoController implements Initializable {
     private TextField groupNameField;
 
     @FXML
+    private TextField avatarField;
+
+    @FXML
     private TextArea announcementArea;
 
     @FXML
@@ -59,13 +62,15 @@ public final class GroupInfoController implements Initializable {
      * @param currentName 当前群名称
      * @param currentAnnouncement 当前群公告
      * @param currentPinned 当前公告是否置顶
+     * @param currentAvatar 当前头像URL
      */
     public void initData(final Long groupId, final GroupListViewModel viewModel,
                          final String currentName, final String currentAnnouncement,
-                         final boolean currentPinned) {
+                         final boolean currentPinned, final String currentAvatar) {
         this.groupId = groupId;
         this.viewModel = viewModel;
         groupNameField.setText(currentName != null ? currentName : "");
+        avatarField.setText(currentAvatar != null ? currentAvatar : "");
         announcementArea.setText(currentAnnouncement != null ? currentAnnouncement : "");
         pinnedCheckBox.setSelected(currentPinned);
     }
@@ -99,7 +104,8 @@ public final class GroupInfoController implements Initializable {
                 groupId,
                 name.trim(),
                 announcementArea.getText(),
-                pinnedCheckBox.isSelected()
+                pinnedCheckBox.isSelected(),
+                avatarField.getText() != null ? avatarField.getText().trim() : null
         );
 
         closeWindow();

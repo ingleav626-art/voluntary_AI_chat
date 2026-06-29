@@ -3,8 +3,14 @@ package org.example.client.service;
 import java.util.concurrent.CompletableFuture;
 
 import org.example.client.model.ApiResponse;
+import org.example.client.model.ChangePasswordRequest;
+import org.example.client.model.ChangePhoneRequest;
+import org.example.client.model.LoginResponse;
 import org.example.client.model.PageResult;
 import org.example.client.model.UserInfo;
+import org.example.client.util.TokenStorage;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -21,6 +27,26 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @DisplayName("UserService 测试")
 class UserServiceTest {
+
+    @BeforeEach
+    void setUp() {
+        // 保存一个假的 LoginResponse，避免 NullPointerException
+        final LoginResponse response = new LoginResponse();
+        response.setAccessToken("test-token");
+        response.setRefreshToken("test-refresh-token");
+        response.setExpiresIn(3600L);
+        final UserInfo user = new UserInfo();
+        user.setUserId(1L);
+        user.setUsername("testuser");
+        user.setPhone("13800138000");
+        response.setUser(user);
+        TokenStorage.save(response, false);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TokenStorage.clear();
+    }
 
     @Test
     @DisplayName("获取单例实例 - 同一实例")
@@ -84,5 +110,71 @@ class UserServiceTest {
         final UserService userService = UserService.getInstance();
         assertDoesNotThrow(() ->
                 userService.searchUsers("张三", 0, 20));
+    }
+
+    // ========== 新增方法测试 ==========
+
+    @Test
+    @DisplayName("updateProfileFull 返回非空 CompletableFuture")
+    void testUpdateProfileFullReturnsFuture() {
+        final UserService userService = UserService.getInstance();
+        final UserInfo profile = new UserInfo();
+        profile.setUsername("张三");
+        profile.setBio("程序员");
+        profile.setGender(1);
+        profile.setAge(25);
+
+        final CompletableFuture<ApiResponse<Void>> future = userService.updateProfileFull(profile);
+
+        assertNotNull(future, "updateProfileFull 应返回非空 Future");
+    }
+
+    @Test
+    @DisplayName("updateProfileFull 空对象不抛异常")
+    void testUpdateProfileFullEmptyObject() {
+        final UserService userService = UserService.getInstance();
+        final UserInfo profile = new UserInfo();
+
+        assertDoesNotThrow(() ->
+                userService.updateProfileFull(profile));
+    }
+
+    @Test
+    @DisplayName("changePassword 返回非空 CompletableFuture")
+    void testChangePasswordReturnsFuture() {
+        final UserService userService = UserService.getInstance();
+        final ChangePasswordRequest request = new ChangePasswordRequest("123456", "newpass123", "newpass123");
+
+        final CompletableFuture<ApiResponse<Void>> future = userService.changePassword(request);
+
+        assertNotNull(future, "changePassword 应返回非空 Future");
+    }
+
+    @Test
+    @DisplayName("changePassword null请求不抛异常")
+    void testChangePasswordNullRequest() {
+        final UserService userService = UserService.getInstance();
+        // null 请求会导致 JsonUtils.toJson 返回 null，但不应抛异常
+        assertDoesNotThrow(() ->
+                userService.changePassword(null));
+    }
+
+    @Test
+    @DisplayName("changePhone 返回非空 CompletableFuture")
+    void testChangePhoneReturnsFuture() {
+        final UserService userService = UserService.getInstance();
+        final ChangePhoneRequest request = new ChangePhoneRequest("123456", "13900139000", "654321");
+
+        final CompletableFuture<ApiResponse<Void>> future = userService.changePhone(request);
+
+        assertNotNull(future, "changePhone 应返回非空 Future");
+    }
+
+    @Test
+    @DisplayName("changePhone null请求不抛异常")
+    void testChangePhoneNullRequest() {
+        final UserService userService = UserService.getInstance();
+        assertDoesNotThrow(() ->
+                userService.changePhone(null));
     }
 }

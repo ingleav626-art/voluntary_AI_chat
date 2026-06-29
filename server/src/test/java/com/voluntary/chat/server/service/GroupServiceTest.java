@@ -22,6 +22,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.util.Collections;
 import java.util.List;
@@ -40,6 +42,7 @@ import static org.mockito.Mockito.*;
  * @since 1.0.0
  */
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("GroupService 单元测试")
 class GroupServiceTest {
 
@@ -54,6 +57,9 @@ class GroupServiceTest {
 
     @Mock
     private MessageMapper messageMapper;
+
+    @Mock
+    private GroupCacheService groupCacheService;
 
     @InjectMocks
     private GroupService groupService;
@@ -152,6 +158,51 @@ class GroupServiceTest {
         assertEquals(GROUP_ID, result.getGroupId());
         // 创建者被排除，只插入群主 + 成员1
         verify(groupMemberMapper, times(2)).insert(any(GroupMember.class));
+    }
+
+    @Test
+    @DisplayName("创建群组-不选择初始成员时仅创建群主")
+    void createGroup_shouldSucceedWithEmptyMemberIds() {
+        CreateGroupRequest request = new CreateGroupRequest();
+        request.setName("我的群");
+        request.setMemberIds(Collections.emptyList());
+
+        when(userService.findById(OWNER_ID)).thenReturn(mockUser1);
+        when(groupMapper.insert(any(GroupEntity.class))).thenAnswer(invocation -> {
+            GroupEntity saved = invocation.getArgument(0);
+            saved.setId(GROUP_ID);
+            return 1;
+        });
+
+        CreateGroupResponse result = groupService.createGroup(OWNER_ID, request);
+
+        assertEquals(GROUP_ID, result.getGroupId());
+        assertEquals("我的群", result.getName());
+        // 仅插入群主，无其他成员
+        verify(groupMemberMapper, times(1)).insert(any(GroupMember.class));
+        // 不应调用 findByIds（无成员需要校验）
+        verify(userService, never()).findByIds(any());
+    }
+
+    @Test
+    @DisplayName("创建群组-memberIds为null时仅创建群主")
+    void createGroup_shouldSucceedWithNullMemberIds() {
+        CreateGroupRequest request = new CreateGroupRequest();
+        request.setName("我的群");
+        request.setMemberIds(null);
+
+        when(userService.findById(OWNER_ID)).thenReturn(mockUser1);
+        when(groupMapper.insert(any(GroupEntity.class))).thenAnswer(invocation -> {
+            GroupEntity saved = invocation.getArgument(0);
+            saved.setId(GROUP_ID);
+            return 1;
+        });
+
+        CreateGroupResponse result = groupService.createGroup(OWNER_ID, request);
+
+        assertEquals(GROUP_ID, result.getGroupId());
+        verify(groupMemberMapper, times(1)).insert(any(GroupMember.class));
+        verify(userService, never()).findByIds(any());
     }
 
     // ==================== 获取群列表 ====================
@@ -363,6 +414,7 @@ class GroupServiceTest {
 
         when(groupMapper.selectById(GROUP_ID)).thenReturn(group);
         when(groupMemberMapper.selectRoleByGroupIdAndUserId(GROUP_ID, OWNER_ID)).thenReturn(2);
+        when(userService.findById(MEMBER_ID_1)).thenReturn(mockUser2);
 
         groupService.removeMember(OWNER_ID, GROUP_ID, MEMBER_ID_1);
 
@@ -408,6 +460,7 @@ class GroupServiceTest {
         group.setOwnerId(OWNER_ID);
 
         when(groupMapper.selectById(GROUP_ID)).thenReturn(group);
+        when(userService.findById(MEMBER_ID_1)).thenReturn(mockUser2);
 
         groupService.leaveGroup(MEMBER_ID_1, GROUP_ID);
 

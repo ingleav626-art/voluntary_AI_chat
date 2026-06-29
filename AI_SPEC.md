@@ -42,45 +42,55 @@
 ### 2.1 模块划分
 ```
 voluntary_AI_chat/
-├── client/                    # JavaFX 客户端
-│   ├── src/main/java/
-│   │   └── com/voluntary/chat/client/
-│   │       ├── controller/    # FXML 控制器
-│   │       ├── view/          # 视图模型（MVVM）
-│   │       ├── service/       # 客户端业务逻辑
-│   │       ├── websocket/     # WebSocket 客户端
-│   │       ├── model/         # 本地数据模型
-│   │       ├── util/          # 工具类
-│   │       └── App.java       # 启动类
-│   └── src/main/resources/
-│       ├── fxml/              # FXML 布局文件
-│       └── css/               # 样式文件
-├── server/                    # Spring Boot 服务端
-│   ├── src/main/java/
-│   │   └── com/voluntary/chat/server/
-│   │       ├── controller/    # REST + WebSocket 控制器
-│   │       ├── service/       # 业务逻辑层
-│   │       ├── mapper/        # MyBatis-Plus Mapper
-│   │       ├── entity/        # 数据库实体
-│   │       ├── dto/           # 数据传输对象
-│   │       ├── config/        # 配置类
-│   │       ├── security/      # JWT + Spring Security
-│   │       ├── websocket/     # WebSocket 处理
-│   │       ├── ai/            # AI 代理层
-│   │       ├── task/          # 定时任务（AI 主动聊天）
-│   │       └── App.java       # 启动类
-│   └── src/main/resources/
-│       ├── mapper/            # MyBatis XML
-│       └── application.yml
-├── common/                    # 公共模块
-│   ├── src/main/java/
-│   │   └── com/voluntary/chat/common/
-│   │       ├── constant/      # 常量定义
-│   │       ├── enums/         # 枚举类
-│   │       ├── exception/     # 自定义异常
-│   │       ├── util/          # 通用工具类
-│   │       └── model/         # 共享数据模型
+├── common/                    # 公共模块（零依赖）
+│   ├── src/main/java/com/voluntary/chat/common/
+│   │   ├── constant/          # 常量定义
+│   │   ├── enums/             # 枚举类
+│   │   ├── exception/         # 自定义异常
+│   │   ├── dto/               # 共享 DTO
+│   │   └── model/             # 共享数据模型
 │   └── pom.xml
+├── ai-core/                   # AI 核心模块（Spring 依赖 optional）
+│   ├── src/main/java/com/voluntary/chat/server/
+│   │   ├── client/            # LLM HTTP 客户端
+│   │   ├── config/            # AI 配置
+│   │   ├── controller/        # 本地 REST 控制器
+│   │   ├── dto/               # AI 请求/响应 DTO
+│   │   ├── entity/            # AI 实体 + 消息实体
+│   │   ├── mapper/            # MyBatis-Plus Mapper
+│   │   ├── security/          # JWT + 安全组件
+│   │   ├── service/           # AI 服务层
+│   │   ├── util/              # AES 加密工具
+│   │   └── websocket/         # AI WebSocket 处理器
+│   └── pom.xml
+├── server/                    # Spring Boot 服务端
+│   ├── src/main/java/com/voluntary/chat/server/
+│   │   ├── controller/        # REST 控制器
+│   │   ├── service/           # 业务逻辑层
+│   │   ├── mapper/            # MyBatis-Plus Mapper
+│   │   ├── entity/            # 数据库实体
+│   │   ├── dto/               # 数据传输对象
+│   │   ├── config/            # 配置类
+│   │   ├── security/          # JWT + Spring Security
+│   │   └── websocket/         # WebSocket 处理
+│   └── src/main/resources/
+│       ├── db/                # Flyway 迁移脚本
+│       └── application*.yml   # 配置文件
+├── client/                    # JavaFX 客户端
+│   ├── src/main/java/org/example/client/
+│   │   ├── controller/        # FXML 控制器
+│   │   ├── view/              # 视图模型（MVVM）
+│   │   ├── service/           # 客户端业务逻辑
+│   │   ├── engine/            # LocalAiEngine 本地 AI 引擎
+│   │   ├── model/             # 本地数据模型
+│   │   ├── config/            # 客户端配置
+│   │   ├── server/            # 嵌入式服务器启动配置
+│   │   ├── util/              # 工具类
+│   │   ├── Launcher.java      # 启动入口
+│   │   └── App.java           # JavaFX Application
+│   └── src/main/resources/
+│       ├── fxml/              # FXML 布局文件（13 个）
+│       └── css/               # 样式文件（9 个）
 └── pom.xml                    # 父 POM
 ```
 
@@ -161,13 +171,12 @@ voluntary_AI_chat/
 
 **示例**：
 ```
-feat(ai): 实现 AI 主动聊天定时任务
+feat(ai): 实现 AI 记忆摘要生成
 
-使用 RabbitMQ 延迟队列实现随机间隔触发：
-- 每个用户独立的随机间隔（5-30分钟）
-- 读取最近20条记忆摘要生成提示词
-- 调用 AI 接口生成主动消息
-- 在线用户通过 WebSocket 推送
+使用定时任务在对话达到阈值后触发记忆总结：
+- 聊天条数达到 20 条触发异步总结
+- 提取关键词和重要度评分
+- 存储到 ai_memory 表
 
 测试覆盖：单元测试 + 集成测试
 ```
@@ -315,12 +324,12 @@ server/
 - **分页查询**：大数据集必须分页
 - **Redis 缓存**：频繁访问的数据使用 Redis 缓存
 - **连接池**：合理配置数据库和 Redis 连接池
-- **异步处理**：耗时操作使用 RabbitMQ 异步处理
+- **异步处理**：耗时操作使用异步线程池处理
 
 ### 8.3 WebSocket 性能
-- **消息压缩**：启用 WebSocket 消息压缩
-- **心跳机制**：实现心跳检测，及时清理断开的连接
-- **消息队列**：高并发场景使用消息队列削峰
+- **心跳机制**：实现心跳检测（PING/PONG），及时清理断开的连接
+- **断线重连**：支持 RECONNECT 消息类型，恢复离线消息
+- **连接管理**：Session 管理器维护在线用户映射
 
 ---
 
@@ -392,13 +401,22 @@ mvn javafx:run -pl client
 ```
 
 ### C. 技术栈
-- **客户端**：JavaFX + FXML + WebSocket + DJL（本地模型）
-- **服务端**：Spring Boot 3 + MyBatis-Plus + Spring Security + JWT + WebSocket
-- **存储**：MySQL 8 + Redis + Milvus/Qdrant（向量数据库）+ MinIO
-- **消息队列**：RabbitMQ（延迟队列）
-- **AI 能力**：OpenAI 兼容协议 + RAG（检索增强生成）
-- **构建工具**：Maven + JDK 25
-- **部署**：Docker + docker-compose
+
+**已采用**：
+- **客户端**：JavaFX 17 + FXML + CSS + WebSocket + H2 本地数据库
+- **服务端**：Spring Boot 3.5.15 + MyBatis-Plus 3.5.15 + Spring Security + JWT + WebSocket
+- **存储**：MySQL 8 + H2（本地嵌入式）+ Redis（可选）
+- **AI 能力**：OpenAI 兼容协议 + RAG（关键词匹配检索）+ AES-256-GCM 加密
+- **构建工具**：Maven + JDK 17
+- **数据库迁移**：Flyway
+- **代码质量**：Checkstyle + SpotBugs + JaCoCo
+- **部署**：jpackage 桌面打包 / Spring Boot Fat JAR + Nginx 反向代理
+
+**规划中**（云端多用户场景）：
+- **对象存储**：MinIO（替代本地文件存储）
+- **向量数据库**：Milvus/Qdrant（替代 MySQL 关键词匹配）
+- **消息队列**：RabbitMQ（异步消息解耦）
+- **本地模型**：DJL + ONNX（句子完整性检测）
 
 ### D. 联系方式
 - 项目负责人：[待填写]

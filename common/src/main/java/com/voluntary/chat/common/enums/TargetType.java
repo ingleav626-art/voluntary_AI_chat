@@ -8,7 +8,8 @@ import lombok.Getter;
 public enum TargetType {
 
     USER("用户"),
-    GROUP("群组");
+    GROUP("群组"),
+    AI("AI");
 
     private final String description;
 }

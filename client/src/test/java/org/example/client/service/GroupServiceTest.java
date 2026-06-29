@@ -191,7 +191,7 @@ class GroupServiceTest {
     @DisplayName("updateGroup 返回非空 Future")
     void testUpdateGroup() {
         final CompletableFuture<ApiResponse<Void>> future =
-                groupService.updateGroup(1L, "新群名", "新公告", true);
+                groupService.updateGroup(1L, "新群名", "新公告", true, null);
 
         assertNotNull(future);
     }

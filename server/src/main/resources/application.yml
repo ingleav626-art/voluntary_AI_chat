@@ -22,8 +22,15 @@ spring:
 
   sql:
     init:
-      mode: always
-      schema-locations: classpath:db/schema.sql
+      mode: never
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration/{vendor}
+    baseline-on-migrate: true
+    baseline-version: 1
+    validate-on-migrate: false
+    encoding: UTF-8
 
   servlet:
     multipart:
@@ -65,3 +72,20 @@ upload:
   image:
     dir: uploads/chat/images
     base-url: http://localhost:8080/files
+
+# Redis 缓存配置（默认值）
+app:
+  cache:
+    enabled: true
+    conversation:
+      ttl: 86400          # 会话缓存 1 天
+    online-status:
+      ttl: 30             # 在线状态 30 秒
+    unread:
+      ttl: 604800         # 未读数 7 天
+    group-members:
+      ttl: 0              # 永不过期（成员变更时更新）
+    ai-memory:
+      ttl: 1800           # AI 记忆 30 分钟
+    offline-message:
+      max-size: 1000      # 离线队列最大长度

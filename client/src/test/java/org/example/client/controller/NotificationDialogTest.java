@@ -89,12 +89,12 @@ class NotificationDialogTest extends JavaFxTestBase {
     }
 
     @Test
-    @DisplayName("Type 枚举 - 有3个值")
+    @DisplayName("Type 枚举 - 有4个值")
     void typeEnum_shouldHaveThreeValues() throws Exception {
         final Class<?> typeClass = Class.forName(
                 "org.example.client.controller.NotificationDialog$Type");
         final Object[] types = typeClass.getEnumConstants();
-        assertEquals(3, types.length);
+        assertEquals(4, types.length);
     }
 
     @Test

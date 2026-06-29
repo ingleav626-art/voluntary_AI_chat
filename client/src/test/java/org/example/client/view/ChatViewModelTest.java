@@ -41,6 +41,18 @@ class ChatViewModelTest {
         conversation.setTargetName("李四");
 
         chatViewModel = new ChatViewModel(currentUser, conversation);
+
+        // 清理静态 pendingSystemMessages，避免测试间干扰
+        try {
+            final java.lang.reflect.Field pendingField = ChatViewModel.class.getDeclaredField("pendingSystemMessages");
+            pendingField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            final java.util.Map<String, java.util.List<MessageInfo>> map =
+                    (java.util.Map<String, java.util.List<MessageInfo>>) pendingField.get(null);
+            map.clear();
+        } catch (final Exception e) {
+            // 忽略清理失败
+        }
     }
 
     @Test
@@ -851,5 +863,101 @@ class ChatViewModelTest {
     void getConversationName_nullConversation_shouldReturnEmpty() {
         final ChatViewModel vm = new ChatViewModel(currentUser, null);
         assertEquals("", vm.getConversationName());
+    }
+
+    // ==================== sendFile 有效文件测试 ====================
+
+    @Test
+    @DisplayName("sendFile - 有效文件时添加乐观消息")
+    void sendFile_validFile_shouldAddOptimisticMessage() throws Exception {
+        final java.nio.file.Path tempFile = java.nio.file.Files.createTempFile("test_upload", ".txt");
+        try {
+            java.nio.file.Files.writeString(tempFile, "test content");
+            chatViewModel.sendFile(tempFile);
+
+            assertEquals(1, chatViewModel.getMessages().size());
+            final MessageInfo msg = chatViewModel.getMessages().get(0);
+            assertEquals("FILE", msg.getType());
+            assertTrue(msg.isSentByMe());
+            assertEquals(-1L, msg.getMessageId());
+            assertTrue(msg.getContent().startsWith("test_upload"));
+        } finally {
+            java.nio.file.Files.deleteIfExists(tempFile);
+        }
+    }
+
+    // ==================== loadHistory null conversation 测试 ====================
+
+    @Test
+    @DisplayName("loadHistory - conversation 为 null 时不执行")
+    void loadHistory_nullConversation_shouldNotExecute() {
+        final ChatViewModel vm = new ChatViewModel(currentUser, null);
+        vm.loadHistory();
+        assertFalse(vm.loadingProperty().get());
+    }
+
+    // ==================== reportRead 测试 ====================
+
+    @Test
+    @DisplayName("reportRead - 有未读消息时不崩溃")
+    void reportRead_withUnreadMessages_shouldNotCrash() {
+        final MessageInfo otherMsg = new MessageInfo();
+        otherMsg.setMessageId(200L);
+        otherMsg.setSentByMe(false);
+        otherMsg.setContent("别人的消息");
+        chatViewModel.appendMessage(otherMsg);
+
+        chatViewModel.reportRead();
+        assertEquals(1, chatViewModel.getMessages().size());
+    }
+
+    @Test
+    @DisplayName("reportRead - conversation 为 null 时不执行")
+    void reportRead_nullConversation_shouldNotExecute() {
+        final ChatViewModel vm = new ChatViewModel(currentUser, null);
+        vm.reportRead();
+    }
+
+    // ==================== addPendingSystemMessage 测试 ====================
+
+    @Test
+    @DisplayName("addPendingSystemMessage - 添加待处理系统消息")
+    void addPendingSystemMessage_shouldAddMessage() {
+        final MessageInfo sysMsg = new MessageInfo();
+        sysMsg.setContent("用户加入了群聊");
+        sysMsg.setType("SYSTEM");
+
+        ChatViewModel.addPendingSystemMessage(conversation.getSessionId(), sysMsg);
+        assertTrue(chatViewModel.getMessages().isEmpty());
+    }
+
+    // ==================== sendMessage null 输入测试 ====================
+
+    @Test
+    @DisplayName("sendMessage - null 输入不发送")
+    void sendMessage_nullInput_shouldNotSend() {
+        chatViewModel.inputTextProperty().set(null);
+        chatViewModel.sendMessage();
+        assertTrue(chatViewModel.getMessages().isEmpty());
+    }
+
+    // ==================== appendMessage 重复 messageId 测试 ====================
+
+    @Test
+    @DisplayName("appendMessage - 消息列表中已有相同 messageId 的消息不重复添加")
+    void appendMessage_duplicateMessageId_shouldNotAdd() {
+        final MessageInfo msg1 = new MessageInfo();
+        msg1.setMessageId(1L);
+        msg1.setContent("消息1");
+
+        final MessageInfo msg2 = new MessageInfo();
+        msg2.setMessageId(1L);
+        msg2.setContent("消息2（重复ID）");
+
+        chatViewModel.appendMessage(msg1);
+        chatViewModel.appendMessage(msg2);
+
+        assertEquals(1, chatViewModel.getMessages().size());
+        assertEquals("消息1", chatViewModel.getMessages().get(0).getContent());
     }
 }

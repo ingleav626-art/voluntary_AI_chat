@@ -14,6 +14,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import org.example.client.config.ClientConfig;
+import org.example.client.config.ServerConnectionManager;
+import org.example.client.config.ServerMode;
 import org.example.client.util.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,10 +26,19 @@ import com.voluntary.chat.common.model.WebSocketMessage;
 import javafx.application.Platform;
 
 /**
- * WebSocket 客户端
+ * WebSocket 客户端（单连接模式，向后兼容）
  *
  * <p>
  * 负责与服务端建立 WebSocket 连接，处理实时消息收发、心跳维持和断线重连。
+ * </p>
+ *
+ * <p>
+ * 三模式启动策略：
+ * <ul>
+ * <li>LOCAL - 本地模式：连接内嵌后端服务器</li>
+ * <li>HOTSPOT - 热点模式：连接局域网测试服务器</li>
+ * <li>CLOUD - 云端模式：连接公网服务器</li>
+ * </ul>
  * </p>
  *
  * @author voluntary-ai-chat
@@ -118,7 +129,7 @@ public final class WebSocketClient {
     }
 
     /**
-     * 建立 WebSocket 连接
+     * 建立 WebSocket 连接（根据启动模式决定连接地址）
      *
      * @param token JWT Token
      */
@@ -148,17 +159,21 @@ public final class WebSocketClient {
     }
 
     /**
-     * 执行连接
+     * 执行连接（根据ServerMode决定连接地址）
      */
     private void doConnect() {
-        final String baseUrl = ClientConfig.getInstance().getBaseUrl();
+        // 根据启动模式获取对应的服务器地址
+        final ServerConnectionManager connectionManager = ServerConnectionManager.getInstance();
+        final ServerMode mode = connectionManager.getCurrentMode();
+        final String baseUrl = ClientConfig.getInstance().getBaseUrlByMode(mode);
+
+        LOG.info("建立 WebSocket 连接，启动模式: {}, 地址: {}", mode.getDescription(), baseUrl);
+
         // 将 http(s):// 转为 ws(s)://
         final String wsBaseUrl = baseUrl.replace("http://", "ws://").replace("https://", "wss://");
         // 去掉 /api 后缀
         final String host = wsBaseUrl.substring(0, wsBaseUrl.length() - "/api".length());
         final String wsUrl = host + WS_PATH + currentToken;
-
-        LOG.info("建立 WebSocket 连接");
 
         try {
             final HttpClient client = HttpClient.newBuilder()

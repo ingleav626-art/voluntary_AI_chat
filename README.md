@@ -1,208 +1,263 @@
-# voluntary_AI_chat
+# Voluntary AI Chat
 
-这是一个主动式ai的仓库
+一个支持主动式 AI 对话的 Java 桌面聊天软件。
 
-## 项目规范
-请参考 [AI开发规范文档](AI_SPEC.md) 了解项目开发规范。
+## 项目简介
+
+Voluntary AI Chat 是一款 JavaFX 桌面聊天应用，支持人人聊天、AI 单聊（流式输出）、多 AI 群聊、AI 主动找用户聊天、RAG 记忆管理等特色功能。项目采用前后端分离架构，客户端与服务端通过 REST + WebSocket 通信，AI 数据本地加密存储保障用户隐私。
+
+## 技术栈
+
+| 层级 | 技术 |
+|------|------|
+| 客户端 | JavaFX 17 + FXML + CSS + WebSocket 客户端 + H2 本地数据库 |
+| 服务端 | Spring Boot 3.5.15 + Spring Security + JWT + WebSocket |
+| ORM | MyBatis-Plus 3.5.15 |
+| 数据库 | MySQL 8（云端）/ H2（本地嵌入式） |
+| 缓存 | Redis（可选，云端模式使用） |
+| AI | OpenAI 兼容协议代理 + RAG 记忆检索 + AES-256-GCM API Key 加密 |
+| 数据库迁移 | Flyway |
+| 构建 | Maven + JDK 17 |
+| 代码质量 | Checkstyle 10.14.2 + SpotBugs 4.8.3.1 + JaCoCo 0.8.11 |
+| 部署 | jpackage 桌面打包 / Spring Boot Fat JAR + Nginx 反向代理 |
+
+## 项目结构
+
+```
+voluntary_AI_chat/
+├── common/                # 公共模块（DTO、枚举、常量、异常）
+├── ai-core/               # AI 核心模块（实体、Mapper、LLM 客户端、安全组件）
+├── server/                # Spring Boot 服务端（REST API + WebSocket + 安全认证）
+├── client/                # JavaFX 桌面客户端（UI + 本地 AI 引擎 + 嵌入式服务器）
+├── docs/                  # 项目文档
+│   ├── sql/               # 数据库 Schema
+│   └── *.md               # 各类设计文档
+├── dist/                  # 分发包
+│   ├── client/            # 纯客户端包（jpackage 安装包）
+│   ├── test/              # 测试包（含嵌入式 Spring Boot）
+│   └── cloud/             # 云端部署包（Spring Boot Fat JAR）
+├── tools/                 # 构建工具（Inno Setup 安装包制作）
+└── pom.xml                # 根 POM
+```
+
+### 模块职责
+
+| 模块 | 包名 | 职责 |
+|------|------|------|
+| **common** | `com.voluntary.chat.common` | 零依赖公共层：消息类型枚举、分页结果、业务异常、WebSocket 消息模型 |
+| **ai-core** | `com.voluntary.chat.server` | AI 核心层：AI 角色/记忆/群配置实体与 Mapper、OpenAI/Embedding/VectorStore HTTP 客户端、JWT 认证组件、AES 加密工具、WebSocket AI 流式推送。Spring 依赖均为 optional，支持纯 POJO 模式运行 |
+| **server** | `com.voluntary.chat.server` | 服务端：用户认证、好友管理、群组管理、消息收发、会话管理的 REST API 与 WebSocket 处理，依赖 ai-core 提供 AI 能力 |
+| **client** | `org.example.client` | 客户端：JavaFX UI（13 个 FXML 视图 + 9 个 CSS 样式表）、MVVM ViewModel、REST/WebSocket 通信服务、LocalAiEngine 本地 AI 引擎、嵌入式服务器启动器 |
+
+## 三种分发包
+
+项目通过 Maven Profile 构建三种分发包，适配不同使用场景：
+
+| 包 | Maven Profile | 内容 | 大小 | 用途 |
+|----|--------------|------|------|------|
+| **客户端包** | `client`（默认） | 纯 JavaFX + LocalAiEngine POJO + H2 | ~44MB | 最终用户使用，仅 AI 功能 |
+| **测试包** | `test` | JavaFX + 完整嵌入式 Spring Boot + H2 | ~84MB | 开发调试，含完整后端 |
+| **云端包** | `cloud` | Spring Boot Fat JAR | ~49MB | 服务器部署，人人+AI 全功能 |
+
+### 客户端包（client）
+
+- 使用 `LocalAiEngine`（纯 POJO，非 Spring），通过 JDBC 直连本地 H2 数据库
+- 启动速度 <1 秒，无需安装数据库
+- 仅支持 AI 单聊功能（人人聊天需连接云端服务器）
+- AI 数据本地加密存储，API Key 使用 AES-256-GCM 加密
+
+### 测试包（test）
+
+- 内嵌完整 Spring Boot 后端，启动时自动初始化 H2 数据库
+- 启动速度约 5-7 秒
+- 支持人人聊天 + AI 聊天全部功能
+- 适合开发阶段本地测试
+
+### 云端包（cloud）
+
+- Spring Boot Fat JAR，通过 `java -jar` 部署到服务器
+- 连接 MySQL + Redis，支持多用户并发
+- 需配合 Nginx 反向代理 + HTTPS
+
+## 客户端启动模式
+
+客户端支持三种启动模式，由 `ServerMode` 枚举定义：
+
+| 模式 | 说明 | 后端来源 |
+|------|------|----------|
+| **LOCAL** | 本地模式（默认） | 检测 classpath 是否有 server 模块：有则启动嵌入式 Spring Boot，无则使用 LocalAiEngine POJO |
+| **HOTSPOT** | 热点测试模式 | 连接局域网内的测试服务器，支持 UDP 自动发现 |
+| **CLOUD** | 云端模式 | 连接公网部署的服务器 |
+
+启动流程：`Launcher` 检测单例（端口 59999）→ 根据模式决定后端策略 → 初始化 JavaFX UI → `App` 加载 FXML 视图。
+
+## 数据库设计
+
+项目使用 12 张数据库表，通过 Flyway 管理迁移：
+
+| 表名 | 说明 |
+|------|------|
+| `user` | 用户表（雪花算法 ID、手机号、用户名、密码哈希+盐值、头像、个人资料） |
+| `user_token` | 用户 Token 表（JWT 访问令牌 + 刷新令牌） |
+| `message` | 消息表（文本/图片/AI/撤回/转发，支持用户和群组目标） |
+| `message_read` | 消息已读表（记录用户对每条消息的阅读时间） |
+| `friend_apply` | 好友申请表（申请-同意/拒绝流程） |
+| `friend` | 好友关系表（双向好友 + 备注名） |
+| `chat_group` | 群组表（群名、头像、公告、群主、最大成员数） |
+| `group_member` | 群成员表（群主/管理员/普通成员角色 + 群昵称） |
+| `ai_profile` | AI 角色表（名称、人设、系统提示词、模型提供商、加密 API Key、温度、最大 Token） |
+| `ai_group_config` | AI 群配置表（触发关键词、触发概率、冷却时间、启用状态） |
+| `ai_memory` | AI 记忆表（摘要、关键词、重要度评分、向量 ID） |
+
+所有表均包含 `is_deleted` 逻辑删除字段和 `create_time`/`update_time` 时间戳。
+
+## 核心功能
+
+### 用户系统
+- 手机号注册（短信验证码）、JWT 登录认证（访问令牌 2 小时 + 刷新令牌 7 天）
+- 个人资料管理（头像、昵称、签名、性别、年龄、生日、详细说明）
+- 密码修改、手机号换绑、忘记密码
+
+### 好友系统
+- 好友申请 → 同意/拒绝流程
+- 好友列表、好友备注、删除好友
+
+### 单人聊天
+- 文本消息、图片消息（上传、压缩、缩略图）
+- 消息撤回（2 分钟内）、消息转发
+- 消息已读回执、历史消息加载
+
+### 群聊
+- 创建群组、邀请/移除成员、退出群组
+- 群主转让、解散群组、设置/取消管理员
+- 群昵称、群头像、群公告（支持置顶）
+- 群消息广播、@提及
+
+### AI 功能
+- **AI 单聊**：流式输出（SSE/WebSocket），支持 OpenAI/DeepSeek/通义/智谱等兼容接口
+- **多 AI 群聊**：群内可挂载多个 AI 角色，支持 @定向回复、关键词触发、概率触发
+- **AI 记忆管理**：对话摘要存储、关键词提取、重要度评分
+- **API Key 安全**：AES-256-GCM 加密存储，用户密码派生密钥
+- **本地 AI 引擎**：`LocalAiEngine` POJO 实现，支持本地登录、AI 角色 CRUD、流式聊天、记忆查询
+
+### 安全设计
+- JWT 认证（访问令牌 + 刷新令牌双令牌机制）
+- Spring Security 过滤器链（JwtAuthenticationFilter）
+- API Key AES-256-GCM 加密（AesKeyUtil）
+- 密码 PBKDF2 哈希 + 盐值
+- 请求频率限制（RateLimitingFilter）
+
+## 构建与运行
+
+### 环境要求
+
+- JDK 17+
+- Maven 3.8+
+- MySQL 8.0+（云端模式）
+- Redis（云端模式，可选）
+
+### 构建命令
+
+```bash
+# 构建全部模块
+mvn clean package -DskipTests
+
+# 构建纯客户端包（默认 profile）
+mvn clean package -P client -DskipTests
+
+# 构建测试包（含嵌入式 Spring Boot）
+mvn clean package -P test -DskipTests
+
+# 构建云端部署包
+mvn clean package -P cloud -DskipTests
+```
+
+### 本地运行
+
+```bash
+# 运行客户端（测试包模式，含嵌入式后端）
+mvn exec:java -pl client
+
+# 运行服务端（独立模式）
+java -jar server/target/voluntary-ai-chat-server-1.0-SNAPSHOT-exec.jar
+
+# 使用 H2 内嵌数据库运行服务端
+java -jar server/target/voluntary-ai-chat-server-1.0-SNAPSHOT-exec.jar --spring.profiles.active=h2
+```
+
+### 云端部署
+
+```bash
+# 启动云端服务
+java -jar voluntary-ai-chat-server-1.0-SNAPSHOT-exec.jar --spring.profiles.active=cloud
+
+# 或使用提供的启动脚本
+./start-cloud.sh    # Linux
+start-cloud.bat     # Windows
+```
+
+详细部署指南见 [docs/DEPLOYMENT_STEP_BY_STEP.md](docs/DEPLOYMENT_STEP_BY_STEP.md) 和 [docs/SERVER_DEPLOYMENT.md](docs/SERVER_DEPLOYMENT.md)。
+
+## 代码质量
+
+项目配置了完整的代码质量工具链：
+
+| 工具 | 用途 | 配置 |
+|------|------|------|
+| **Checkstyle** | 代码风格检查 | `checkstyle.xml`，构建时自动执行 |
+| **SpotBugs** | 静态缺陷分析 | `findbugs-exclude.xml`，构建时自动执行 |
+| **JaCoCo** | 测试覆盖率 | 行覆盖率 ≥70%，分支覆盖率 ≥60% |
+| **Sonar** | 代码质量平台 | `mvn sonar:sonar -Dsonar` 激活 |
+
+### 测试
+
+```bash
+# 运行全部测试
+mvn test
+
+# 运行测试并生成覆盖率报告
+mvn test jacoco:report
+
+# 查看覆盖率报告
+# 各模块 target/site/jacoco/index.html
+```
 
 ## 文档目录
+
 | 文档 | 说明 |
 |------|------|
-| [CONTRIBUTING.md](CONTRIBUTING.md) | 贡献指南（两人协作规范） |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | 开发路线图 |
-| [docs/FEATURES.md](docs/FEATURES.md) | 功能规格文档 |
-| [docs/API.md](docs/API.md) | API接口文档 |
-| [docs/DATABASE.md](docs/DATABASE.md) | 数据库设计文档 |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 架构设计文档 |
-| [docs/TASK_BOARD.md](docs/TASK_BOARD.md) | 任务看板 |
+| [AI_SPEC.md](AI_SPEC.md) | AI 开发规范文档（协作规范、代码质量、安全规范） |
+| [AGENTS.md](AGENTS.md) | AI Agent 开发准则（精简版，供 AI 助手每次会话加载） |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 贡献指南（两人协作分支策略与工作流） |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 系统架构设计（模块结构、核心流程、安全设计） |
+| [docs/FINAL_ARCHITECTURE.md](docs/FINAL_ARCHITECTURE.md) | 三包架构最终方案（客户端/测试/云端分包设计） |
+| [docs/API.md](docs/API.md) | API 接口文档（REST + WebSocket + LocalAiEngine POJO API） |
+| [docs/DATABASE.md](docs/DATABASE.md) | 数据库设计文档（MySQL DDL + Redis 缓存设计） |
+| [docs/FEATURES.md](docs/FEATURES.md) | 功能规格文档（各模块详细功能定义） |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | 开发路线图（P0-P5 阶段规划） |
+| [docs/TASK_BOARD.md](docs/TASK_BOARD.md) | 任务看板（当前进度跟踪） |
+| [docs/CHAT_PLAN.md](docs/CHAT_PLAN.md) | 聊天功能开发计划 |
+| [docs/GROUP_CHAT_PLAN.md](docs/GROUP_CHAT_PLAN.md) | 群聊功能开发计划 |
+| [docs/AI_MODULE_PLAN.md](docs/AI_MODULE_PLAN.md) | AI 模块实现计划 |
+| [docs/AI_PRIVACY_ARCHITECTURE.md](docs/AI_PRIVACY_ARCHITECTURE.md) | AI API Key 隐私架构设计 |
+| [docs/AI_CORE_MIGRATION_PLAN.md](docs/AI_CORE_MIGRATION_PLAN.md) | ai-core 模块拆分计划 |
+| [docs/CLIENT_INDEPENDENCE_PLAN.md](docs/CLIENT_INDEPENDENCE_PLAN.md) | 客户端独立化计划 |
+| [docs/THREE_PACKAGE_ANALYSIS.md](docs/THREE_PACKAGE_ANALYSIS.md) | 三包拆分分析文档 |
+| [docs/IMAGE_MODULE_PLAN.md](docs/IMAGE_MODULE_PLAN.md) | 图片功能完成计划 |
+| [docs/RECALL_FIX_PLAN.md](docs/RECALL_FIX_PLAN.md) | 消息撤回修复计划 |
+| [docs/HOTSPOT_TEST.md](docs/HOTSPOT_TEST.md) | 局域网热点测试指南 |
+| [docs/DEPLOYMENT_STEP_BY_STEP.md](docs/DEPLOYMENT_STEP_BY_STEP.md) | 部署教程（新手友好） |
+| [docs/SERVER_DEPLOYMENT.md](docs/SERVER_DEPLOYMENT.md) | 云端部署完整指南 |
+| [docs/UNINSTALLATION.md](docs/UNINSTALLATION.md) | 云端卸载教程 |
+| [docs/ERROR_LOG.md](docs/ERROR_LOG.md) | 错误分析与修复记录 |
 
-# Java 桌面 AI 特色聊天软件 — 技术与架构规划
+## 开发阶段
 
-下面我按"技术选型 → 整体架构 → 模块拆解 → 关键难点 → 开发路线"五个层面给你完整规划。
-
-## 一、技术选型
-
-### 1. 客户端（桌面端）
-
-| 技术 | 用途 | 说明 |
-|---|---|---|
-| JavaFX + FXML | UI 框架 | 现代 Java 桌面首选，支持 CSS 美化、MVVM |
-| ControlsFX / AtlantaFX | UI 组件库 | 提供美观的对话框、气泡、列表 |
-| WebView (JavaFX 内置) | 富文本/Markdown 渲染 | AI 回复用 Markdown 渲染 |
-| Netty / Java-WebSocket | WebSocket 客户端 | 实时消息收发 |
-| Jackson | JSON 序列化 | 与后端统一 |
-| DJL (Deep Java Library) | 本地小模型推理 | 句子完整性识别 |
-
-> 不建议用 Swing，JavaFX 在动画、CSS、富文本上更适合聊天软件。
-
-### 2. 服务端
-
-| 技术 | 用途 |
-|---|---|
-| Spring Boot 3.x (JDK 25) | 后端主框架 |
-| Spring Security + JWT | 鉴权 |
-| Netty / Spring WebSocket (STOMP) | 实时通信 |
-| MyBatis-Plus | ORM |
-| Redis | 在线状态、Token、消息队列缓存、未读数 |
-| RabbitMQ / RocketMQ | 异步消息（AI 主动聊天、记忆总结任务） |
-| MinIO | 图片/文件对象存储 |
-
-### 3. 数据存储
-
-| 数据库 | 用途 |
-|---|---|
-| MySQL 8 | 用户、好友、群、消息元数据 |
-| Redis | 在线状态、会话缓存、限流 |
-| Milvus / Qdrant（向量数据库） | AI 记忆向量检索 |
-| MongoDB（可选） | 聊天记录大文本存储，水平扩展友好 |
-
-### 4. AI 能力
-
-| 能力 | 方案 |
-|---|---|
-| 大模型对话 | 用户自带 API Key，后端做代理转发（OpenAI 兼容协议） |
-| 记忆管理 | 向量化历史 + 检索增强（RAG） |
-| 句子完整性识别 | 本地小模型（BERT-tiny / ONNX），DJL 加载 |
-| AI 主动聊天 | 定时任务 + 概率触发 + 上下文摘要 |
-
-## 二、整体架构
-
-```plainText
-┌─────────────────────────────────────────────┐
-│            JavaFX 桌面客户端                  │
-│  ┌─────────┐ ┌──────────┐ ┌──────────────┐  │
-│  │ UI 层    │ │ WebSocket│ │ 本地模型推理  │  │
-│  │(FXML/MVVM)│ │  Client  │ │ (句子完整性)  │  │
-│  └─────────┘ └──────────┘ └──────────────┘  │
-└──────────────────┬──────────────────────────┘
-                   │ HTTPS + WSS
-┌──────────────────▼──────────────────────────┐
-│            Spring Boot 服务端                 │
-│  ┌──────────────────────────────────────┐   │
-│  │ Gateway / Controller 层 (REST + WS)   │   │
-│  ├──────────────────────────────────────┤   │
-│  │ Service 层                            │   │
-│  │  用户│好友│群聊│消息│AI代理│记忆管理    │   │
-│  ├──────────────────────────────────────┤   │
-│  │ AI 编排层 (多AI群路由 / 主动聊天调度)  │   │
-│  └──────────────────────────────────────┘   │
-└───┬──────────┬──────────┬──────────┬────────┘
-    │          │          │          │
-┌───▼───┐ ┌───▼───┐ ┌────▼────┐ ┌───▼────┐
-│ MySQL │ │ Redis │ │ Milvus  │ │ MinIO  │
-└───────┘ └───────┘ └─────────┘ └────────┘
-```
-
-## 三、模块拆解与关键设计
-
-### 1. 用户系统
-- **UID 生成**：雪花算法（Snowflake），保证分布式唯一且有序。
-- **在线状态**：Redis 维护 `uid -> WebSocket session`，好友查询时读 Redis，状态变更通过 WebSocket 推送给好友列表。
-- **好友关系**：MySQL 表 `friend_relation(uid, friend_uid, remark, status)`，加好友走"申请-同意"流程。
-
-### 2. 单人聊天
-- **消息模型**：统一抽象为 `Message`，包含 `type(TEXT/IMAGE/AI/RECALL/FORWARD)`。
-- **撤回逻辑**：
-  - 人-人：消息表加 `create_time`，撤回时校验 `now - create_time < 2min`。
-  - 人-AI：AI 消息不强制时间限制，客户端可随时撤回（仅本地 + 通知服务端删除）。
-- **背景图**：客户端本地存储，按 `session_id` 关联，不上传服务端（隐私 + 省流量）。
-- **转发**：转发本质是把若干 `Message` 打包成 `ForwardPackage`，作为一条新消息发送。
-
-### 3. 群聊
-- **群角色**：`owner / admin / member`，权限用枚举 + 策略模式校验（踢人、加管理员等）。
-- **多 AI 群（特色）**：群内可挂多个 AI，每个 AI 有独立人设和 API Key。消息路由策略：
-  - `@某个AI` → 定向回复
-  - 未 @ → 按概率/轮询/关键词触发某个 AI
-- **群公告置顶**：公告表加 `is_pinned` 字段，置顶项单独查询。
-
-### 4. 特色功能（核心难点）
-
-#### a) AI 主动找用户聊天
-```plainText
-定时任务(每用户随机间隔) → 读取最近N条记忆摘要
-→ 生成"主动聊天"提示词 → 调用AI → 推送消息给在线用户
-```
-- 用 RabbitMQ 延迟队列实现"随机间隔"，避免定时任务集中。
-
-#### b) 记忆管理（AI 日记 + 向量检索）
-```plainText
-聊天达到阈值(如20条) → 异步任务总结为"日记"
-→ 存MySQL(摘要) + Milvus(向量)
-→ 下次对话时: 当前问题向量化 → Milvus检索Top-K相关记忆 → 拼入Prompt
-```
-- 向量化用 Embedding 模型（如 `text-embedding-3-small` 或本地 BGE）。
-- 这是典型的 **RAG** 架构，能解决长上下文记忆问题。
-
-#### c) 本地小模型识别句子完整性
-- 用 DJL 加载一个轻量分类模型（可基于 BERT-tiny 微调）。
-- 客户端发送前先过模型：`is_complete(text) -> bool`，不完整则拦截。
-- 模型放客户端本地推理，**不上传文字**，保护隐私。
-
-### 5. AI 代理层（用户自带 Key）
-- 后端不存明文 Key，加密存储（AES + 用户密码派生密钥）。
-- 调用时解密，代理转发到 OpenAI 兼容接口，流式返回给客户端。
-- 这样支持 OpenAI / DeepSeek / 通义 / 智谱 等任何兼容接口。
-
-## 四、关键数据库表（简版）
-
-```sql
--- 用户
-user(uid PK, phone, username, password_hash, salt, bio, avatar, create_time)
-
--- 好友关系
-friend(id PK, uid, friend_uid, remark, status, create_time)
-
--- 群
-chat_group(group_id PK, name, owner_uid, announcement, announcement_pinned, create_time)
-
--- 群成员
-group_member(group_id, uid, role, join_time)
-
--- AI 角色
-ai_profile(ai_id PK, owner_uid, name, persona, model_provider, api_key_enc, is_group)
-
--- 消息
-message(msg_id PK, session_id, sender_uid, sender_type(USER/AI),
-        msg_type, content, ref_msg_id, create_time, is_recalled)
-
--- AI 记忆摘要
-ai_memory(id PK, ai_id, user_uid, summary, vector_id, create_time)
-```
-
-## 五、推荐技术栈总结
-
-```plainText
-后端:  Spring Boot 3 + MyBatis-Plus + Spring Security + JWT
-通信:  WebSocket(STOMP) + REST
-存储:  MySQL + Redis + Milvus + MinIO
-消息:  RabbitMQ(延迟队列做AI主动聊天)
-AI:    OpenAI兼容协议代理 + DJL(本地模型) + Embedding(RAG)
-桌面:  JavaFX + FXML + AtlantaFX + WebView
-构建:  Maven(jdk17)
-部署:  Docker + docker-compose
-```
-
-## 六、开发路线建议（分阶段）
-
-| 阶段 | 内容 | 周期参考 |
-|---|---|---|
-| P0 | 用户系统 + 单聊文字 + WebSocket 打通 | 基础 |
-| P1 | 群聊 + 好友/群管理 + 图片消息 | 核心 |
-| P2 | AI 接入（单聊 AI + 自定义人设 + Key 管理） | 特色起步 |
-| P3 | 多 AI 群 + AI 主动聊天 + 记忆管理(RAG) | 特色核心 |
-| P4 | 本地句子完整性模型 + 撤回/转发/背景图 | 体验打磨 |
-| P5 | 文件传输、TTS、图片识别、随机陌生人聊天 | 未来扩展 |
-
-## 七、几个关键提醒
-1. **API Key 安全**：用户 Key 一定加密存储，前端不直连第三方 API（避免 CORS 和 Key 泄露）。
-2. **本地模型体积**：句子完整性模型控制在 50MB 以内，否则客户端打包臃肿。
-3. **向量库选型**：个人/小规模项目用 `Qdrant` 比 Milvus 更轻量，部署简单。
-4. **桌面端打包**：用 `jpackage` 生成 `.exe` / `.dmg`，内嵌 JRE。
-5. **JavaFX 线程**：WebSocket 回调不在 JavaFX UI 线程，更新 UI 必须用 `Platform.runLater()`。
-
----
-
-如果你确认这个技术方向，我可以帮你：
-- 生成项目骨架（Maven 多模块：`client` / `server` / `common`）
-- 设计完整的数据库 DDL
-- 搭建 Spring Boot + WebSocket 基础通信
+| 阶段 | 内容 | 状态 |
+|------|------|------|
+| P0 | 框架搭建、用户系统、单聊文字、WebSocket 通信 | 已完成 |
+| P1 | 群聊、好友管理、图片消息 | 已完成 |
+| P2 | AI 接入（单聊 AI、自定义人设、Key 管理） | 已完成 |
+| P3 | 多 AI 群、AI 主动聊天、记忆管理（RAG） | 进行中 |
+| P4 | 本地句子完整性模型、转发、背景图 | 计划中 |
+| P5 | 优化与发布 | 计划中 |

@@ -1,6 +1,8 @@
 package com.voluntary.chat.server.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.voluntary.chat.common.enums.SenderType;
+import com.voluntary.chat.common.enums.TargetType;
 import com.voluntary.chat.server.client.OpenAiClient;
 import com.voluntary.chat.server.config.AiConfig;
 import com.voluntary.chat.server.entity.AiProfile;
@@ -10,21 +12,34 @@ import com.voluntary.chat.server.websocket.ChatWebSocketHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.stereotype.Service;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Consumer;
 
 /**
  * AI 对话服务
+ *
+ * <p>
+ * 负责 AI 单聊的流式处理、上下文构建、记忆检索与摘要生成。
+ * </p>
+ *
+ * <p>
+ * <b>线程模型说明：</b>
+ * <ul>
+ * <li>handleAiChat 由 WebSocket 线程调用，立即返回，避免阻塞</li>
+ * <li>AI 调用与消息保存通过 AsyncTaskExecutor 异步执行</li>
+ * <li>用户消息保存在独立事务中，AI 调用不在事务内</li>
+ * </ul>
+ * </p>
  */
 @Slf4j
-@Service
 @RequiredArgsConstructor
 public class AiChatService {
 
@@ -32,15 +47,47 @@ public class AiChatService {
     private final OpenAiClient openAiClient;
     private final AiConfig aiConfig;
     private final MessageMapper messageMapper;
+    private final AiMemoryService aiMemoryService;
 
     @Autowired
     @Lazy
     private ChatWebSocketHandler webSocketHandler;
 
     /**
-     * 处理 AI 单聊（流式）
+     * 设置 WebSocket 处理器（用于测试注入 mock）
+     *
+     * @param webSocketHandler WebSocket 处理器
      */
-    @Transactional
+    void setWebSocketHandler(final ChatWebSocketHandler webSocketHandler) {
+        this.webSocketHandler = webSocketHandler;
+    }
+
+    @Autowired
+    @Qualifier("aiTaskExecutor")
+    private TaskExecutor aiTaskExecutor;
+
+    /**
+     * 设置 AI 任务执行器（用于测试注入同步执行器）
+     *
+     * @param aiTaskExecutor 任务执行器
+     */
+    void setAiTaskExecutor(final TaskExecutor aiTaskExecutor) {
+        this.aiTaskExecutor = aiTaskExecutor;
+    }
+
+    /**
+     * 处理 AI 单聊（流式）
+     *
+     * <p>
+     * 异步执行，立即返回，避免阻塞 WebSocket 线程。
+     * </p>
+     *
+     * @param userId    用户ID
+     * @param aiId      AI 角色ID
+     * @param sessionId 会话ID
+     * @param content   用户消息内容
+     * @param messageId 客户端消息ID（用于流式推送匹配）
+     */
     public void handleAiChat(
             final Long userId,
             final Long aiId,
@@ -48,44 +95,66 @@ public class AiChatService {
             final String content,
             final String messageId) {
 
-        // 获取 AI 角色信息
-        final AiProfile profile = aiService.getAiProfileById(aiId);
-        final String apiKey = aiService.decryptApiKey(profile);
-        final String baseUrl = openAiClient.getBaseUrl(profile.getModelProvider());
+        aiTaskExecutor.execute(() -> doHandleAiChat(userId, aiId, sessionId, content, messageId));
+    }
 
-        // 构建对话上下文
-        final List<Map<String, String>> messages = buildContext(profile, userId, sessionId, content);
+    /**
+     * 实际处理 AI 对话（异步执行）
+     */
+    private void doHandleAiChat(
+            final Long userId,
+            final Long aiId,
+            final String sessionId,
+            final String content,
+            final String messageId) {
 
-        // 流式调用 AI
-        final StringBuilder fullResponse = new StringBuilder();
+        try {
+            final AiProfile profile = aiService.getAiProfileById(aiId);
+            final String apiKey = aiService.decryptApiKey(profile);
+            final String baseUrl = openAiClient.getBaseUrl(profile.getModelProvider());
 
-        final OpenAiClient.StreamConfig streamConfig = new OpenAiClient.StreamConfig(
-                baseUrl,
-                apiKey,
-                profile.getModel(),
-                messages,
-                profile.getTemperature(),
-                profile.getMaxTokens(),
-                // onChunk: 推送增量内容
-                chunk -> {
-                    webSocketHandler.sendAiStream(userId, messageId, chunk, false);
-                },
-                // onComplete: 推送完成消息
-                completeContent -> {
-                    fullResponse.append(completeContent);
-                    // 保存 AI 消息
-                    final Long aiMessageId = saveAiMessage(profile.getId(), sessionId, completeContent, userId);
-                    // 推送完成消息
-                    webSocketHandler.sendAiStream(userId, messageId, completeContent, true, aiMessageId);
-                    log.info("AI 对话完成: aiId={}, userId={}, messageId={}", aiId, userId, aiMessageId);
-                }
-        );
+            saveUserMessage(userId, sessionId, content, aiId);
 
-        openAiClient.streamChatCompletion(streamConfig);
+            final List<Map<String, String>> messages = buildContext(profile, userId, sessionId, content);
+
+            final StringBuilder fullResponse = new StringBuilder();
+
+            final OpenAiClient.StreamConfig streamConfig = new OpenAiClient.StreamConfig(
+                    baseUrl,
+                    apiKey,
+                    profile.getModel(),
+                    messages,
+                    profile.getTemperature(),
+                    profile.getMaxTokens(),
+                    chunk -> webSocketHandler.sendAiStream(userId, messageId, chunk, false),
+                    completeContent -> {
+                        fullResponse.append(completeContent);
+                        final Long aiMessageId = saveAiMessage(profile.getId(), sessionId, completeContent, userId);
+                        webSocketHandler.sendAiStream(userId, messageId, completeContent, true, aiMessageId);
+                        log.info("AI 对话完成: aiId={}, userId={}, messageId={}", aiId, userId, aiMessageId);
+
+                        aiTaskExecutor.execute(() -> {
+                            try {
+                                aiMemoryService.summarizeIfNeeded(aiId, userId, sessionId);
+                            } catch (final RuntimeException e) {
+                                log.warn("记忆摘要生成失败: aiId={}, userId={}", aiId, userId, e);
+                            }
+                        });
+                    });
+
+            openAiClient.streamChatCompletion(streamConfig);
+        } catch (final RuntimeException e) {
+            log.error("AI 对话处理失败: aiId={}, userId={}, messageId={}", aiId, userId, messageId, e);
+            webSocketHandler.sendAiStream(userId, messageId, "AI 回复失败，请稍后重试", true, null);
+        }
     }
 
     /**
      * 构建对话上下文
+     *
+     * <p>
+     * 上下文组成：System Prompt + 相关记忆（RAG）+ 历史消息 + 当前输入
+     * </p>
      */
     private List<Map<String, String>> buildContext(
             final AiProfile profile,
@@ -95,7 +164,6 @@ public class AiChatService {
 
         final List<Map<String, String>> messages = new ArrayList<>();
 
-        // 1. System Prompt（AI 人设）
         final String systemPrompt = profile.getSystemPrompt() != null
                 ? profile.getSystemPrompt()
                 : profile.getPersona();
@@ -107,22 +175,32 @@ public class AiChatService {
             messages.add(systemMessage);
         }
 
-        // 2. 历史消息（最近 N 轮）
+        final List<String> relevantMemories = searchMemoriesSafely(profile, userId, userContent);
+        if (!relevantMemories.isEmpty()) {
+            final StringBuilder memoryContext = new StringBuilder("以下是关于该用户的长期记忆，请参考：\n");
+            for (int i = 0; i < relevantMemories.size(); i++) {
+                memoryContext.append(i + 1).append(". ").append(relevantMemories.get(i)).append("\n");
+            }
+            final Map<String, String> memoryMessage = new HashMap<>();
+            memoryMessage.put("role", "system");
+            memoryMessage.put("content", memoryContext.toString());
+            messages.add(memoryMessage);
+        }
+
         final int maxHistoryRounds = aiConfig.getContext().getMaxHistoryRounds();
         final List<Message> historyMessages = getHistoryMessages(sessionId, maxHistoryRounds * 2);
 
         for (final Message msg : historyMessages) {
             final Map<String, String> historyMessage = new HashMap<>();
-            if (msg.getSenderType() == 1) { // AI
+            if (msg.getSenderType() == SenderType.AI.ordinal()) {
                 historyMessage.put("role", "assistant");
-            } else { // User
+            } else {
                 historyMessage.put("role", "user");
             }
             historyMessage.put("content", msg.getContent());
             messages.add(historyMessage);
         }
 
-        // 3. 当前用户输入
         final Map<String, String> userMessage = new HashMap<>();
         userMessage.put("role", "user");
         userMessage.put("content", userContent);
@@ -132,33 +210,66 @@ public class AiChatService {
     }
 
     /**
+     * 安全检索相关记忆（异常时降级为空列表，不影响主流程）
+     */
+    private List<String> searchMemoriesSafely(final AiProfile profile, final Long userId, final String query) {
+        try {
+            final List<String> memories = aiMemoryService.searchRelevantMemories(profile.getId(), userId, query);
+            return memories != null ? memories : Collections.emptyList();
+        } catch (final RuntimeException e) {
+            log.warn("记忆检索失败，降级为无记忆上下文: aiId={}", profile.getId(), e);
+            return Collections.emptyList();
+        }
+    }
+
+    /**
      * 获取历史消息
      */
     private List<Message> getHistoryMessages(final String sessionId, final int limit) {
         final LambdaQueryWrapper<Message> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Message::getSessionId, sessionId)
-               .eq(Message::getRecallTime, null) // 未撤回
-               .orderByDesc(Message::getCreateTime)
-               .last("LIMIT " + limit);
+                .isNull(Message::getRecallTime)
+                .orderByDesc(Message::getCreateTime)
+                .last("LIMIT " + limit);
 
         final List<Message> messages = messageMapper.selectList(wrapper);
-        // 反转顺序，使历史消息按时间正序排列
         final List<Message> result = new ArrayList<>(messages);
-        java.util.Collections.reverse(result);
+        Collections.reverse(result);
         return result;
     }
 
     /**
-     * 保存 AI 消息
+     * 保存用户消息（独立短事务）
      */
-    private Long saveAiMessage(final Long aiId, final String sessionId, final String content, final Long userId) {
+    @Transactional
+    public void saveUserMessage(final Long userId, final String sessionId,
+            final String content, final Long aiId) {
+        final Message message = new Message();
+        message.setSessionId(sessionId);
+        message.setSenderId(userId);
+        message.setSenderType(SenderType.USER.ordinal());
+        message.setTargetId(aiId);
+        message.setTargetType(TargetType.AI.ordinal());
+        message.setType(0);
+        message.setContent(content);
+        message.setIsDeleted(0);
+
+        messageMapper.insert(message);
+        log.debug("用户AI消息已保存: userId={}, aiId={}, sessionId={}", userId, aiId, sessionId);
+    }
+
+    /**
+     * 保存 AI 消息（独立短事务）
+     */
+    @Transactional
+    public Long saveAiMessage(final Long aiId, final String sessionId, final String content, final Long userId) {
         final Message message = new Message();
         message.setSessionId(sessionId);
         message.setSenderId(aiId);
-        message.setSenderType(1); // AI
+        message.setSenderType(SenderType.AI.ordinal());
         message.setTargetId(userId);
-        message.setTargetType(0); // User
-        message.setType(0); // TEXT
+        message.setTargetType(TargetType.USER.ordinal());
+        message.setType(0);
         message.setContent(content);
         message.setIsDeleted(0);
 

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.shape.Circle?>
+
+<VBox prefHeight="380.0" prefWidth="400.0" spacing="0"
+      styleClass="group-create-root"
+      xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="org.example.client.controller.GroupAvatarController">
+
+    <!-- 标题栏 -->
+    <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="group-create-header">
+        <Label styleClass="group-create-title" text="修改群头像"/>
+    </HBox>
+
+    <Separator/>
+
+    <!-- 当前头像预览 -->
+    <VBox spacing="12.0" styleClass="avatar-preview-section" alignment="CENTER">
+        <Label styleClass="group-create-label" text="当前头像预览"/>
+
+        <!-- 头像预览区域 -->
+        <StackPane styleClass="avatar-preview-container">
+            <Circle fx:id="avatarCircle" radius="50" fill="#E76F51"/>
+            <Label fx:id="avatarText" style="-fx-text-fill: white; -fx-font-size: 24; -fx-font-weight: bold;" text="群"/>
+            <ImageView fx:id="avatarImage" fitWidth="100" fitHeight="100"
+                       styleClass="avatar-preview-image" visible="false"/>
+        </StackPane>
+    </VBox>
+
+    <Separator/>
+
+    <!-- 头像URL输入 -->
+    <VBox spacing="6.0" styleClass="group-create-name-section">
+        <Label styleClass="group-create-label" text="头像图片URL"/>
+        <TextField fx:id="avatarUrlField" promptText="输入头像图片URL（支持 jpg/png/gif/webp）"
+                   styleClass="group-create-input"/>
+        <Label styleClass="hint-label" text="提示：可直接粘贴网络图片链接，或使用图片托管服务上传"/>
+    </VBox>
+
+    <Separator/>
+
+    <!-- 底部操作栏 -->
+    <HBox alignment="CENTER_RIGHT" spacing="12.0" styleClass="group-create-footer">
+        <Label fx:id="errorLabel" styleClass="error-message" text="" HBox.hgrow="ALWAYS"/>
+        <Button fx:id="cancelButton" mnemonicParsing="false"
+                onAction="#handleCancel" styleClass="btn-secondary" text="取消"/>
+        <Button fx:id="confirmButton" mnemonicParsing="false"
+                onAction="#handleConfirm" styleClass="btn-primary" text="保存头像"/>
+    </HBox>
+</VBox>

@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.example.client.engine.AiStreamCallback;
+import org.example.client.engine.LocalAiEngine;
 import org.example.client.model.ConversationInfo;
 import org.example.client.model.ImageUploadResponse;
 import org.example.client.model.MarkReadRequest;
@@ -34,7 +36,19 @@ import javafx.collections.ObservableList;
 /**
  * 聊天区域视图模型（MVVM）
  *
- * <p>管理当前会话的消息列表、消息发送和历史记录加载。</p>
+ * <p>
+ * 管理当前会话的消息列表、消息发送和历史记录加载。
+ * </p>
+ *
+ * <p>
+ * <b>TODO:⚠️ 类长度接近限制警告：当前379行，接近Service限制（400行）</b>
+ * <br>
+ * 请谨慎添加新功能，避免超限。如需扩展，应考虑拆分为：
+ * <ul>
+ * <li>MessageSender（消息发送逻辑）</li>
+ * <li>MessageListManager（消息列表管理）</li>
+ * </ul>
+ * </p>
  *
  * @author voluntary-ai-chat
  * @since 1.0.0
@@ -56,8 +70,7 @@ public final class ChatViewModel {
     private final ConversationInfo conversation;
 
     /** 消息列表 */
-    private final ListProperty<MessageInfo> messages =
-            new SimpleListProperty<>(FXCollections.observableArrayList());
+    private final ListProperty<MessageInfo> messages = new SimpleListProperty<>(FXCollections.observableArrayList());
 
     /** 输入框文本 */
     private final StringProperty inputText = new SimpleStringProperty("");
@@ -116,11 +129,25 @@ public final class ChatViewModel {
                             final List<MessageInfo> list = response.getData().getList();
                             if (list != null) {
                                 try {
+                                    // 保存旧消息的已读状态（服务端返回的消息不含 read 字段）
+                                    // 避免 setAll 后本地的已读状态丢失
+                                    final java.util.Map<Long, Boolean> oldReadStatus = new java.util.HashMap<>();
+                                    for (final MessageInfo old : messages) {
+                                        if (old.getMessageId() != null && old.getMessageId() > 0) {
+                                            oldReadStatus.put(old.getMessageId(), old.isRead());
+                                        }
+                                    }
+
                                     // 标记是否为当前用户发送
                                     for (final MessageInfo msg : list) {
                                         msg.setSentByMe(currentUser != null
                                                 && currentUser.getUserId() != null
                                                 && currentUser.getUserId().equals(msg.getSenderId()));
+                                        // 恢复已读状态（仅在旧消息中有标记时恢复）
+                                        final Boolean wasRead = oldReadStatus.get(msg.getMessageId());
+                                        if (wasRead != null) {
+                                            msg.setRead(wasRead);
+                                        }
                                     }
                                     // 按时间升序排序（先发的在上方），服务端默认按时间倒序返回
                                     list.sort(java.util.Comparator.comparing(
@@ -196,7 +223,108 @@ public final class ChatViewModel {
         data.put("msgType", MSG_TYPE_TEXT);
         data.put("content", text.trim());
 
-        WebSocketClient.getInstance().send(MessageTypes.SEND_MESSAGE, data);
+        if ("AI".equals(conversation.getTargetType())) {
+            // AI 对话始终使用本地引擎（API.md 架构：客户包不走 HTTP/WS 回环）
+            final Long aiId = conversation.getTargetId();
+            final Long userId = currentUser != null ? currentUser.getUserId() : 0L;
+            final String sessionId = conversation.getSessionId();
+            final String content = text.trim();
+
+            // 创建 AI 占位消息（用于流式更新）
+            final MessageInfo aiPlaceholder = new MessageInfo();
+            aiPlaceholder.setMessageId(-2L);
+            aiPlaceholder.setSessionId(sessionId);
+            aiPlaceholder.setSenderId(aiId);
+            aiPlaceholder.setSenderName(conversation.getTargetName());
+            aiPlaceholder.setSenderType("AI");
+            aiPlaceholder.setType(MSG_TYPE_TEXT);
+            aiPlaceholder.setContent("");
+            aiPlaceholder.setCreateTime(java.time.LocalDateTime.now());
+            aiPlaceholder.setSentByMe(false);
+            messages.add(aiPlaceholder);
+
+            LocalAiEngine.getInstance().chat(aiId, userId, content, new AiStreamCallback() {
+                private final StringBuilder fullContent = new StringBuilder();
+
+                    @Override
+                    public void onChunk(String chunk) {
+                        fullContent.append(chunk);
+                        // 流式更新最后一条 AI 消息
+                        Platform.runLater(() -> {
+                            // 查找是否已有 AI 回复消息
+                            MessageInfo lastAiMsg = null;
+                            for (MessageInfo msg : messages) {
+                                if (msg.getMessageId() != null && msg.getMessageId() < 0
+                                        && msg.getSenderType() != null && "AI".equals(msg.getSenderType())) {
+                                    lastAiMsg = msg;
+                                    break;
+                                }
+                            }
+                            if (lastAiMsg != null) {
+                                lastAiMsg.setContent(fullContent.toString());
+                                final int idx = messages.indexOf(lastAiMsg);
+                                if (idx >= 0) {
+                                    messages.set(idx, lastAiMsg);
+                                }
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onComplete(String fullResponse, Long messageId) {
+                        Platform.runLater(() -> {
+                            // 创建完整的 AI 回复消息
+                            final MessageInfo aiMsg = new MessageInfo();
+                            aiMsg.setMessageId(messageId != null ? messageId : -1L);
+                            aiMsg.setSessionId(sessionId);
+                            aiMsg.setSenderId(aiId);
+                            aiMsg.setSenderName(conversation.getTargetName());
+                            aiMsg.setSenderType("AI");
+                            aiMsg.setType(MSG_TYPE_TEXT);
+                            aiMsg.setContent(fullResponse);
+                            aiMsg.setCreateTime(LocalDateTime.now());
+                            aiMsg.setSentByMe(false);
+
+                            // 移除占位消息
+                            messages.removeIf(msg -> msg.getMessageId() != null
+                                    && msg.getMessageId() < 0 && "AI".equals(msg.getSenderType()));
+
+                            messages.add(aiMsg);
+                            LOG.info("AI 回复完成（本地）: aiId={}, sessionId={}", aiId, sessionId);
+                        });
+                    }
+
+                    @Override
+                    public void onError(String error) {
+                        Platform.runLater(() -> {
+                            LOG.warn("AI 回复失败（本地）: error={}", error);
+                            // 生成更友好的错误提示
+                            String userMsg;
+                            if (error != null && error.contains("authentication_error")) {
+                                userMsg = "API Key 无效，请在 AI 设置中更新有效的 API Key";
+                            } else if (error != null && error.contains("invalid_request_error")) {
+                                userMsg = "API 请求失败，请检查 AI 角色的模型配置是否正确";
+                            } else {
+                                userMsg = "AI 回复失败: " + error;
+                            }
+                            // 更新占位消息为错误提示
+                            for (MessageInfo msg : messages) {
+                                if (msg.getMessageId() != null && msg.getMessageId() < 0
+                                        && "AI".equals(msg.getSenderType())) {
+                                    msg.setContent(userMsg);
+                                    final int idx = messages.indexOf(msg);
+                                    if (idx >= 0) {
+                                        messages.set(idx, msg);
+                                    }
+                                    break;
+                                }
+                            }
+                        });
+                    }
+                });
+        } else {
+            WebSocketClient.getInstance().send(MessageTypes.SEND_MESSAGE, data);
+        }
 
         // 清空输入框
         inputText.set("");
@@ -228,12 +356,12 @@ public final class ChatViewModel {
     /**
      * 更新消息确认
      *
-     * @param clientId 客户端消息ID
-     * @param messageId 服务端消息ID
+     * @param clientId   客户端消息ID
+     * @param messageId  服务端消息ID
      * @param createTime 创建时间
      */
     public void updateMessageAck(final String clientId, final Long messageId,
-                                  final java.time.LocalDateTime createTime) {
+            final java.time.LocalDateTime createTime) {
         final MessageInfo pending = pendingMessages.remove(clientId);
         if (pending != null) {
             pending.setMessageId(messageId);
@@ -639,6 +767,15 @@ public final class ChatViewModel {
         return conversation != null ? conversation.getTargetName() : "";
     }
 
+    /**
+     * 获取当前会话
+     *
+     * @return 当前会话信息
+     */
+    public ConversationInfo getConversation() {
+        return conversation;
+    }
+
     // Property getters
     public ListProperty<MessageInfo> messagesProperty() {
         return messages;
@@ -684,6 +821,71 @@ public final class ChatViewModel {
         if (pending != null && !pending.isEmpty()) {
             messages.addAll(pending);
             LOG.info("注入系统消息: sessionId={}, count={}", sessionId, pending.size());
+        }
+    }
+
+    /** AI 流式输出缓存：streamMessageId -> MessageInfo（用于增量追加），实例变量避免跨会话污染 */
+    private final Map<String, MessageInfo> aiStreamCache = new ConcurrentHashMap<>();
+
+    /**
+     * 处理 AI 流式输出
+     * 首次收到时创建 AI 消息占位，后续追加内容，完成时设置最终 messageId
+     *
+     * @param streamMessageId 流式消息ID（客户端发送时的ID）
+     * @param content         增量内容（done=false）或完整内容（done=true）
+     * @param done            是否完成
+     * @param aiMessageId     AI 消息的服务端ID（仅 done=true 时有值）
+     */
+    public void handleAiStream(final String streamMessageId, final String content,
+            final boolean done, final Long aiMessageId) {
+        if (content == null) {
+            return;
+        }
+
+        MessageInfo aiMsg = aiStreamCache.get(streamMessageId);
+
+        if (aiMsg == null) {
+            if (done) {
+                LOG.warn("[AI-STREAM] 收到完成消息但无占位缓存，可能是超时清理或异常重发: streamId={}", streamMessageId);
+                return;
+            }
+            // 首次收到流式消息，创建 AI 消息占位
+            aiMsg = new MessageInfo();
+            aiMsg.setMessageId(-System.currentTimeMillis());
+            aiMsg.setSessionId(conversation.getSessionId());
+            aiMsg.setSenderId(conversation.getTargetId());
+            aiMsg.setSenderName(conversation.getTargetName());
+            aiMsg.setSenderType("AI");
+            aiMsg.setType("TEXT");
+            aiMsg.setContent(content);
+            aiMsg.setCreateTime(java.time.LocalDateTime.now());
+            aiMsg.setSentByMe(false);
+
+            messages.add(aiMsg);
+            aiStreamCache.put(streamMessageId, aiMsg);
+            LOG.debug("[AI-STREAM] 创建AI消息占位: streamId={}", streamMessageId);
+        } else {
+            // 增量追加内容
+            aiMsg.setContent(aiMsg.getContent() + content);
+            // 触发列表更新
+            final int index = messages.indexOf(aiMsg);
+            if (index >= 0) {
+                messages.set(index, aiMsg);
+            }
+        }
+
+        if (done) {
+            // 流式输出完成
+            if (aiMessageId != null) {
+                aiMsg.setMessageId(aiMessageId);
+            }
+            aiStreamCache.remove(streamMessageId);
+            // 最终刷新一次列表
+            final int index = messages.indexOf(aiMsg);
+            if (index >= 0) {
+                messages.set(index, aiMsg);
+            }
+            LOG.info("[AI-STREAM] AI流式输出完成: streamId={}, aiMessageId={}", streamMessageId, aiMessageId);
         }
     }
 }

@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox fx:id="rootPane" prefHeight="700.0" prefWidth="1000.0"
+      styleClass="ai-root"
+      xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="org.example.client.controller.AiController">
+
+    <!-- 顶部标题栏 -->
+    <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="ai-header">
+        <Label styleClass="ai-title" text="AI 助手管理"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button fx:id="backButton" mnemonicParsing="false"
+                onAction="#handleBack" styleClass="btn-icon" text="返回"/>
+    </HBox>
+
+    <Separator/>
+
+    <!-- 主体内容：左右分栏 -->
+    <SplitPane dividerPositions="0.45" VBox.vgrow="ALWAYS">
+
+        <!-- 左侧：AI 角色列表 -->
+        <VBox spacing="5.0" styleClass="ai-panel">
+            <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="ai-panel-header">
+                <Label styleClass="ai-panel-title" text="AI 角色列表"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Button fx:id="refreshButton" mnemonicParsing="false"
+                        onAction="#handleRefresh" styleClass="btn-icon" text="刷新"/>
+                <Button fx:id="createButton" mnemonicParsing="false"
+                        onAction="#handleCreate" styleClass="btn-primary" text="创建"/>
+            </HBox>
+
+            <ListView fx:id="aiListView" styleClass="ai-list" VBox.vgrow="ALWAYS">
+                <placeholder>
+                    <Label text="暂无AI角色，点击创建"/>
+                </placeholder>
+            </ListView>
+        </VBox>
+
+        <!-- 右侧：AI 角色详情 + 记忆 -->
+        <VBox spacing="5.0" styleClass="ai-panel">
+            <!-- AI 角色详情 -->
+            <VBox fx:id="detailPanel" spacing="8.0" styleClass="ai-detail">
+                <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="ai-panel-header">
+                    <Label styleClass="ai-panel-title" text="角色详情"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button fx:id="editButton" mnemonicParsing="false"
+                            onAction="#handleEdit" styleClass="btn-icon" text="编辑" visible="false"/>
+                    <Button fx:id="deleteButton" mnemonicParsing="false"
+                            onAction="#handleDelete" styleClass="btn-icon" text="删除" visible="false"/>
+                </HBox>
+
+                <!-- 详情展示区 -->
+                <VBox fx:id="detailContent" spacing="6.0" styleClass="ai-detail-content" visible="false">
+                    <HBox spacing="8.0" alignment="CENTER_LEFT">
+                        <Label text="名称:" styleClass="ai-detail-label"/>
+                        <Label fx:id="detailName" styleClass="ai-detail-value"/>
+                    </HBox>
+                    <HBox spacing="8.0" alignment="CENTER_LEFT">
+                        <Label text="模型:" styleClass="ai-detail-label"/>
+                        <Label fx:id="detailModel" styleClass="ai-detail-value"/>
+                    </HBox>
+                    <HBox spacing="8.0" alignment="CENTER_LEFT">
+                        <Label text="提供商:" styleClass="ai-detail-label"/>
+                        <Label fx:id="detailProvider" styleClass="ai-detail-value"/>
+                    </HBox>
+                    <HBox spacing="8.0" alignment="CENTER_LEFT">
+                        <Label text="群聊:" styleClass="ai-detail-label"/>
+                        <Label fx:id="detailIsGroup" styleClass="ai-detail-value"/>
+                    </HBox>
+                    <VBox spacing="4.0">
+                        <Label text="人设:" styleClass="ai-detail-label"/>
+                        <Label fx:id="detailPersona" styleClass="ai-detail-value" wrapText="true"
+                               maxWidth="400"/>
+                    </VBox>
+                </VBox>
+
+                <!-- 空状态提示 -->
+                <VBox fx:id="detailEmpty" alignment="CENTER" spacing="10.0" styleClass="ai-detail-empty">
+                    <Label text="选择左侧AI角色查看详情" styleClass="ai-empty-hint"/>
+                </VBox>
+            </VBox>
+
+            <Separator/>
+
+            <!-- AI 记忆列表 -->
+            <VBox spacing="5.0" VBox.vgrow="ALWAYS">
+                <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="ai-panel-header">
+                    <Label styleClass="ai-panel-title" text="AI 记忆"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                </HBox>
+
+                <ListView fx:id="memoryList" styleClass="ai-memory-list" VBox.vgrow="ALWAYS">
+                    <placeholder>
+                        <Label text="暂无记忆数据"/>
+                    </placeholder>
+                </ListView>
+            </VBox>
+        </VBox>
+    </SplitPane>
+
+    <!-- 底部状态栏 -->
+    <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="ai-footer">
+        <Label fx:id="errorLabel" styleClass="error-message" text=""/>
+        <Label fx:id="successLabel" styleClass="success-message" text=""/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <ProgressIndicator fx:id="loadingIndicator" prefWidth="20" prefHeight="20" visible="false"/>
+    </HBox>
+</VBox>

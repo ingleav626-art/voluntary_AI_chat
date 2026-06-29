@@ -2,13 +2,20 @@ package org.example.client.view;
 
 import java.util.function.Consumer;
 
+import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
+import org.example.client.config.ServerConnectionManager;
+import org.example.client.config.ServerMode;
+import org.example.client.engine.JdbcUserRepository;
+import org.example.client.engine.LocalAiEngine;
 import org.example.client.model.LoginRequest;
 import org.example.client.model.LoginResponse;
+import org.example.client.model.UserInfo;
 import org.example.client.service.AuthService;
+import org.example.client.util.CredentialStorage;
 import org.example.client.util.TokenStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,6 +59,11 @@ public final class LoginViewModel {
 
     /**
      * 执行登录
+     *
+     * <p>
+     * 本地模式时优先尝试云端登录，云端不可用时自动回退到本地 H2 密码验证。
+     * 热点/云端模式仅走云端登录。
+     * </p>
      */
     public void login() {
         // 清空错误消息
@@ -65,24 +77,93 @@ public final class LoginViewModel {
         // 设置加载状态
         loading.set(true);
 
+        final String phoneValue = phone.get();
+        final String passwordValue = password.get();
+        final boolean rememberMeValue = rememberMe.get();
+
         // 构建请求
         final LoginRequest request = new LoginRequest(
-                phone.get(),
-                password.get(),
-                rememberMe.get()
-        );
+                phoneValue, passwordValue, rememberMeValue);
 
-        // 发送异步请求
+        // 发送云端登录请求
         AuthService.getInstance().login(request)
                 .thenAcceptAsync(response -> {
-                    loading.set(false);
-
                     if (response != null && response.isSuccess()) {
-                        handleSuccess(response.getData());
+                        // 云端登录成功
+                        Platform.runLater(() -> {
+                            loading.set(false);
+                            handleSuccess(response.getData());
+                        });
                     } else {
-                        handleFailure(response != null ? response.getMessage() : "登录失败");
+                        // 云端登录失败，检查是否可本地回退
+                        if (ServerConnectionManager.getInstance().getCurrentMode() == ServerMode.LOCAL) {
+                            // 本地模式：尝试本地 H2 登录兜底
+                            tryLocalLogin(phoneValue, passwordValue, rememberMeValue);
+                        } else {
+                            // 热点/云端模式：无回退，显示云端错误
+                            Platform.runLater(() -> {
+                                loading.set(false);
+                                handleFailure(response != null ? response.getMessage() : "登录失败");
+                            });
+                        }
                     }
+                })
+                .exceptionally(ex -> {
+                    // 网络异常（云端不可达）
+                    LOG.warn("云端登录网络异常", ex);
+                    if (ServerConnectionManager.getInstance().getCurrentMode() == ServerMode.LOCAL) {
+                        tryLocalLogin(phoneValue, passwordValue, rememberMeValue);
+                    } else {
+                        Platform.runLater(() -> {
+                            loading.set(false);
+                            handleFailure("网络连接失败，请检查网络");
+                        });
+                    }
+                    return null;
                 });
+    }
+
+    /**
+     * 尝试本地 H2 密码登录（云端不可用时兜底）
+     */
+    private void tryLocalLogin(final String phone, final String password, final boolean rememberMe) {
+        try {
+            LOG.info("尝试本地 H2 登录兜底: phone={}", phone);
+            final JdbcUserRepository.LocalUser localUser = LocalAiEngine.getInstance().loginLocal(phone, password);
+
+            if (localUser != null) {
+                Platform.runLater(() -> {
+                    loading.set(false);
+                    LOG.info("本地登录成功: userId={}, username={}", localUser.getId(), localUser.getUsername());
+
+                    // 构造本地 LoginResponse（无云端 Token，本地可用）
+                    final UserInfo userInfo = new UserInfo();
+                    userInfo.setUserId(localUser.getId());
+                    userInfo.setUsername(localUser.getUsername());
+                    userInfo.setPhone(localUser.getPhone());
+                    userInfo.setAvatar(localUser.getAvatar());
+
+                    final LoginResponse localResponse = new LoginResponse(
+                            "local_token_" + localUser.getId(),
+                            "local_refresh_" + localUser.getId(),
+                            86400L, // 24h
+                            userInfo);
+
+                    handleSuccess(localResponse);
+                });
+            } else {
+                Platform.runLater(() -> {
+                    loading.set(false);
+                    handleFailure("手机号或密码错误");
+                });
+            }
+        } catch (final Exception e) {
+            LOG.error("本地登录异常", e);
+            Platform.runLater(() -> {
+                loading.set(false);
+                handleFailure("本地登录失败，请稍后重试");
+            });
+        }
     }
 
     private boolean validateInput() {
@@ -113,11 +194,21 @@ public final class LoginViewModel {
     }
 
     private void handleSuccess(final LoginResponse response) {
-        LOG.info("登录成功");
+        LOG.info("[记住我-登录成功] 登录成功, rememberMe={}, phone={}", rememberMe.get(), phone.get());
 
         // 无论是否勾选"记住我"，都保存 Token 到内存
-        // 只有勾选"记住我"时才持久化到文件
+        // 只有勾选"记住我"时才持久化 Token 和凭证到文件
         TokenStorage.save(response, rememberMe.get());
+
+        // 勾选"记住我"时，保存账号密码用于下次预填表单
+        if (rememberMe.get()) {
+            LOG.info("[记住我-登录成功] 勾选了记住我，开始保存凭证...");
+            CredentialStorage.save(phone.get(), password.get());
+        } else {
+            // 未勾选时清除旧凭证，防止残留
+            LOG.info("[记住我-登录成功] 未勾选记住我，清除旧凭证");
+            CredentialStorage.clear();
+        }
 
         // 调用成功回调
         if (onSuccess != null) {
@@ -165,4 +256,3 @@ public final class LoginViewModel {
         this.onFailure = callback;
     }
 }
-

@@ -1,13 +1,15 @@
-/* ===== 群组管理面板样式 ===== */
+/* ===== 群组管理面板样式（粉白渐变主题） ===== */
 
+/* ========== 群组根容器 - 粉白渐变背景 ========== */
 .group-root {
-    -fx-background-color: #f5f5f5;
+    -fx-background-color: linear-gradient(from 0% 0% to 0% 100%, #FFF5F8 0%, #FFE0EC 55%, #FFC1D6 100%);
 }
 
+/* ========== 群组标题栏 - 浅粉毛玻璃 ========== */
 .group-header {
     -fx-padding: 15px 20px;
-    -fx-background-color: #ffffff;
-    -fx-border-color: #e0e0e0;
+    -fx-background-color: rgba(255, 240, 244, 0.95);
+    -fx-border-color: rgba(255, 224, 236, 0.7);
     -fx-border-width: 0 0 1px 0;
 }
 
@@ -17,9 +19,10 @@
     -fx-text-fill: #333333;
 }
 
+/* ========== 群组面板 - 浅粉毛玻璃 ========== */
 .group-panel {
     -fx-padding: 10px;
-    -fx-background-color: #ffffff;
+    -fx-background-color: rgba(255, 240, 244, 0.85);
 }
 
 .group-panel-header {
@@ -29,14 +32,14 @@
 .group-panel-title {
     -fx-font-size: 14px;
     -fx-font-weight: bold;
-    -fx-text-fill: #555555;
+    -fx-text-fill: #333333;
 }
 
-/* 创建群组表单 */
+/* ========== 创建群组表单 - 浅粉毛玻璃 ========== */
 .create-group-form {
     -fx-padding: 10px;
-    -fx-background-color: #fafafa;
-    -fx-border-color: #e8e8e8;
+    -fx-background-color: rgba(255, 240, 244, 0.85);
+    -fx-border-color: rgba(255, 224, 236, 0.7);
     -fx-border-width: 1px;
     -fx-border-radius: 6px;
     -fx-background-radius: 6px;
@@ -45,14 +48,14 @@
 .group-input {
     -fx-pref-height: 32px;
     -fx-padding: 4px 10px;
-    -fx-border-color: #d0d0d0;
+    -fx-border-color: #E0E0E0;
     -fx-border-radius: 4px;
     -fx-background-radius: 4px;
     -fx-font-size: 13px;
 }
 
 .group-input:focused {
-    -fx-border-color: #42A5F5;
+    -fx-border-color: #FF6B9D;
 }
 
 /* 群组列表 */
@@ -67,17 +70,17 @@
 }
 
 .group-list .list-cell:selected {
-    -fx-background-color: #e3f2fd;
+    -fx-background-color: #FFE0EC;
 }
 
 .group-cell {
     -fx-padding: 10px 8px;
-    -fx-border-color: transparent transparent #f0f0f0 transparent;
+    -fx-border-color: transparent transparent #E0E0E0 transparent;
     -fx-border-width: 0 0 1px 0;
 }
 
 .group-cell:hover {
-    -fx-background-color: #f5f8ff;
+    -fx-background-color: #FFF5F8;
 }
 
 .group-name {
@@ -103,17 +106,17 @@
 }
 
 .member-list .list-cell:selected {
-    -fx-background-color: #e3f2fd;
+    -fx-background-color: #FFE0EC;
 }
 
 .member-cell {
     -fx-padding: 8px 8px;
-    -fx-border-color: transparent transparent #f0f0f0 transparent;
+    -fx-border-color: transparent transparent #E0E0E0 transparent;
     -fx-border-width: 0 0 1px 0;
 }
 
 .member-cell:hover {
-    -fx-background-color: #f5f8ff;
+    -fx-background-color: #FFF5F8;
 }
 
 .member-name {
@@ -124,58 +127,66 @@
 
 .member-role {
     -fx-font-size: 11px;
-    -fx-text-fill: #888888;
+    -fx-text-fill: #999999;
 }
 
-/* 底部状态栏 */
+/* ========== 底部状态栏 - 浅粉毛玻璃 ========== */
 .group-footer {
     -fx-padding: 8px 20px;
-    -fx-background-color: #ffffff;
-    -fx-border-color: #e0e0e0;
+    -fx-background-color: rgba(255, 240, 244, 0.95);
+    -fx-border-color: rgba(255, 224, 236, 0.7);
     -fx-border-width: 1px 0 0 0;
 }
 
 /* 按钮样式 - 复用 friend.css 中的样式类，在此补充 */
 .btn-icon {
-    -fx-background-color: transparent;
-    -fx-border-color: #d0d0d0;
+    -fx-background-color: #FF6B9D;
+    -fx-text-fill: white;
+    -fx-border-color: transparent;
     -fx-border-radius: 4px;
-    -fx-padding: 6px 14px;
+    -fx-background-radius: 4px;
+    -fx-padding: 8px 16px;
     -fx-font-size: 13px;
+    -fx-font-weight: bold;
     -fx-cursor: hand;
+    -fx-min-width: 80px;
 }
 
 .btn-icon:hover {
-    -fx-background-color: #e8e8e8;
+    -fx-background-color: #E8507A;
 }
 
 .btn-primary {
-    -fx-background-color: #42A5F5;
+    -fx-background-color: #FF6B9D;
     -fx-text-fill: #ffffff;
     -fx-border-radius: 4px;
     -fx-background-radius: 4px;
     -fx-padding: 8px 16px;
     -fx-font-size: 13px;
+    -fx-font-weight: bold;
     -fx-cursor: hand;
     -fx-border: none;
 }
 
 .btn-primary:hover {
-    -fx-background-color: #1E88E5;
+    -fx-background-color: #E8507A;
 }
 
+/* ========== 危险按钮（解散群组） - 与普通按钮一样大 ========== */
 .btn-danger-sm {
-    -fx-background-color: #ef5350;
+    -fx-background-color: #FF6B9D;
     -fx-text-fill: #ffffff;
     -fx-border-radius: 4px;
     -fx-background-radius: 4px;
-    -fx-padding: 4px 10px;
-    -fx-font-size: 12px;
+    -fx-padding: 8px 16px;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
     -fx-cursor: hand;
+    -fx-min-width: 80px;
 }
 
 .btn-danger-sm:hover {
-    -fx-background-color: #d32f2f;
+    -fx-background-color: #E8507A;
 }
 
 .error-message {
@@ -193,14 +204,14 @@
 .group-info-announcement {
     -fx-pref-height: 120px;
     -fx-padding: 8px 10px;
-    -fx-border-color: #d0d0d0;
+    -fx-border-color: #E0E0E0;
     -fx-border-radius: 4px;
     -fx-background-radius: 4px;
     -fx-font-size: 13px;
 }
 
 .group-info-announcement:focused {
-    -fx-border-color: #42A5F5;
+    -fx-border-color: #FF6B9D;
 }
 
 /* ===== 成员管理按钮样式 ===== */
@@ -211,8 +222,8 @@
 }
 
 .btn-action-sm {
-    -fx-background-color: #f5f5f5;
-    -fx-border-color: #d0d0d0;
+    -fx-background-color: rgba(255, 240, 244, 0.85);
+    -fx-border-color: rgba(255, 224, 236, 0.7);
     -fx-border-radius: 3px;
     -fx-background-radius: 3px;
     -fx-padding: 2px 8px;
@@ -221,6 +232,52 @@
 }
 
 .btn-action-sm:hover {
-    -fx-background-color: #e3f2fd;
-    -fx-border-color: #42A5F5;
+    -fx-background-color: #FFE0EC;
+    -fx-border-color: #FF6B9D;
+}
+
+/* ===== 确认对话框粉色风格 ===== */
+.dialog-container {
+    -fx-background-color: #FFF5F8;
+}
+
+.dialog-container .content.label {
+    -fx-text-fill: #333333;
+    -fx-font-size: 13px;
+}
+
+.dialog-container .header-panel {
+    -fx-background-color: linear-gradient(from 0% 0% to 100% 0%, #FF6B9D, #FF8CB3);
+}
+
+.dialog-container .header-panel .label {
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+
+.dialog-container .button-bar .button {
+    -fx-background-color: #FF6B9D;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-padding: 6px 20px;
+    -fx-cursor: hand;
+}
+
+.dialog-container .button-bar .button:hover {
+    -fx-background-color: #E8507A;
+}
+
+.dialog-container .button-bar .button:pressed {
+    -fx-background-color: #D04570;
+}
+
+.dialog-container .button-bar .button.cancel-button {
+    -fx-background-color: #E0E0E0;
+    -fx-text-fill: #555555;
+}
+
+.dialog-container .button-bar .button.cancel-button:hover {
+    -fx-background-color: #CCCCCC;
 }

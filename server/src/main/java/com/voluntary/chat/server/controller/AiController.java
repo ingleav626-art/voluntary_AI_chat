@@ -106,6 +106,43 @@ public class AiController {
     }
 
     /**
+     * 删除 AI 记忆
+     */
+    @DeleteMapping("/{aiId}/memories/{memoryId}")
+    public ApiResult<Void> deleteMemory(
+            @PathVariable final Long aiId,
+            @PathVariable final Long memoryId) {
+        final Long userId = SecurityUtils.getCurrentUserId();
+        aiMemoryService.deleteMemory(memoryId, userId);
+        return ApiResult.ok("已删除", null);
+    }
+
+    /**
+     * 修改群 AI 配置
+     */
+    @PutMapping("/group/{groupId}/config/{configId}")
+    public ApiResult<Void> updateGroupConfig(
+            @PathVariable final Long groupId,
+            @PathVariable final Long configId,
+            @Valid @RequestBody final AiGroupConfigRequest request) {
+        final Long userId = SecurityUtils.getCurrentUserId();
+        aiGroupConfigService.updateGroupConfig(groupId, configId, userId, request);
+        return ApiResult.ok("修改成功", null);
+    }
+
+    /**
+     * 删除群 AI 配置
+     */
+    @DeleteMapping("/group/{groupId}/config/{configId}")
+    public ApiResult<Void> deleteGroupConfig(
+            @PathVariable final Long groupId,
+            @PathVariable final Long configId) {
+        final Long userId = SecurityUtils.getCurrentUserId();
+        aiGroupConfigService.deleteGroupConfig(configId, userId);
+        return ApiResult.ok("已删除", null);
+    }
+
+    /**
      * 获取 AI 记忆列表
      */
     @GetMapping("/{aiId}/memories")

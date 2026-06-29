@@ -75,6 +75,32 @@ class ImageUploadServiceTest {
     }
 
     @Test
+    @DisplayName("上传 GIF 图片成功")
+    void uploadImage_shouldSucceed_withGif() throws IOException {
+        MultipartFile file = createMockImageFile("image/gif", ".gif", 200, 200);
+
+        ImageUploadResponse response = imageUploadService.uploadImage(file);
+
+        assertEquals("image/gif", response.getFileType());
+        assertEquals(200, response.getWidth());
+        assertEquals(200, response.getHeight());
+        assertTrue(response.getUrl().endsWith(".gif"));
+        assertTrue(response.getThumbnailUrl().endsWith(".gif"));
+    }
+
+    @Test
+    @DisplayName("上传小尺寸图片不压缩")
+    void uploadImage_shouldNotCompress_whenSmallImage() throws IOException {
+        MultipartFile file = createMockImageFile("image/jpeg", ".jpg", 100, 100);
+
+        ImageUploadResponse response = imageUploadService.uploadImage(file);
+
+        assertEquals(100, response.getWidth());
+        assertEquals(100, response.getHeight());
+        assertNotNull(response.getUrl());
+    }
+
+    @Test
     @DisplayName("上传宽图自动压缩到 1080px")
     void uploadImage_shouldCompress_whenWidthExceedsMax() throws IOException {
         MultipartFile file = createMockImageFile("image/jpeg", ".jpg", 1920, 1080);

@@ -10,7 +10,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Base64;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -80,10 +79,9 @@ class TokenStorageTest {
     @Test
     @DisplayName("加载格式错误的 Token 返回 null")
     void testLoadCorruptedData() throws Exception {
-        // 写入只有一部分的数据（Base64编码后少于2个分隔部分）
-        String badData = Base64.getEncoder().encodeToString("only-one-part".getBytes());
+        // 写入不是 AES-GCM 加密格式的数据
         Path tokenFile = tempDir.resolve("token.dat");
-        Files.writeString(tokenFile, badData);
+        Files.writeString(tokenFile, "this-is-not-valid-aes-gcm-data");
 
         assertNull(TokenStorage.load());
     }
@@ -109,17 +107,24 @@ class TokenStorageTest {
 
     @Test
     @DisplayName("load 优先从内存缓存加载")
-    void testLoadPrefersMemoryCache() throws Exception {
-        // 先保存到内存
+    void testLoadPrefersMemoryCache() {
+        // 先保存到内存（不持久化）
         LoginResponse memResponse = new LoginResponse();
         memResponse.setAccessToken("mem-token");
         memResponse.setRefreshToken("mem-refresh");
         TokenStorage.save(memResponse, false);
 
-        // 再写入不同的文件内容
-        String fileData = Base64.getEncoder().encodeToString("file-token|file-refresh".getBytes());
-        Path tokenFile = tempDir.resolve("token.dat");
-        Files.writeString(tokenFile, fileData);
+        // 再持久化保存另一个（会覆盖文件但不会覆盖内存）
+        LoginResponse fileResponse = new LoginResponse();
+        fileResponse.setAccessToken("file-token");
+        fileResponse.setRefreshToken("file-refresh");
+        TokenStorage.save(fileResponse, true);
+
+        // 最后再次设置内存版本（不持久化）
+        LoginResponse memOverride = new LoginResponse();
+        memOverride.setAccessToken("mem-token");
+        memOverride.setRefreshToken("mem-refresh");
+        TokenStorage.save(memOverride, false);
 
         // 应从内存加载（优先）
         LoginResponse loaded = TokenStorage.load();
@@ -178,34 +183,6 @@ class TokenStorageTest {
     }
 
     @Test
-    @DisplayName("load 文件内容有三段分隔符返回 null")
-    void testLoadFileWithThreeParts() throws Exception {
-        String threeParts = Base64.getEncoder().encodeToString("part1|part2|part3".getBytes());
-        Path tokenFile = tempDir.resolve("token.dat");
-        Files.writeString(tokenFile, threeParts);
-
-        assertNull(TokenStorage.load());
-    }
-
-    @Test
-    @DisplayName("load 文件存在且无内存缓存时从文件加载")
-    void testLoadFromFileWithoutMemoryCache() throws Exception {
-        // 先清除所有缓存
-        TokenStorage.clear();
-
-        // 直接写入文件
-        String fileData = Base64.getEncoder().encodeToString("file-load-token|file-load-refresh".getBytes());
-        Path tokenFile = tempDir.resolve("token.dat");
-        Files.writeString(tokenFile, fileData);
-
-        // 无内存缓存时应从文件加载
-        LoginResponse loaded = TokenStorage.load();
-        assertNotNull(loaded);
-        assertEquals("file-load-token", loaded.getAccessToken());
-        assertEquals("file-load-refresh", loaded.getRefreshToken());
-    }
-
-    @Test
     @DisplayName("clear 清除后内存和文件都为空")
     void testClearRemovesBoth() throws Exception {
         LoginResponse response = new LoginResponse();
@@ -226,12 +203,10 @@ class TokenStorageTest {
     }
 
     @Test
-    @DisplayName("load 文件内容为带换行的 Base64 返回 null")
-    void testLoadFileWithNewlineInBase64() throws Exception {
+    @DisplayName("load 文件内容为无效加密数据时返回 null")
+    void testLoadFileWithInvalidEncryptedData() throws Exception {
         Path tokenFile = tempDir.resolve("token.dat");
-        // "a\nb\n" split by | → 1 part (no |) → null
-        String data = Base64.getEncoder().encodeToString("a\nb\n".getBytes());
-        Files.writeString(tokenFile, data);
+        Files.writeString(tokenFile, "random-invalid-data");
 
         assertNull(TokenStorage.load());
     }
@@ -263,16 +238,23 @@ class TokenStorageTest {
     void testLoadCachesToMemory() throws Exception {
         TokenStorage.clear();
 
-        // 写入一个文件
-        String fileData = Base64.getEncoder().encodeToString("cache-token|cache-refresh".getBytes());
-        Path tokenFile = tempDir.resolve("token.dat");
-        Files.writeString(tokenFile, fileData);
+        // 通过 save 持久化创建文件
+        LoginResponse saved = new LoginResponse();
+        saved.setAccessToken("cache-token");
+        saved.setRefreshToken("cache-refresh");
+        TokenStorage.save(saved, true);
+
+        // 通过反射清除内存缓存，但保留文件
+        java.lang.reflect.Field cachedField = TokenStorage.class.getDeclaredField("cachedToken");
+        cachedField.setAccessible(true);
+        cachedField.set(null, (LoginResponse) null);
 
         // 第一次 load 从文件
         LoginResponse first = TokenStorage.load();
         assertNotNull(first);
 
         // 删除文件
+        Path tokenFile = tempDir.resolve("token.dat");
         Files.deleteIfExists(tokenFile);
 
         // 第二次 load 应该从内存缓存（文件已删）

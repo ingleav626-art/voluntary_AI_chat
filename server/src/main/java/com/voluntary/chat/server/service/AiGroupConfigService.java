@@ -12,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -23,7 +22,6 @@ import java.util.stream.Collectors;
  * AI 群配置服务
  */
 @Slf4j
-@Service
 @RequiredArgsConstructor
 public class AiGroupConfigService {
 
@@ -94,9 +92,51 @@ public class AiGroupConfigService {
                             .triggerKeywords(config.getTriggerKeywords())
                             .triggerProbability(config.getTriggerProbability())
                             .isEnabled(config.getIsEnabled())
+                            .cooldownSeconds(config.getCooldownSeconds())
                             .build();
                 })
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 修改群 AI 配置
+     */
+    @Transactional
+    public void updateGroupConfig(final Long groupId, final Long configId, final Long userId,
+            final AiGroupConfigRequest request) {
+        final AiGroupConfig config = aiGroupConfigMapper.selectById(configId);
+        if (config == null || !config.getGroupId().equals(groupId)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "配置不存在");
+        }
+
+        if (request.getTriggerKeywords() != null) {
+            config.setTriggerKeywords(request.getTriggerKeywords());
+        }
+        if (request.getTriggerProbability() != null) {
+            config.setTriggerProbability(request.getTriggerProbability());
+        }
+        if (request.getIsEnabled() != null) {
+            config.setIsEnabled(request.getIsEnabled());
+        }
+        if (request.getCooldownSeconds() != null) {
+            config.setCooldownSeconds(request.getCooldownSeconds());
+        }
+
+        aiGroupConfigMapper.updateById(config);
+        log.info("群 AI 配置修改成功: groupId={}, configId={}, userId={}", groupId, configId, userId);
+    }
+
+    /**
+     * 删除群 AI 配置
+     */
+    @Transactional
+    public void deleteGroupConfig(final Long configId, final Long userId) {
+        final AiGroupConfig config = aiGroupConfigMapper.selectById(configId);
+        if (config == null) {
+            return;
+        }
+        aiGroupConfigMapper.deleteById(configId);
+        log.info("群 AI 配置删除成功: configId={}, userId={}", configId, userId);
     }
 
     /**
@@ -192,7 +232,6 @@ public class AiGroupConfigService {
                 key,
                 String.valueOf(System.currentTimeMillis()),
                 cooldownSeconds + EXTRA_EXPIRE_SECONDS,
-                TimeUnit.SECONDS
-        );
+                TimeUnit.SECONDS);
     }
 }

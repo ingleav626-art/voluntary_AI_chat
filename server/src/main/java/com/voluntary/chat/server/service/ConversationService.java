@@ -4,14 +4,18 @@ import com.voluntary.chat.common.dto.PageResult;
 import com.voluntary.chat.common.enums.MessageType;
 import com.voluntary.chat.common.enums.TargetType;
 import com.voluntary.chat.server.dto.response.ConversationResponse;
+import com.voluntary.chat.server.entity.AiProfile;
 import com.voluntary.chat.server.entity.GroupEntity;
 import com.voluntary.chat.server.entity.Message;
 import com.voluntary.chat.server.entity.User;
+import com.voluntary.chat.server.mapper.AiProfileMapper;
 import com.voluntary.chat.server.mapper.GroupMapper;
+import com.voluntary.chat.server.service.ConversationCacheService.LastMessageCache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -24,6 +28,8 @@ public class ConversationService {
     private final MessageService messageService;
     private final UserService userService;
     private final GroupMapper groupMapper;
+    private final AiProfileMapper aiProfileMapper;
+    private final ConversationCacheService conversationCacheService;
 
     /** 私聊sessionId分割后的第一个用户ID索引 */
     private static final int PRIVATE_SESSION_ID1_INDEX = 1;
@@ -56,7 +62,29 @@ public class ConversationService {
         // 为每个会话获取最后一条消息和未读数
         List<ConversationResponse> conversations = new ArrayList<>();
         for (String sessionId : sessionIds) {
-            Message lastMsg = messageService.getLastMessage(sessionId);
+            // 1. 尝试从缓存获取最后一条消息
+            Message lastMsg = null;
+            LastMessageCache cachedLastMsg = conversationCacheService.getLastMessage(sessionId);
+            if (cachedLastMsg != null) {
+                lastMsg = new Message();
+                lastMsg.setContent(cachedLastMsg.content());
+                lastMsg.setType(cachedLastMsg.type());
+                lastMsg.setCreateTime(cachedLastMsg.createTime());
+                lastMsg.setSenderId(cachedLastMsg.senderId());
+            } else {
+                // 缓存未命中，查库
+                lastMsg = messageService.getLastMessage(sessionId);
+                if (lastMsg != null) {
+                    // 回填缓存
+                    conversationCacheService.setLastMessage(sessionId,
+                            new LastMessageCache(
+                                    lastMsg.getContent(),
+                                    lastMsg.getType(),
+                                    lastMsg.getCreateTime(),
+                                    lastMsg.getSenderId()));
+                }
+            }
+
             // 群会话即使没有消息也要展示（新创建的群或刚被邀请入群时没有消息）
             if (lastMsg == null) {
                 if (sessionId.startsWith("g_")) {
@@ -82,7 +110,15 @@ public class ConversationService {
                 continue;
             }
 
-            long unreadCount = messageService.getUnreadCount(userId, sessionId);
+            // 2. 尝试从缓存获取未读数
+            long unreadCount;
+            long cachedUnread = conversationCacheService.getUnread(userId, sessionId);
+            if (cachedUnread >= 0) {
+                unreadCount = cachedUnread;
+            } else {
+                unreadCount = messageService.getUnreadCount(userId, sessionId);
+            }
+
             ConversationResponse conv = buildConversationResponse(userId, sessionId, lastMsg, unreadCount);
             conversations.add(conv);
         }
@@ -144,13 +180,21 @@ public class ConversationService {
                         .targetAvatar(null);
             }
         } else if (sessionId.startsWith("a_")) {
-            // AI单聊
+            // AI单聊：查询 AI 角色名称和头像
             String[] parts = sessionId.split("_");
             Long aiId = Long.parseLong(parts[1]);
-            builder.targetId(aiId)
-                    .targetType(TargetType.USER.name())
-                    .targetName("AI助手")
-                    .targetAvatar(null);
+            AiProfile aiProfile = aiProfileMapper.selectById(aiId);
+            if (aiProfile != null) {
+                builder.targetId(aiId)
+                        .targetType(TargetType.AI.name())
+                        .targetName(aiProfile.getName())
+                        .targetAvatar(aiProfile.getAvatar());
+            } else {
+                builder.targetId(aiId)
+                        .targetType(TargetType.AI.name())
+                        .targetName("AI助手")
+                        .targetAvatar(null);
+            }
         }
 
         return builder.build();

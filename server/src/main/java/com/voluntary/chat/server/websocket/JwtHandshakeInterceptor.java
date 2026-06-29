@@ -16,10 +16,13 @@ import java.util.Map;
 
 /**
  * WebSocket 握手拦截器
- * 从 URL 参数中提取 JWT Token 并验证，将 userId 存入 attributes
+ *
+ * <p>
+ * 从 URL 参数中提取 JWT Token 并验证，将 userId 存入 attributes。
+ * Bean 注册在 ai-core 模块中，此处只保留文件用于编译兼容。
+ * </p>
  */
 @Slf4j
-@Component
 @RequiredArgsConstructor
 public class JwtHandshakeInterceptor implements HandshakeInterceptor {
 
@@ -30,7 +33,7 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
 
     @Override
     public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response,
-                                   WebSocketHandler wsHandler, Map<String, Object> attributes) {
+            WebSocketHandler wsHandler, Map<String, Object> attributes) {
         String token = extractToken(request);
         if (!StringUtils.hasText(token) || !jwtTokenProvider.validateToken(token)) {
             log.warn("WebSocket 握手失败：Token 无效");
@@ -45,7 +48,7 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
 
     @Override
     public void afterHandshake(ServerHttpRequest request, ServerHttpResponse response,
-                               WebSocketHandler wsHandler, Exception exception) {
+            WebSocketHandler wsHandler, Exception exception) {
         // 无需处理
     }
 

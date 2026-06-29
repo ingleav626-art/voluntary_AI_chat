@@ -36,6 +36,15 @@ import org.slf4j.LoggerFactory;
  *
  * <p>负责群组列表展示、创建群组、群成员管理、退出/解散群组等操作。</p>
  *
+ * <p>
+ * <b>TODO:⚠️ 类长度超限警告：当前311行，超出Controller限制（300行）</b>
+ * <br>请勿在此类中添加新的职责，应拆分为：
+ * <ul>
+ * <li>GroupListController（群组列表管理）</li>
+ * <li>GroupMemberController（群成员管理）</li>
+ * </ul>
+ * </p>
+ *
  * @author voluntary-ai-chat
  * @since 1.0.0
  */
@@ -47,6 +56,9 @@ public final class GroupController implements Initializable {
 
     /** 修改群信息对话框 FXML */
     private static final String GROUP_INFO_DIALOG_FXML = "/fxml/group_info_dialog.fxml";
+
+    /** 修改群头像对话框 FXML */
+    private static final String GROUP_AVATAR_DIALOG_FXML = "/fxml/group_avatar_dialog.fxml";
 
     /** 邀请成员对话框 FXML */
     private static final String GROUP_INVITE_DIALOG_FXML = "/fxml/group_invite_dialog.fxml";
@@ -86,6 +98,12 @@ public final class GroupController implements Initializable {
     private Button inviteMemberButton;
 
     @FXML
+    private Button aiConfigButton;
+
+    @FXML
+    private Button avatarButton;
+
+    @FXML
     private Button editGroupButton;
 
     @FXML
@@ -103,6 +121,24 @@ public final class GroupController implements Initializable {
         // 绑定群组列表
         groupList.itemsProperty().bind(viewModel.groupsProperty());
         groupList.setCellFactory(param -> new GroupCell());
+
+        // 监听viewModel.selectedGroup变化，用于自动选中群组后更新UI
+        viewModel.selectedGroupProperty().addListener((obs, oldGroup, newGroup) -> {
+            if (newGroup != null) {
+                // 查找群组列表中对应的群组并选中
+                for (final GroupInfo group : groupList.getItems()) {
+                    if (group.getGroupId().equals(newGroup.getGroupId())) {
+                        groupList.getSelectionModel().select(group);
+                        groupDetailTitle.setText("群成员 - " + newGroup.getName());
+                        viewModel.loadMembers(newGroup.getGroupId());
+                        updateActionButtons(newGroup);
+                        LOG.info("监听器触发：已选中群组 groupId={}, groupName={}",
+                                newGroup.getGroupId(), newGroup.getName());
+                        break;
+                    }
+                }
+            }
+        });
 
         // 群组点击事件：显示群成员
         groupList.setOnMouseClicked(event -> {
@@ -184,6 +220,14 @@ public final class GroupController implements Initializable {
         inviteMemberButton.setVisible(true);
         inviteMemberButton.setManaged(true);
 
+        // AI配置按钮所有人可见
+        aiConfigButton.setVisible(true);
+        aiConfigButton.setManaged(true);
+
+        // 头像按钮所有人可见
+        avatarButton.setVisible(true);
+        avatarButton.setManaged(true);
+
         // 群主显示"解散群组"和"修改群信息"，成员显示"退出群组"
         if (viewModel.isOwnerOfSelectedGroup()) {
             editGroupButton.setVisible(true);
@@ -210,6 +254,10 @@ public final class GroupController implements Initializable {
     private void setActionButtonsVisible(final boolean visible) {
         inviteMemberButton.setVisible(visible);
         inviteMemberButton.setManaged(visible);
+        aiConfigButton.setVisible(visible);
+        aiConfigButton.setManaged(visible);
+        avatarButton.setVisible(visible);
+        avatarButton.setManaged(visible);
         editGroupButton.setVisible(visible);
         editGroupButton.setManaged(visible);
         leaveGroupButton.setVisible(visible);
@@ -225,6 +273,45 @@ public final class GroupController implements Initializable {
     private void handleBack() {
         LOG.info("返回主界面");
         org.example.client.App.switchToMainFromGroup();
+    }
+
+    /**
+     * 根据群组ID选中群组
+     *
+     * @param groupId 群组ID
+     */
+    public void selectGroupById(final Long groupId) {
+        if (groupId == null) {
+            LOG.warn("群组ID为空，无法选中群组");
+            return;
+        }
+
+        // 检查群组列表是否已加载
+        if (groupList.getItems().isEmpty()) {
+            LOG.info("群组列表未加载，设置待选中群组ID: {}", groupId);
+            // 设置待选中的群组ID，等待群组列表加载完成后自动选中
+            viewModel.setPendingSelectGroupId(groupId);
+            return;
+        }
+
+        // 遍历群组列表，查找匹配的群组
+        for (final GroupInfo group : groupList.getItems()) {
+            if (group.getGroupId().equals(groupId)) {
+                // 选中群组
+                groupList.getSelectionModel().select(group);
+
+                // 设置选中的群组并加载群成员
+                viewModel.setSelectedGroup(group);
+                groupDetailTitle.setText("群成员 - " + group.getName());
+                viewModel.loadMembers(groupId);
+                updateActionButtons(group);
+
+                LOG.info("已选中群组: groupId={}, groupName={}", groupId, group.getName());
+                return;
+            }
+        }
+
+        LOG.warn("未找到群组ID为{}的群组", groupId);
     }
 
     /**
@@ -290,12 +377,13 @@ public final class GroupController implements Initializable {
                     viewModel,
                     selected.getName(),
                     null,  // 当前公告（API 暂不返回，可后续扩展）
-                    false  // 当前置顶状态
+                    false,  // 当前置顶状态
+                    selected.getAvatar()  // 当前头像URL
             );
 
             final Stage dialog = new Stage();
             dialog.setTitle("修改群信息");
-            dialog.setScene(new Scene(root, 440, 420));
+            dialog.setScene(new Scene(root, 440, 480));
             dialog.initModality(Modality.APPLICATION_MODAL);
             dialog.initOwner(editGroupButton.getScene().getWindow());
             final java.net.URL cssUrl = getClass().getResource("/css/default.css");
@@ -306,6 +394,45 @@ public final class GroupController implements Initializable {
         } catch (final Exception e) {
             LOG.error("打开修改群信息对话框失败", e);
             errorLabel.setText("打开修改窗口失败");
+        }
+    }
+
+    /**
+     * 打开修改群头像对话框
+     */
+    @FXML
+    private void handleEditAvatar() {
+        final GroupInfo selected = viewModel.getSelectedGroup();
+        if (selected == null) {
+            return;
+        }
+
+        try {
+            final FXMLLoader loader = new FXMLLoader(getClass().getResource(GROUP_AVATAR_DIALOG_FXML));
+            final Parent root = loader.load();
+
+            final GroupAvatarController controller = loader.getController();
+            // 传入当前群信息
+            controller.initData(
+                    selected.getGroupId(),
+                    viewModel,
+                    selected.getName(),
+                    selected.getAvatar()  // 当前头像URL
+            );
+
+            final Stage dialog = new Stage();
+            dialog.setTitle("修改群头像");
+            dialog.setScene(new Scene(root, 400, 380));
+            dialog.initModality(Modality.APPLICATION_MODAL);
+            dialog.initOwner(avatarButton.getScene().getWindow());
+            final java.net.URL cssUrl = getClass().getResource("/css/default.css");
+            if (cssUrl != null) {
+                dialog.getScene().getStylesheets().add(cssUrl.toExternalForm());
+            }
+            dialog.showAndWait();
+        } catch (final Exception e) {
+            LOG.error("打开修改群头像对话框失败", e);
+            errorLabel.setText("打开头像窗口失败");
         }
     }
 
@@ -347,6 +474,19 @@ public final class GroupController implements Initializable {
     }
 
     /**
+     * 打开群 AI 配置对话框
+     */
+    @FXML
+    private void handleAiConfig() {
+        final GroupInfo selected = viewModel.getSelectedGroup();
+        if (selected == null) {
+            return;
+        }
+
+        GroupAiConfigDialog.show(aiConfigButton.getScene().getWindow(), selected.getGroupId());
+    }
+
+    /**
      * 退出群组（成员）
      */
     @FXML
@@ -360,6 +500,8 @@ public final class GroupController implements Initializable {
         confirm.setTitle("退出群组");
         confirm.setHeaderText("确认退出群组");
         confirm.setContentText("确定要退出群「" + selected.getName() + "」吗？");
+        // 应用粉色风格样式
+        applyDialogStyle(confirm);
         confirm.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
                 viewModel.leaveGroup(selected.getGroupId());
@@ -385,6 +527,8 @@ public final class GroupController implements Initializable {
         confirm.setTitle("解散群组");
         confirm.setHeaderText("确认解散群组");
         confirm.setContentText("解散群「" + selected.getName() + "」后，所有成员将被移除，且不可恢复。\n确定要解散吗？");
+        // 应用粉色风格样式
+        applyDialogStyle(confirm);
         confirm.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
                 viewModel.dismissGroup(selected.getGroupId());
@@ -397,44 +541,68 @@ public final class GroupController implements Initializable {
     }
 
     /**
+     * 为 Alert 对话框应用粉色风格样式
+     *
+     * @param alert Alert 对话框
+     */
+    private void applyDialogStyle(final Alert alert) {
+        final javafx.scene.control.DialogPane dialogPane = alert.getDialogPane();
+        final java.net.URL cssUrl = getClass().getResource("/css/default.css");
+        if (cssUrl != null) {
+            dialogPane.getStylesheets().add(cssUrl.toExternalForm());
+        }
+        dialogPane.getStyleClass().add("dialog-container");
+    }
+
+    /**
      * 群组列表 Cell
      */
     private final class GroupCell extends ListCell<GroupInfo> {
 
-        @Override
-        protected void updateItem(final GroupInfo item, final boolean empty) {
-            super.updateItem(item, empty);
+            @Override
+            protected void updateItem(final GroupInfo item, final boolean empty) {
+                super.updateItem(item, empty);
 
-            if (empty || item == null) {
+                if (empty || item == null) {
+                    setText(null);
+                    setGraphic(null);
+                    return;
+                }
+
+                final HBox cell = new HBox(10);
+                cell.getStyleClass().add("group-cell");
+                cell.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+                // 头像
+                final javafx.scene.shape.Circle avatarCircle = new javafx.scene.shape.Circle(18);
+                avatarCircle.setFill(javafx.scene.paint.Color.valueOf("#E76F51"));
+                final Label avatarText = new Label(
+                        item.getName() != null && !item.getName().isEmpty()
+                                ? String.valueOf(item.getName().charAt(0)) : "群");
+                avatarText.setStyle("-fx-text-fill: white; -fx-font-size: 13; -fx-font-weight: bold;");
+                final javafx.scene.layout.StackPane avatarPane = new javafx.scene.layout.StackPane(
+                        avatarCircle, avatarText);
+
+                final VBox info = new VBox(2);
+                info.getStyleClass().add("group-info");
+
+                final Label name = new Label(item.getName() != null ? item.getName() : "未知群组");
+                name.getStyleClass().add("group-name");
+
+                final Label meta = new Label(
+                        (item.getMemberCount() != null ? item.getMemberCount() + "人" : "未知人数"));
+                meta.getStyleClass().add("group-meta");
+
+                info.getChildren().addAll(name, meta);
+
+                final Region spacer = new Region();
+                HBox.setHgrow(spacer, Priority.ALWAYS);
+
+                cell.getChildren().addAll(avatarPane, info, spacer);
+                setGraphic(cell);
                 setText(null);
-                setGraphic(null);
-                return;
             }
-
-            final HBox cell = new HBox(10);
-            cell.getStyleClass().add("group-cell");
-            cell.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-
-            final VBox info = new VBox(2);
-            info.getStyleClass().add("group-info");
-
-            final Label name = new Label(item.getName() != null ? item.getName() : "未知群组");
-            name.getStyleClass().add("group-name");
-
-            final Label meta = new Label(
-                    (item.getMemberCount() != null ? item.getMemberCount() + "人" : "未知人数"));
-            meta.getStyleClass().add("group-meta");
-
-            info.getChildren().addAll(name, meta);
-
-            final Region spacer = new Region();
-            HBox.setHgrow(spacer, Priority.ALWAYS);
-
-            cell.getChildren().addAll(info, spacer);
-            setGraphic(cell);
-            setText(null);
         }
-    }
 
     /**
      * 群成员列表 Cell

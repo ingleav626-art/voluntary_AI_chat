@@ -14,6 +14,8 @@ import org.example.client.model.LoginRequest;
 import org.example.client.model.LoginResponse;
 import org.example.client.model.RegisterRequest;
 import org.example.client.model.RegisterResponse;
+import org.example.client.model.RefreshTokenRequest;
+import org.example.client.model.RefreshTokenResponse;
 import org.example.client.model.SmsSendRequest;
 import org.example.client.util.ErrorCodeRegistry;
 import org.example.client.util.JsonUtils;
@@ -111,6 +113,30 @@ public final class AuthService extends BaseHttpService {
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(this::handleLoginResponse)
                 .exceptionally(this::handleLoginError);
+    }
+
+    /**
+     * 异步刷新令牌
+     *
+     * @param request 刷新令牌请求
+     * @return 异步结果
+     */
+    public CompletableFuture<ApiResponse<RefreshTokenResponse>> refreshToken(final RefreshTokenRequest request) {
+        final String url = ClientConfig.getInstance().getBaseUrl() + "/auth/refresh";
+        final String body = JsonUtils.toJson(request);
+
+        LOG.info("发送刷新令牌请求");
+
+        final HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "application/json")
+                .timeout(Duration.ofSeconds(ClientConfig.getInstance().getReadTimeout()))
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build();
+
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(this::handleRefreshTokenResponse)
+                .exceptionally(this::handleRefreshTokenError);
     }
 
     /**
@@ -268,6 +294,43 @@ public final class AuthService extends BaseHttpService {
     private ApiResponse<LoginResponse> handleLoginError(final Throwable ex) {
         LOG.error("登录请求异常", ex);
         return createErrorResponse(HTTP_SERVER_ERROR, "网络连接失败，请检查网络");
+    }
+
+    private ApiResponse<RefreshTokenResponse> handleRefreshTokenResponse(final HttpResponse<String> response) {
+        final int statusCode = response.statusCode();
+
+        if (statusCode == HTTP_OK) {
+            final ApiResponse<RefreshTokenResponse> apiResponse = JsonUtils.fromJson(response.body(),
+                    JsonUtils.getMapper().getTypeFactory()
+                            .constructParametricType(ApiResponse.class, RefreshTokenResponse.class));
+
+            if (apiResponse != null && apiResponse.isSuccess()) {
+                LOG.info("刷新令牌成功");
+            } else if (apiResponse != null) {
+                final String friendlyMessage = ErrorCodeRegistry.getMessage(
+                        apiResponse.getCode(), apiResponse.getMessage());
+                LOG.warn("刷新令牌失败: code={}, backendMsg={}, displayMsg={}",
+                        apiResponse.getCode(), apiResponse.getMessage(), friendlyMessage);
+                apiResponse.setMessage(friendlyMessage);
+            }
+
+            return apiResponse;
+        }
+
+        LOG.error("刷新令牌请求失败: statusCode={}", statusCode);
+        return createRefreshTokenErrorResponse(statusCode, ErrorCodeRegistry.getMessage(statusCode));
+    }
+
+    private ApiResponse<RefreshTokenResponse> handleRefreshTokenError(final Throwable ex) {
+        LOG.error("刷新令牌请求异常", ex);
+        return createRefreshTokenErrorResponse(HTTP_SERVER_ERROR, "网络连接失败，请检查网络");
+    }
+
+    private ApiResponse<RefreshTokenResponse> createRefreshTokenErrorResponse(final int code, final String message) {
+        final ApiResponse<RefreshTokenResponse> response = new ApiResponse<>();
+        response.setCode(code);
+        response.setMessage(message);
+        return response;
     }
 
     protected ApiResponse<LoginResponse> createErrorResponse(final int code, final String message) {

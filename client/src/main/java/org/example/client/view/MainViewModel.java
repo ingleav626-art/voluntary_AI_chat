@@ -8,6 +8,8 @@ import org.example.client.model.ConversationInfo;
 import org.example.client.model.LoginResponse;
 import org.example.client.model.MessageInfo;
 import org.example.client.model.UserInfo;
+import org.example.client.util.CredentialStorage;
+import org.example.client.util.TokenStorage;
 import org.example.client.service.ChatService;
 import org.example.client.service.WebSocketClient;
 import org.slf4j.Logger;
@@ -16,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import com.voluntary.chat.common.constant.MessageTypes;
 import com.voluntary.chat.common.model.WebSocketMessage;
 
+import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ListProperty;
 import javafx.beans.property.ObjectProperty;
@@ -32,6 +35,17 @@ import javafx.collections.ObservableList;
  *
  * <p>
  * 管理当前用户信息、会话列表、WebSocket 连接和消息分发。
+ * </p>
+ *
+ * <p>
+ * <b>TODO:⚠️ 类长度超限警告：当前526行，超出Service限制（400行）</b>
+ * <br>
+ * 请勿在此类中添加新的职责，应拆分为：
+ * <ul>
+ * <li>WebSocketMessageHandler（WebSocket消息处理）</li>
+ * <li>ConversationManager（会话列表管理）</li>
+ * <li>MainViewModel（主视图模型，协调上述组件）</li>
+ * </ul>
  * </p>
  *
  * @author voluntary-ai-chat
@@ -71,6 +85,9 @@ public final class MainViewModel {
 
     /** 退出登录回调 */
     private Consumer<Void> onLogout;
+
+    /** 被踢下线回调（参数为原因描述） */
+    private Consumer<String> onKickedOut;
 
     public MainViewModel() {
         // 初始化 WebSocket 消息回调
@@ -132,26 +149,28 @@ public final class MainViewModel {
 
         ChatService.getInstance().getConversations()
                 .thenAccept(response -> {
-                    loading.set(false);
+                    Platform.runLater(() -> {
+                        loading.set(false);
 
-                    if (response != null && response.isSuccess()) {
-                        final List<ConversationInfo> list = response.getData() != null
-                                ? response.getData().getList()
-                                : new ArrayList<>();
-                        allConversations.setAll(list);
-                        // 如果有搜索关键词，应用过滤；否则显示全部
-                        final String kw = searchKeyword.get();
-                        if (kw != null && !kw.trim().isEmpty()) {
-                            filterConversations(kw);
+                        if (response != null && response.isSuccess()) {
+                            final List<ConversationInfo> list = response.getData() != null
+                                    ? response.getData().getList()
+                                    : new ArrayList<>();
+                            allConversations.setAll(list);
+                            // 如果有搜索关键词，应用过滤；否则显示全部
+                            final String kw = searchKeyword.get();
+                            if (kw != null && !kw.trim().isEmpty()) {
+                                filterConversations(kw);
+                            } else {
+                                conversations.setAll(list);
+                            }
+                            LOG.info("会话列表加载成功: count={}", list.size());
                         } else {
-                            conversations.setAll(list);
+                            final String msg = response != null ? response.getMessage() : "加载会话列表失败";
+                            errorMessage.set(msg);
+                            LOG.warn("会话列表加载失败: {}", msg);
                         }
-                        LOG.info("会话列表加载成功: count={}", list.size());
-                    } else {
-                        final String msg = response != null ? response.getMessage() : "加载会话列表失败";
-                        errorMessage.set(msg);
-                        LOG.warn("会话列表加载失败: {}", msg);
-                    }
+                    });
                 });
     }
 
@@ -159,7 +178,8 @@ public final class MainViewModel {
      * 加载会话列表（带搜索关键词）- 已废弃，改用本地过滤
      *
      * @param keyword 搜索关键词，为空则返回全部
-     * @deprecated 使用 {@link #loadConversations()} + {@link #filterConversations(String)} 替代
+     * @deprecated 使用 {@link #loadConversations()} +
+     *             {@link #filterConversations(String)} 替代
      */
     @Deprecated
     private void loadConversations(final String keyword) {
@@ -208,6 +228,8 @@ public final class MainViewModel {
             return;
         }
 
+        LOG.debug("[WS-RECV] 收到WebSocket消息: type={}", wsMessage.getType());
+
         switch (wsMessage.getType()) {
             case MessageTypes.RECEIVE_MESSAGE -> handleReceiveMessage(wsMessage);
             case MessageTypes.GROUP_MESSAGE -> handleGroupMessage(wsMessage);
@@ -222,6 +244,9 @@ public final class MainViewModel {
             case MessageTypes.GROUP_MEMBER_ROLE_CHANGE -> handleGroupMemberRoleChange(wsMessage);
             case MessageTypes.GROUP_INFO_CHANGE -> handleGroupInfoChange(wsMessage);
             case MessageTypes.GROUP_DISMISSED -> handleGroupDismissed(wsMessage);
+            // AI 流式输出
+            case MessageTypes.AI_STREAM -> handleAiStream(wsMessage);
+            case MessageTypes.FORCE_LOGOUT -> handleForceLogout(wsMessage);
             default -> LOG.debug("未处理的消息类型: {}", wsMessage.getType());
         }
     }
@@ -306,21 +331,49 @@ public final class MainViewModel {
 
         final ChatViewModel chatVm = chatViewModel.get();
         if (chatVm != null && sessionId.equals(chatVm.getSessionId())) {
-            // 更新当前会话中消息的已读状态
-            for (final MessageInfo msg : chatVm.getMessages()) {
+            // 更新当前会话中所有 <= lastReadMessageId 的已发送消息为已读
+            final Long lastReadId = Long.parseLong(lastReadMessageId);
+            final ObservableList<MessageInfo> msgList = chatVm.getMessages();
+            for (int i = 0; i < msgList.size(); i++) {
+                final MessageInfo msg = msgList.get(i);
                 if (msg.isSentByMe() && msg.getMessageId() != null
-                        && lastReadMessageId.equals(String.valueOf(msg.getMessageId()))) {
+                        && msg.getMessageId() <= lastReadId && !msg.isRead()) {
                     msg.setRead(true);
-                    final int index = chatVm.getMessages().indexOf(msg);
-                    if (index >= 0) {
-                        chatVm.getMessages().set(index, msg);
-                    }
-                    break;
+                    // 替换元素触发 ObservableList 更新事件
+                    msgList.set(i, msg);
                 }
             }
         }
 
         LOG.info("收到已读回执: sessionId={}, lastReadMessageId={}", sessionId, lastReadMessageId);
+    }
+
+    /**
+     * 处理强制下线通知（账号在其他设备登录）
+     * 清理数据、停止重连，触发前端弹窗提示并跳转到登录页
+     */
+    @SuppressWarnings("unchecked")
+    private void handleForceLogout(final WebSocketMessage wsMessage) {
+        final java.util.Map<String, Object> data = (java.util.Map<String, Object>) wsMessage.getData();
+        final String reason = data != null && data.get("reason") != null
+                ? String.valueOf(data.get("reason"))
+                : "您的账号在其他设备登录";
+
+        LOG.warn("收到强制下线通知: reason={}", reason);
+
+        // 关闭 WebSocket、清理本地数据
+        WebSocketClient.getInstance().close();
+        currentUser.set(null);
+        conversations.clear();
+        selectedConversation.set(null);
+        chatViewModel.set(null);
+
+        // 触发 UI 弹窗并跳转登录页
+        if (onKickedOut != null) {
+            onKickedOut.accept("您的账户在别处登录，如果不是本人操作，请立即修改密码。");
+        } else if (onLogout != null) {
+            onLogout.accept(null);
+        }
     }
 
     /**
@@ -414,7 +467,7 @@ public final class MainViewModel {
      * 确保群会话在会话列表中可见（不存在则动态添加）
      */
     private void ensureGroupConversation(final Long groupId, final String sessionId,
-                                          final String content, final String avatar) {
+            final String content, final String avatar) {
         // 检查是否已在列表中
         for (final ConversationInfo conv : conversations) {
             if (sessionId.equals(conv.getSessionId())) {
@@ -432,7 +485,7 @@ public final class MainViewModel {
         newConv.setSessionId(sessionId);
         newConv.setTargetId(groupId);
         newConv.setTargetType("GROUP");
-        newConv.setTargetName("群聊");  // 及时显示，名称后续刷新会话列表时更新
+        newConv.setTargetName("群聊"); // 临时占位，立即刷新获取真实名称
         newConv.setTargetAvatar(avatar);
         newConv.setLastMessage(content);
         newConv.setLastMessageType("SYSTEM");
@@ -440,7 +493,9 @@ public final class MainViewModel {
         newConv.setUnreadCount(1);
         // 插入到列表最前面
         conversations.add(0, newConv);
-        LOG.info("动态添加群会话: groupId={}, sessionId={}", groupId, sessionId);
+        LOG.info("动态添加群会话: groupId={}, sessionId={}，正在刷新获取群名称...", groupId, sessionId);
+        // 立即刷新会话列表以获取正确的群名称
+        Platform.runLater(this::loadConversations);
     }
 
     /**
@@ -454,8 +509,54 @@ public final class MainViewModel {
         }
         final Long groupId = toLong(data.get("groupId"));
         final Long userId = toLong(data.get("userId"));
-        LOG.info("群成员离开: groupId={}, userId={}", groupId, userId);
-        // 通知群组面板刷新成员列表（踢人后实时更新）
+        final String username = (String) data.get("username");
+        final String reason = (String) data.get("reason");
+        LOG.info("群成员离开: groupId={}, userId={}, username={}, reason={}", groupId, userId, username, reason);
+
+        // 根据离开原因构造不同的系统消息
+        final String sessionId = "g_" + groupId;
+        final String content;
+        if ("KICKED".equals(reason)) {
+            content = (username != null ? username : "未知用户") + " 已被移出群聊";
+        } else {
+            content = (username != null ? username : "未知用户") + " 已退出群聊";
+        }
+        final MessageInfo sysMsg = new MessageInfo();
+        sysMsg.setMessageId(-System.currentTimeMillis());
+        sysMsg.setSessionId(sessionId);
+        sysMsg.setSenderId(-1L);
+        sysMsg.setSenderName("");
+        sysMsg.setSenderAvatar("");
+        sysMsg.setSenderType("SYSTEM");
+        sysMsg.setType("SYSTEM");
+        sysMsg.setContent(content);
+        sysMsg.setCreateTime(java.time.LocalDateTime.now());
+        sysMsg.setSentByMe(false);
+
+        // 追加到聊天区（如果正在查看）或加入待注入队列
+        final ChatViewModel chatVm = chatViewModel.get();
+        if (chatVm != null && sessionId.equals(chatVm.getSessionId())) {
+            chatVm.appendMessage(sysMsg);
+        } else {
+            // 用户未查看该群时，进入待注入队列，待下次打开群聊时自动注入
+            ChatViewModel.addPendingSystemMessage(sessionId, sysMsg);
+        }
+
+        // 更新会话列表中的最后一条消息
+        for (final ConversationInfo conv : conversations) {
+            if (sessionId.equals(conv.getSessionId())) {
+                conv.setLastMessage(content);
+                conv.setLastMessageTime(java.time.LocalDateTime.now());
+                conv.setLastMessageType("SYSTEM");
+                final int index = conversations.indexOf(conv);
+                if (index >= 0) {
+                    conversations.set(index, conv);
+                }
+                break;
+            }
+        }
+
+        // 通知群组面板刷新成员列表
         GroupListViewModel.notifyMemberChanged(groupId);
     }
 
@@ -511,6 +612,34 @@ public final class MainViewModel {
         if (chatVm != null && sessionId.equals(chatVm.getSessionId())) {
             chatViewModel.set(null);
         }
+    }
+
+    /**
+     * 处理 AI 流式输出
+     * 将 AI 增量内容追加到当前聊天区的消息中
+     */
+    @SuppressWarnings("unchecked")
+    private void handleAiStream(final WebSocketMessage wsMessage) {
+        final java.util.Map<String, Object> data = (java.util.Map<String, Object>) wsMessage.getData();
+        if (data == null) {
+            return;
+        }
+
+        final String messageId = String.valueOf(data.get("messageId"));
+        final String content = (String) data.get("content");
+        final boolean done = Boolean.TRUE.equals(data.get("done"));
+        final Object aiMessageIdObj = data.get("aiMessageId");
+
+        LOG.debug("[AI-STREAM] 收到AI流式消息: messageId={}, done={}, contentLen={}",
+                messageId, done, content != null ? content.length() : 0);
+
+        final ChatViewModel chatVm = chatViewModel.get();
+        if (chatVm == null) {
+            LOG.debug("[AI-STREAM] 当前无活跃聊天，忽略AI流式消息");
+            return;
+        }
+
+        chatVm.handleAiStream(messageId, content, done, aiMessageIdObj != null ? toLong(aiMessageIdObj) : null);
     }
 
     /**
@@ -746,6 +875,7 @@ public final class MainViewModel {
      */
     public void logout() {
         WebSocketClient.getInstance().close();
+        TokenStorage.clear();
         currentUser.set(null);
         conversations.clear();
         selectedConversation.set(null);
@@ -799,6 +929,18 @@ public final class MainViewModel {
     // Property getters
     public ObjectProperty<UserInfo> currentUserProperty() {
         return currentUser;
+    }
+
+    /**
+     * 更新当前用户信息
+     *
+     * @param user 新的用户信息
+     */
+    public void updateCurrentUser(final UserInfo user) {
+        if (user != null) {
+            currentUser.set(user);
+            LOG.info("用户信息已更新: userId={}", user.getUserId());
+        }
     }
 
     public ListProperty<ConversationInfo> conversationsProperty() {
@@ -867,5 +1009,14 @@ public final class MainViewModel {
 
     public void setOnLogout(final Consumer<Void> callback) {
         this.onLogout = callback;
+    }
+
+    /**
+     * 设置被踢下线回调
+     *
+     * @param callback 参数为弹窗提示文字
+     */
+    public void setOnKickedOut(final Consumer<String> callback) {
+        this.onKickedOut = callback;
     }
 }
