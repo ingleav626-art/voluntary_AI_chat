@@ -108,11 +108,67 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
         switch (message.getType()) {
             case MessageTypes.SEND_MESSAGE -> handleSendMessage(userId, message);
             case MessageTypes.RECONNECT -> handleReconnect(userId, message);
+            case MessageTypes.GROUP_AI_STREAM -> handleGroupAiStream(userId, message);
             default -> super.handleUnknownMessage(userId, message);
         }
     }
 
     // ======================== 发送消息 ========================
+
+    /**
+     * 处理本地模式下客户端广播的群AI回复
+     *
+     * <p>
+     * 本地模式下AI角色存储在客户端H2数据库，服务端无法直接处理AI对话。
+     * 客户端生成AI回复后，通过此消息类型请求服务端广播给群成员。
+     * </p>
+     */
+    private void handleGroupAiStream(final Long userId, final WebSocketMessage wsMessage) {
+        @SuppressWarnings("unchecked")
+        final Map<String, Object> data = (Map<String, Object>) wsMessage.getData();
+
+        final String sessionId = (String) data.get("sessionId");
+        final Long groupId = Long.parseLong(String.valueOf(data.get("groupId")));
+        final Long aiId = Long.parseLong(String.valueOf(data.get("aiId")));
+        final String aiName = (String) data.get("aiName");
+        final String aiAvatar = (String) data.get("aiAvatar");
+        final String content = (String) data.get("content");
+        final Boolean done = (Boolean) data.get("done");
+        final Object aiMessageIdObj = data.get("aiMessageId");
+        final Long aiMessageId = aiMessageIdObj != null
+                ? Long.parseLong(String.valueOf(aiMessageIdObj)) : null;
+
+        // 构建AI_STREAM消息并广播
+        final Map<String, Object> streamData = new LinkedHashMap<>();
+        streamData.put("messageId", wsMessage.getId());
+        streamData.put("sessionId", sessionId);
+        streamData.put("senderId", aiId);
+        streamData.put("senderName", aiName);
+        streamData.put("senderAvatar", aiAvatar != null ? aiAvatar : "");
+        streamData.put("senderType", SenderType.AI.name());
+        streamData.put("msgType", "TEXT");
+        streamData.put("content", content);
+        streamData.put("done", done);
+        if (aiMessageId != null) {
+            streamData.put("aiMessageId", aiMessageId);
+        }
+        streamData.put("createTime", java.time.LocalDateTime.now().toString());
+
+        final WebSocketMessage streamMsg = WebSocketMessage.builder()
+                .id(wsMessage.getId())
+                .type(MessageTypes.AI_STREAM)
+                .data(streamData)
+                .build();
+
+        // 广播给群成员
+        final List<Long> memberIds = getGroupMemberIds(groupId);
+        for (final Long memberId : memberIds) {
+            sendToUser(memberId, streamMsg);
+        }
+
+        log.info("群AI回复广播（本地模式）: groupId={}, aiId={}, done={}, memberCount={}",
+                groupId, aiId, done, memberIds.size());
+    }
 
     private void handleSendMessage(final Long senderId, final WebSocketMessage wsMessage) {
         @SuppressWarnings("unchecked")
@@ -365,6 +421,82 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
         for (final Long memberId : memberIds) {
             sendToUser(memberId, message);
         }
+    }
+
+    /**
+     * 向群聊广播 AI 流式回复
+     *
+     * @param sessionId 会话ID（格式: g_{groupId}_a_{aiId}）
+     * @param messageId 消息ID
+     * @param aiId      AI角色ID
+     * @param aiName    AI名称
+     * @param aiAvatar  AI头像
+     * @param content   内容分块
+     * @param done      是否结束
+     */
+    public void sendGroupAiStream(final String sessionId, final String messageId,
+            final Long aiId, final String aiName, final String aiAvatar,
+            final String content, final boolean done) {
+        sendGroupAiStream(sessionId, messageId, aiId, aiName, aiAvatar, content, done, null);
+    }
+
+    /**
+     * 向群聊广播 AI 流式回复（带消息ID）
+     *
+     * @param sessionId    会话ID（格式: g_{groupId}_a_{aiId}）
+     * @param messageId    消息ID
+     * @param aiId         AI角色ID
+     * @param aiName       AI名称
+     * @param aiAvatar     AI头像
+     * @param content      内容分块
+     * @param done         是否结束
+     * @param aiMessageId  AI消息ID（仅 done=true 时有值）
+     */
+    public void sendGroupAiStream(final String sessionId, final String messageId,
+            final Long aiId, final String aiName, final String aiAvatar,
+            final String content, final boolean done, final Long aiMessageId) {
+        final Map<String, Object> data = new LinkedHashMap<>();
+        data.put("messageId", messageId);
+        data.put("sessionId", sessionId);
+        data.put("senderId", aiId);
+        data.put("senderName", aiName);
+        data.put("senderAvatar", aiAvatar != null ? aiAvatar : "");
+        data.put("senderType", SenderType.AI.name());
+        data.put("msgType", "TEXT");
+        data.put("content", content);
+        data.put("done", done);
+        if (aiMessageId != null) {
+            data.put("aiMessageId", aiMessageId);
+        }
+        data.put("createTime", java.time.LocalDateTime.now().toString());
+
+        final WebSocketMessage streamMsg = WebSocketMessage.builder()
+                .id(messageId)
+                .type(MessageTypes.AI_STREAM)
+                .data(data)
+                .build();
+
+        final String groupSessionId = extractGroupSessionId(sessionId);
+        broadcastToGroup(groupSessionId, streamMsg);
+
+        log.debug("群聊AI流式回复: groupSessionId={}, aiId={}, done={}, contentLen={}",
+                groupSessionId, aiId, done, content.length());
+    }
+
+    /**
+     * 从群AI会话ID中提取群会话ID
+     * 输入: g_{groupId}_a_{aiId}
+     * 输出: g_{groupId}
+     */
+    private String extractGroupSessionId(final String sessionId) {
+        if (sessionId == null) {
+            return null;
+        }
+        final int aIdx = sessionId.indexOf("_a_");
+        if (aIdx > 0) {
+            return sessionId.substring(0, aIdx);
+        }
+        return sessionId;
     }
 
     public void broadcastMemberJoin(final Long groupId, final Long userId,

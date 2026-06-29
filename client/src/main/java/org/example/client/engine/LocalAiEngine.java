@@ -330,6 +330,35 @@ public class LocalAiEngine implements AutoCloseable {
     }
 
     /**
+     * 获取 AI 会话的历史消息
+     *
+     * @param sessionId 会话ID（格式: a_{aiId}_{userId}）
+     * @param limit     消息数量限制
+     * @return 消息列表
+     */
+    public List<Message> getAiConversationHistory(String sessionId, int limit) {
+        ensureInitialized();
+        List<Message> messages = repository.findMessages(sessionId, limit);
+        LOG.info("获取AI会话历史消息: sessionId={}, count={}", sessionId, messages.size());
+        return messages;
+    }
+
+    /**
+     * 获取群聊中 AI 消息（按 sessionId 前缀匹配，格式: g_{groupId}_a_）
+     *
+     * @param groupId 群组ID
+     * @param limit   消息数量限制
+     * @return 消息列表
+     */
+    public List<Message> getGroupAiMessages(Long groupId, int limit) {
+        ensureInitialized();
+        String prefix = "g_" + groupId + "_a_";
+        List<Message> messages = repository.findMessagesByPrefix(prefix, limit);
+        LOG.info("获取群聊AI消息: groupId={}, prefix={}, count={}", groupId, prefix, messages.size());
+        return messages;
+    }
+
+    /**
      * 获取 AI 角色详情
      */
     public AiProfile getAiProfile(Long aiId) {
@@ -364,11 +393,28 @@ public class LocalAiEngine implements AutoCloseable {
      * @param callback 流式回调
      */
     public void chat(Long aiId, Long userId, String content, AiStreamCallback callback) {
-        ensureInitialized();
-        executor.submit(() -> doChat(aiId, userId, content, callback));
+        chat(aiId, userId, null, content, callback);
     }
 
-    private void doChat(Long aiId, Long userId, String content, AiStreamCallback callback) {
+    /**
+     * AI 流式对话（支持自定义 sessionId）
+     *
+     * <p>
+     * 用于群聊 AI 回复场景，sessionId 格式为 "g_{groupId}_a_{aiId}"。
+     * </p>
+     *
+     * @param aiId     AI 角色 ID
+     * @param userId   用户 ID
+     * @param sessionId 会话 ID（null 时自动生成 "a_{aiId}_{userId}"）
+     * @param content  用户消息内容
+     * @param callback 流式回调
+     */
+    public void chat(Long aiId, Long userId, String sessionId, String content, AiStreamCallback callback) {
+        ensureInitialized();
+        executor.submit(() -> doChat(aiId, userId, sessionId, content, callback));
+    }
+
+    private void doChat(Long aiId, Long userId, String sessionId, String content, AiStreamCallback callback) {
         try {
             // 1. 获取 AI 角色配置
             AiProfile profile = repository.findAiProfileById(aiId);
@@ -382,13 +428,13 @@ public class LocalAiEngine implements AutoCloseable {
             // 2. 解密 API Key
             String apiKey = AesKeyUtil.decrypt(profile.getApiKeyEnc(), getEncryptionKey());
 
-            // 3. 构建会话 ID
-            String sessionId = "a_" + aiId + "_" + userId;
+            // 3. 构建会话 ID（群聊使用传入的sessionId，私聊自动生成）
+            String finalSessionId = sessionId != null ? sessionId : "a_" + aiId + "_" + userId;
 
             // 4. 保存用户消息
             Message userMsg = new Message();
             userMsg.setId(generateId());
-            userMsg.setSessionId(sessionId);
+            userMsg.setSessionId(finalSessionId);
             userMsg.setSenderId(userId);
             userMsg.setSenderType(0); // USER
             userMsg.setTargetId(aiId);
@@ -396,22 +442,38 @@ public class LocalAiEngine implements AutoCloseable {
             userMsg.setType(0);
             userMsg.setContent(content);
             repository.insertMessage(userMsg);
+            LOG.info("保存群聊用户消息: sessionId={}, userId={}, aiId={}, content={}",
+                    finalSessionId, userId, aiId, content);
 
             // 5. 构建对话上下文
-            List<Map<String, String>> messages = buildChatContext(profile, userId, sessionId, content);
+            List<Map<String, String>> messages = buildChatContext(profile, userId, finalSessionId, content);
 
             // 6. 调用 AI 提供商（流式）
             StringBuilder fullResponse = new StringBuilder();
 
             // 获取 baseUrl：优先使用 profile 配置，否则根据 provider 获取默认值
             String profileBaseUrl = profile.getBaseUrl();
-            String providerDefaultUrl = getBaseUrl(profile.getModelProvider());
-            String baseUrl = profileBaseUrl != null && !profileBaseUrl.trim().isEmpty()
-                    ? profileBaseUrl.trim()
-                    : providerDefaultUrl;
+            String modelProvider = profile.getModelProvider();
+            String baseUrl;
+
+            // custom provider 必须配置 baseUrl
+            if ("custom".equalsIgnoreCase(modelProvider)) {
+                if (profileBaseUrl == null || profileBaseUrl.trim().isEmpty()) {
+                    String errorMsg = "自定义AI提供商(custom)必须配置API地址(baseUrl)，请在AI设置中填写";
+                    LOG.error("AI配置错误: {}", errorMsg);
+                    callback.onError(errorMsg);
+                    return;
+                }
+                baseUrl = profileBaseUrl.trim();
+            } else {
+                String providerDefaultUrl = getBaseUrl(modelProvider);
+                baseUrl = profileBaseUrl != null && !profileBaseUrl.trim().isEmpty()
+                        ? profileBaseUrl.trim()
+                        : providerDefaultUrl;
+            }
 
             LOG.info("AI API baseUrl: profile.baseUrl={}, provider={}, 实际使用={}",
-                    profileBaseUrl, profile.getModelProvider(), baseUrl);
+                    profileBaseUrl, modelProvider, baseUrl);
 
             OpenAiClient.StreamConfig streamConfig = new OpenAiClient.StreamConfig(
                     baseUrl,
@@ -429,7 +491,7 @@ public class LocalAiEngine implements AutoCloseable {
                         // 保存 AI 回复消息
                         Message aiMsg = new Message();
                         aiMsg.setId(generateId());
-                        aiMsg.setSessionId(sessionId);
+                        aiMsg.setSessionId(finalSessionId);
                         aiMsg.setSenderId(aiId);
                         aiMsg.setSenderType(1); // AI
                         aiMsg.setTargetId(userId);
@@ -437,6 +499,8 @@ public class LocalAiEngine implements AutoCloseable {
                         aiMsg.setType(0);
                         aiMsg.setContent(completeContent);
                         repository.insertMessage(aiMsg);
+                        LOG.info("保存群聊AI回复: sessionId={}, aiId={}, userId={}, messageId={}",
+                                finalSessionId, aiId, userId, aiMsg.getId());
 
                         callback.onComplete(completeContent, aiMsg.getId());
                     });

@@ -230,6 +230,27 @@ public class JdbcAiProfileRepository implements AutoCloseable {
         return reversed;
     }
 
+    public List<Message> findMessagesByPrefix(String sessionIdPrefix, int limit) {
+        List<Message> list = new ArrayList<>();
+        String sql = "SELECT * FROM message WHERE session_id LIKE ? AND recall_time IS NULL " +
+                "AND is_deleted = 0 ORDER BY create_time DESC LIMIT ?";
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, sessionIdPrefix + "%");
+            ps.setInt(2, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapToMessage(rs));
+                }
+            }
+        } catch (SQLException e) {
+            LOG.error("查询消息历史失败(前缀): sessionIdPrefix={}", sessionIdPrefix, e);
+        }
+        // 反转成时间正序
+        List<Message> reversed = new ArrayList<>(list);
+        java.util.Collections.reverse(reversed);
+        return reversed;
+    }
+
     public void insertMessage(Message message) {
         String sql = "INSERT INTO message (id, session_id, sender_id, sender_type, target_id, target_type, " +
                 "type, content, extra, create_time, update_time, is_deleted) " +
@@ -329,6 +350,10 @@ public class JdbcAiProfileRepository implements AutoCloseable {
         msg.setType(rs.getInt("type"));
         msg.setContent(rs.getString("content"));
         msg.setExtra(rs.getString("extra"));
+        Timestamp createTime = rs.getTimestamp("create_time");
+        if (createTime != null) {
+            msg.setCreateTime(createTime.toLocalDateTime());
+        }
         Timestamp recallTime = rs.getTimestamp("recall_time");
         if (recallTime != null) {
             msg.setRecallTime(recallTime.toLocalDateTime());

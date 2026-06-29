@@ -289,7 +289,10 @@ public final class MainController implements Initializable {
             }
         }
         if (!found) {
+            // AI会话不在会话列表中，需要先添加到列表
+            viewModel.conversationsProperty().add(0, conv);
             viewModel.selectConversation(conv);
+            LOG.info("AI会话已添加到会话列表: sessionId={}, name={}", conv.getSessionId(), conv.getTargetName());
         }
         LOG.info("已选中AI会话: sessionId={}, name={}", conv.getSessionId(), conv.getTargetName());
     }

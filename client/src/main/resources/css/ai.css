@@ -48,6 +48,49 @@
     -fx-border-width: 0 0 1 0;
 }
 
+/* ========== AI 删除确认弹窗 - 粉色风格 ========== */
+.ai-delete-dialog {
+    -fx-background-color: linear-gradient(from 0% 0% to 0% 100%, #FFF5F8 0%, #FFE0EC 55%, #FFC1D6 100%);
+    -fx-border-color: #FFB6C1;
+    -fx-border-width: 2;
+    -fx-border-radius: 10;
+}
+
+.ai-delete-dialog .header-panel {
+    -fx-background-color: #FFB6C1;
+}
+
+.ai-delete-dialog .header-panel .label {
+    -fx-text-fill: #FFFFFF;
+    -fx-font-weight: bold;
+}
+
+.ai-delete-dialog .content {
+    -fx-background-color: rgba(255, 240, 244, 0.9);
+    -fx-text-fill: #333333;
+}
+
+.ai-delete-dialog .button-bar {
+    -fx-background-color: rgba(255, 182, 193, 0.85);
+}
+
+.ai-delete-dialog .button {
+    -fx-background-color: linear-gradient(from 0% 0% to 0% 100%, #FFB6C1 0%, #FF69B4 100%);
+    -fx-text-fill: #FFFFFF;
+    -fx-border-color: #FF69B4;
+    -fx-border-radius: 5;
+    -fx-background-radius: 5;
+    -fx-font-weight: bold;
+}
+
+.ai-delete-dialog .button:hover {
+    -fx-background-color: linear-gradient(from 0% 0% to 0% 100%, #FF69B4 0%, #FF1493 100%);
+}
+
+.ai-delete-dialog .button:pressed {
+    -fx-background-color: #DB7093;
+}
+
 .ai-list .list-cell:hover {
     -fx-background-color: #FFE0EC;
 }

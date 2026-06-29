@@ -26,4 +26,7 @@ public class MessageTypes {
     public static final String GROUP_MEMBER_ROLE_CHANGE = "GROUP_MEMBER_ROLE_CHANGE";
     public static final String GROUP_INFO_CHANGE = "GROUP_INFO_CHANGE";
     public static final String GROUP_DISMISSED = "GROUP_DISMISSED";
+
+    // 本地模式下客户端广播群AI回复
+    public static final String GROUP_AI_STREAM = "GROUP_AI_STREAM";
 }
