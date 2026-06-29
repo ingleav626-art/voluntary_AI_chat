@@ -273,11 +273,13 @@ public final class FriendController implements Initializable {
                 actionBox.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
 
                 final Button acceptBtn = new Button("同意");
-                acceptBtn.getStyleClass().add("btn-success-sm");
+                acceptBtn.getStyleClass().add("btn-accept");
+                acceptBtn.setPrefWidth(80);
                 acceptBtn.setOnAction(e -> viewModel.acceptApply(item.getApplyId()));
 
                 final Button rejectBtn = new Button("拒绝");
-                rejectBtn.getStyleClass().add("btn-danger-sm");
+                rejectBtn.getStyleClass().add("btn-reject");
+                rejectBtn.setPrefWidth(80);
                 rejectBtn.setOnAction(e -> viewModel.rejectApply(item.getApplyId()));
 
                 actionBox.getChildren().addAll(acceptBtn, rejectBtn);

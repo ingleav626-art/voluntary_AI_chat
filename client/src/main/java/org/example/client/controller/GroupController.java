@@ -98,6 +98,9 @@ public final class GroupController implements Initializable {
     private Button inviteMemberButton;
 
     @FXML
+    private Button aiConfigButton;
+
+    @FXML
     private Button avatarButton;
 
     @FXML
@@ -118,6 +121,24 @@ public final class GroupController implements Initializable {
         // 绑定群组列表
         groupList.itemsProperty().bind(viewModel.groupsProperty());
         groupList.setCellFactory(param -> new GroupCell());
+
+        // 监听viewModel.selectedGroup变化，用于自动选中群组后更新UI
+        viewModel.selectedGroupProperty().addListener((obs, oldGroup, newGroup) -> {
+            if (newGroup != null) {
+                // 查找群组列表中对应的群组并选中
+                for (final GroupInfo group : groupList.getItems()) {
+                    if (group.getGroupId().equals(newGroup.getGroupId())) {
+                        groupList.getSelectionModel().select(group);
+                        groupDetailTitle.setText("群成员 - " + newGroup.getName());
+                        viewModel.loadMembers(newGroup.getGroupId());
+                        updateActionButtons(newGroup);
+                        LOG.info("监听器触发：已选中群组 groupId={}, groupName={}",
+                                newGroup.getGroupId(), newGroup.getName());
+                        break;
+                    }
+                }
+            }
+        });
 
         // 群组点击事件：显示群成员
         groupList.setOnMouseClicked(event -> {
@@ -199,6 +220,10 @@ public final class GroupController implements Initializable {
         inviteMemberButton.setVisible(true);
         inviteMemberButton.setManaged(true);
 
+        // AI配置按钮所有人可见
+        aiConfigButton.setVisible(true);
+        aiConfigButton.setManaged(true);
+
         // 头像按钮所有人可见
         avatarButton.setVisible(true);
         avatarButton.setManaged(true);
@@ -229,6 +254,8 @@ public final class GroupController implements Initializable {
     private void setActionButtonsVisible(final boolean visible) {
         inviteMemberButton.setVisible(visible);
         inviteMemberButton.setManaged(visible);
+        aiConfigButton.setVisible(visible);
+        aiConfigButton.setManaged(visible);
         avatarButton.setVisible(visible);
         avatarButton.setManaged(visible);
         editGroupButton.setVisible(visible);
@@ -246,6 +273,45 @@ public final class GroupController implements Initializable {
     private void handleBack() {
         LOG.info("返回主界面");
         org.example.client.App.switchToMainFromGroup();
+    }
+
+    /**
+     * 根据群组ID选中群组
+     *
+     * @param groupId 群组ID
+     */
+    public void selectGroupById(final Long groupId) {
+        if (groupId == null) {
+            LOG.warn("群组ID为空，无法选中群组");
+            return;
+        }
+
+        // 检查群组列表是否已加载
+        if (groupList.getItems().isEmpty()) {
+            LOG.info("群组列表未加载，设置待选中群组ID: {}", groupId);
+            // 设置待选中的群组ID，等待群组列表加载完成后自动选中
+            viewModel.setPendingSelectGroupId(groupId);
+            return;
+        }
+
+        // 遍历群组列表，查找匹配的群组
+        for (final GroupInfo group : groupList.getItems()) {
+            if (group.getGroupId().equals(groupId)) {
+                // 选中群组
+                groupList.getSelectionModel().select(group);
+
+                // 设置选中的群组并加载群成员
+                viewModel.setSelectedGroup(group);
+                groupDetailTitle.setText("群成员 - " + group.getName());
+                viewModel.loadMembers(groupId);
+                updateActionButtons(group);
+
+                LOG.info("已选中群组: groupId={}, groupName={}", groupId, group.getName());
+                return;
+            }
+        }
+
+        LOG.warn("未找到群组ID为{}的群组", groupId);
     }
 
     /**
@@ -408,6 +474,19 @@ public final class GroupController implements Initializable {
     }
 
     /**
+     * 打开群 AI 配置对话框
+     */
+    @FXML
+    private void handleAiConfig() {
+        final GroupInfo selected = viewModel.getSelectedGroup();
+        if (selected == null) {
+            return;
+        }
+
+        GroupAiConfigDialog.show(aiConfigButton.getScene().getWindow(), selected.getGroupId());
+    }
+
+    /**
      * 退出群组（成员）
      */
     @FXML
@@ -421,6 +500,8 @@ public final class GroupController implements Initializable {
         confirm.setTitle("退出群组");
         confirm.setHeaderText("确认退出群组");
         confirm.setContentText("确定要退出群「" + selected.getName() + "」吗？");
+        // 应用粉色风格样式
+        applyDialogStyle(confirm);
         confirm.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
                 viewModel.leaveGroup(selected.getGroupId());
@@ -446,6 +527,8 @@ public final class GroupController implements Initializable {
         confirm.setTitle("解散群组");
         confirm.setHeaderText("确认解散群组");
         confirm.setContentText("解散群「" + selected.getName() + "」后，所有成员将被移除，且不可恢复。\n确定要解散吗？");
+        // 应用粉色风格样式
+        applyDialogStyle(confirm);
         confirm.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
                 viewModel.dismissGroup(selected.getGroupId());
@@ -455,6 +538,20 @@ public final class GroupController implements Initializable {
                 setActionButtonsVisible(false);
             }
         });
+    }
+
+    /**
+     * 为 Alert 对话框应用粉色风格样式
+     *
+     * @param alert Alert 对话框
+     */
+    private void applyDialogStyle(final Alert alert) {
+        final javafx.scene.control.DialogPane dialogPane = alert.getDialogPane();
+        final java.net.URL cssUrl = getClass().getResource("/css/default.css");
+        if (cssUrl != null) {
+            dialogPane.getStylesheets().add(cssUrl.toExternalForm());
+        }
+        dialogPane.getStyleClass().add("dialog-container");
     }
 
     /**

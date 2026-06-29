@@ -50,7 +50,7 @@
                     <Button fx:id="editButton" mnemonicParsing="false"
                             onAction="#handleEdit" styleClass="btn-icon" text="编辑" visible="false"/>
                     <Button fx:id="deleteButton" mnemonicParsing="false"
-                            onAction="#handleDelete" styleClass="btn-danger" text="删除" visible="false"/>
+                            onAction="#handleDelete" styleClass="btn-icon" text="删除" visible="false"/>
                 </HBox>
 
                 <!-- 详情展示区 -->

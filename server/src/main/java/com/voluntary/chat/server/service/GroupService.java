@@ -37,18 +37,29 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 群组服务
+ * 群组服务（已废弃）
  *
  * <p>
  * 处理群组的创建、管理、成员操作等业务逻辑。
  * </p>
  *
+ * <p>原GroupService.java已拆分为三个更小的服务类，符合AGENTS.md的文件规范（≤400行）：</p>
+ * <ul>
+ *   <li><strong>GroupCoreService</strong>：核心群组操作（创建、查询、修改、解散）</li>
+ *   <li><strong>GroupMemberService</strong>：成员管理（邀请、移除、退出、成员列表、昵称）</li>
+ *   <li><strong>GroupRoleService</strong>：权限管理（转让群主、设置管理员、角色验证）</li>
+ * </ul>
+ *
+ * <p>请直接使用上述三个服务类，不要使用GroupService。</p>
+ *
+ * @deprecated 已拆分为 {@link GroupCoreService}、{@link GroupMemberService}、{@link GroupRoleService}
  * @author voluntary-ai-chat
  * @since 1.0.0
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Deprecated
 public class GroupService {
 
     private final GroupMapper groupMapper;
@@ -89,9 +100,12 @@ public class GroupService {
 
         // 3. 添加初始成员（去重，排除创建者自己），并发送系统消息
         final String groupSessionId = "g_" + group.getId();
-        Set<Long> memberIds = request.getMemberIds().stream()
-                .filter(id -> !id.equals(userId))
-                .collect(Collectors.toSet());
+        List<Long> rawMemberIds = request.getMemberIds();
+        Set<Long> memberIds = rawMemberIds == null
+                ? Collections.emptySet()
+                : rawMemberIds.stream()
+                        .filter(id -> !id.equals(userId))
+                        .collect(Collectors.toSet());
         if (!memberIds.isEmpty()) {
             // 验证用户是否存在
             Map<Long, User> userMap = userService.findByIds(memberIds);
@@ -166,15 +180,20 @@ public class GroupService {
         }
 
         // 2. 分页查询群组信息
-        LambdaQueryWrapper<GroupEntity> wrapper = new LambdaQueryWrapper<>();
-        wrapper.in(GroupEntity::getId, groupIds)
+        // 注意：count 查询与 list 查询必须使用独立的 wrapper，
+        // 因为 H2 不允许 COUNT(*) 查询带 ORDER BY 子句
+        LambdaQueryWrapper<GroupEntity> countWrapper = new LambdaQueryWrapper<>();
+        countWrapper.in(GroupEntity::getId, groupIds)
+                .eq(GroupEntity::getIsDeleted, 0);
+        long total = groupMapper.selectCount(countWrapper);
+
+        LambdaQueryWrapper<GroupEntity> listWrapper = new LambdaQueryWrapper<>();
+        listWrapper.in(GroupEntity::getId, groupIds)
                 .eq(GroupEntity::getIsDeleted, 0)
                 .orderByDesc(GroupEntity::getCreateTime);
-
-        long total = groupMapper.selectCount(wrapper);
         int offset = (page - 1) * size;
         List<GroupEntity> groups = groupMapper.selectList(
-                wrapper.last("LIMIT " + offset + ", " + size));
+                listWrapper.last("LIMIT " + offset + ", " + size));
 
         // 3. 批量查询成员数量
         List<GroupResponse> list = groups.stream()
@@ -195,16 +214,21 @@ public class GroupService {
     public PageResult<GroupMemberResponse> getGroupMembers(final Long groupId, final int page, final int size) {
         GroupEntity group = findGroupById(groupId);
 
-        LambdaQueryWrapper<GroupMember> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(GroupMember::getGroupId, groupId)
+        // 注意：count 查询与 list 查询必须使用独立的 wrapper，
+        // 因为 H2 不允许 COUNT(*) 查询带 ORDER BY 子句
+        LambdaQueryWrapper<GroupMember> countWrapper = new LambdaQueryWrapper<>();
+        countWrapper.eq(GroupMember::getGroupId, groupId)
+                .eq(GroupMember::getIsDeleted, 0);
+        long total = groupMemberMapper.selectCount(countWrapper);
+
+        LambdaQueryWrapper<GroupMember> listWrapper = new LambdaQueryWrapper<>();
+        listWrapper.eq(GroupMember::getGroupId, groupId)
                 .eq(GroupMember::getIsDeleted, 0)
                 .orderByAsc(GroupMember::getRole)
                 .orderByAsc(GroupMember::getCreateTime);
-
-        long total = groupMemberMapper.selectCount(wrapper);
         int offset = (page - 1) * size;
         List<GroupMember> members = groupMemberMapper.selectList(
-                wrapper.last("LIMIT " + offset + ", " + size));
+                listWrapper.last("LIMIT " + offset + ", " + size));
 
         if (members.isEmpty()) {
             return PageResult.of(Collections.emptyList(), total, page, size);

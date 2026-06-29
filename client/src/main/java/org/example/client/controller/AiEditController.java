@@ -44,6 +44,9 @@ public final class AiEditController implements Initializable {
     private PasswordField apiKeyField;
 
     @FXML
+    private TextField baseUrlField;
+
+    @FXML
     private TextField avatarField;
 
     @FXML
@@ -117,6 +120,7 @@ public final class AiEditController implements Initializable {
         modelField.setText(profile.getModel() != null ? profile.getModel() : "");
         // 编辑模式下不回填 API Key（安全考虑）
         apiKeyField.setPromptText("留空则不修改");
+        baseUrlField.setText(profile.getBaseUrl() != null ? profile.getBaseUrl() : "");
         avatarField.setText(profile.getAvatar() != null ? profile.getAvatar() : "");
         openingMessageField.setText(profile.getOpeningMessage() != null ? profile.getOpeningMessage() : "");
         personaField.setText(profile.getPersona() != null ? profile.getPersona() : "");
@@ -135,6 +139,7 @@ public final class AiEditController implements Initializable {
         modelField.clear();
         apiKeyField.clear();
         apiKeyField.setPromptText("输入 API Key");
+        baseUrlField.clear();
         avatarField.clear();
         openingMessageField.clear();
         personaField.clear();
@@ -153,7 +158,7 @@ public final class AiEditController implements Initializable {
         final String name = nameField.getText().trim();
         final String provider = providerCombo.getValue();
         final String model = modelField.getText().trim();
-        final String apiKey = apiKeyField.getText();
+        final String apiKey = apiKeyField.getText() != null ? apiKeyField.getText().trim() : "";
 
         // 验证必填项
         if (name.isEmpty()) {
@@ -168,7 +173,7 @@ public final class AiEditController implements Initializable {
             errorLabel.setText("模型名称不能为空");
             return;
         }
-        if (!isEditMode && (apiKey == null || apiKey.isEmpty())) {
+        if (!isEditMode && apiKey.isEmpty()) {
             errorLabel.setText("API Key 不能为空");
             return;
         }
@@ -208,9 +213,10 @@ public final class AiEditController implements Initializable {
         profile.setName(name);
         profile.setModelProvider(provider);
         profile.setModel(model);
-        if (apiKey != null && !apiKey.isEmpty()) {
+        if (!apiKey.isEmpty()) {
             profile.setApiKey(apiKey);
         }
+        profile.setBaseUrl(baseUrlField.getText().trim().isEmpty() ? null : baseUrlField.getText().trim());
         profile.setAvatar(avatarField.getText().trim().isEmpty() ? null : avatarField.getText().trim());
         profile.setOpeningMessage(openingMessageField.getText().trim().isEmpty()
                 ? null : openingMessageField.getText().trim());

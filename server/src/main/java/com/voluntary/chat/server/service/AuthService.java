@@ -56,6 +56,20 @@ public class AuthService {
     }
 
     /**
+     * 根据用户ID发送验证码（用于密码修改）
+     *
+     * @param userId 用户ID
+     */
+    public void sendSmsCodeForUser(Long userId) {
+        User user = userService.findById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+        sendSmsCode(user.getPhone());
+        log.info("为用户 {} 发送密码修改验证码", userId);
+    }
+
+    /**
      * 验证手机号的短信验证码
      *
      * @param phone 手机号

@@ -121,6 +121,7 @@ public final class AiViewModel {
                 entity.getIsGroup(),
                 entity.getSystemPrompt(),
                 null, // apiKey (不返回加密密钥)
+                entity.getBaseUrl(),
                 entity.getTemperature(),
                 entity.getMaxTokens());
     }
@@ -335,8 +336,10 @@ public final class AiViewModel {
                         profile.getAvatar(),
                         profile.getPersona(),
                         profile.getSystemPrompt(),
+                        profile.getModelProvider(),
                         profile.getModel(),
                         profile.getApiKey(),
+                        profile.getBaseUrl(),
                         profile.getIsGroup(),
                         profile.getTemperature(),
                         profile.getMaxTokens());
@@ -486,6 +489,38 @@ public final class AiViewModel {
                 .exceptionally(ex -> {
                     LOG.error("加载AI记忆异常: aiId={}", aiId, ex);
                     Platform.runLater(() -> memories.clear());
+                    return null;
+                });
+    }
+
+    /**
+     * 删除 AI 记忆
+     *
+     * @param memoryId 记忆ID
+     */
+    public void deleteMemory(final Long memoryId) {
+        final AiProfile selected = selectedAi.get();
+        if (selected == null || memoryId == null) {
+            return;
+        }
+
+        AiService.getInstance().deleteMemory(selected.getAiId(), memoryId)
+                .thenAccept(response -> {
+                    Platform.runLater(() -> {
+                        if (response != null && response.isSuccess()) {
+                            successMessage.set("记忆已删除");
+                            LOG.info("AI记忆已删除: memoryId={}", memoryId);
+                            loadMemories(selected.getAiId());
+                        } else {
+                            final String msg = response != null ? response.getMessage() : "删除记忆失败";
+                            errorMessage.set(msg);
+                            LOG.warn("AI记忆删除失败: {}", msg);
+                        }
+                    });
+                })
+                .exceptionally(ex -> {
+                    LOG.error("删除AI记忆异常: memoryId={}", memoryId, ex);
+                    Platform.runLater(() -> errorMessage.set("网络异常，删除记忆失败"));
                     return null;
                 });
     }

@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -285,6 +286,55 @@ class AiChatServiceTest {
 
         aiChatService.handleAiChat(USER_ID, AI_ID, SESSION_ID, "你好", "msg-001");
 
+        verify(openAiClient).streamChatCompletion(any(OpenAiClient.StreamConfig.class));
+    }
+
+    @Test
+    @DisplayName("处理 AI 对话 - 验证流式回调执行")
+    void handleAiChat_shouldExecuteStreamCallbacks() {
+        final AiProfile profile = createAiProfile();
+
+        when(aiService.getAiProfileById(AI_ID)).thenReturn(profile);
+        when(aiService.decryptApiKey(profile)).thenReturn("sk-test-key");
+        when(openAiClient.getBaseUrl("openai")).thenReturn("https://api.openai.com/v1");
+        when(messageMapper.selectList(any())).thenReturn(List.of());
+        when(messageMapper.insert(any(Message.class))).thenAnswer(invocation -> {
+            Message msg = invocation.getArgument(0);
+            msg.setId(5001L);
+            return 1;
+        });
+
+        // 触发回调执行，覆盖 saveAiMessage 和 WebSocket 推送逻辑
+        org.mockito.Mockito.doAnswer(invocation -> {
+            OpenAiClient.StreamConfig config = invocation.getArgument(0);
+            config.getOnChunk().accept("你好");
+            config.getOnComplete().accept("你好！有什么可以帮助你的？");
+            return null;
+        }).when(openAiClient).streamChatCompletion(any(OpenAiClient.StreamConfig.class));
+
+        aiChatService.handleAiChat(USER_ID, AI_ID, SESSION_ID, "你好", "msg-001");
+
+        // 验证用户消息和AI消息都被保存
+        verify(messageMapper, times(2)).insert(any(Message.class));
+        verify(openAiClient).streamChatCompletion(any(OpenAiClient.StreamConfig.class));
+    }
+
+    @Test
+    @DisplayName("处理 AI 对话 - 不同模型提供商")
+    void handleAiChat_shouldHandleDifferentProviders() {
+        final AiProfile profile = createAiProfile();
+        profile.setModelProvider("anthropic");
+        profile.setModel("claude-3");
+
+        when(aiService.getAiProfileById(AI_ID)).thenReturn(profile);
+        when(aiService.decryptApiKey(profile)).thenReturn("sk-anthropic-key");
+        when(openAiClient.getBaseUrl("anthropic")).thenReturn("https://api.anthropic.com/v1");
+        when(messageMapper.selectList(any())).thenReturn(List.of());
+        when(messageMapper.insert(any(Message.class))).thenReturn(1);
+
+        aiChatService.handleAiChat(USER_ID, AI_ID, SESSION_ID, "你好", "msg-001");
+
+        verify(openAiClient).getBaseUrl("anthropic");
         verify(openAiClient).streamChatCompletion(any(OpenAiClient.StreamConfig.class));
     }
 

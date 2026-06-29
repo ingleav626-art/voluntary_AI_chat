@@ -40,6 +40,13 @@
                                styleClass="ai-form-input"/>
             </VBox>
 
+            <!-- 基准地址 -->
+            <VBox spacing="4.0">
+                <Label text="基准地址" styleClass="ai-form-label"/>
+                <TextField fx:id="baseUrlField" promptText="自定义 API 地址（可选，如 https://api.deepseek.com/v1）"
+                           styleClass="ai-form-input"/>
+            </VBox>
+
             <!-- 头像URL -->
             <VBox spacing="4.0">
                 <Label text="头像URL" styleClass="ai-form-label"/>

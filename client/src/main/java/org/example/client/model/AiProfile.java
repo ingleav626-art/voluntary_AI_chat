@@ -44,6 +44,9 @@ public class AiProfile {
     /** API Key（创建/编辑时使用） */
     private String apiKey;
 
+    /** API 基准地址（可选，用于自定义 API endpoint） */
+    private String baseUrl;
+
     /** 温度参数 */
     private Double temperature;
 

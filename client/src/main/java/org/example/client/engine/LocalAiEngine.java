@@ -120,6 +120,20 @@ public class LocalAiEngine implements AutoCloseable {
             // 从环境变量或系统属性读取加密密钥
             this.encryptionKey = System.getProperty("ai.encryption-key",
                     System.getenv("AI_ENCRYPTION_KEY"));
+            // 如果密钥未配置，自动生成并存储在本地
+            if (encryptionKey == null || encryptionKey.isEmpty()) {
+                Path keyFile = Path.of(dataDir, "encryption.key");
+                if (Files.exists(keyFile)) {
+                    // 从本地文件读取已保存的密钥
+                    encryptionKey = Files.readString(keyFile).trim();
+                    LOG.info("从本地文件读取加密密钥: {}", keyFile);
+                } else {
+                    // 生成随机32位密钥并保存
+                    encryptionKey = generateRandomKey();
+                    Files.writeString(keyFile, encryptionKey);
+                    LOG.info("自动生成加密密钥并保存: {}", keyFile);
+                }
+            }
             if (encryptionKey != null && !encryptionKey.isEmpty()) {
                 aiConfig.setEncryptionKey(encryptionKey);
             }
@@ -257,8 +271,8 @@ public class LocalAiEngine implements AutoCloseable {
      * 更新 AI 角色
      */
     public void updateAiProfile(Long aiId, Long userId, String name, String avatar,
-            String persona, String systemPrompt, String model,
-            String apiKey, Boolean isGroup, Double temperature, Integer maxTokens) {
+            String persona, String systemPrompt, String modelProvider, String model,
+            String apiKey, String baseUrl, Boolean isGroup, Double temperature, Integer maxTokens) {
         ensureInitialized();
 
         AiProfile profile = repository.findAiProfileById(aiId);
@@ -278,11 +292,15 @@ public class LocalAiEngine implements AutoCloseable {
             profile.setPersona(persona);
         if (systemPrompt != null)
             profile.setSystemPrompt(systemPrompt);
+        if (modelProvider != null)
+            profile.setModelProvider(modelProvider);
         if (model != null)
             profile.setModel(model);
         if (apiKey != null) {
             profile.setApiKeyEnc(AesKeyUtil.encrypt(apiKey, getEncryptionKey()));
         }
+        if (baseUrl != null)
+            profile.setBaseUrl(baseUrl);
         if (isGroup != null)
             profile.setIsGroup(isGroup);
         if (temperature != null)
@@ -358,6 +376,8 @@ public class LocalAiEngine implements AutoCloseable {
                 callback.onError("AI 角色不存在");
                 return;
             }
+            LOG.info("【诊断】读取AI配置: aiId={}, name={}, provider={}, baseUrl={}, model={}", 
+                aiId, profile.getName(), profile.getModelProvider(), profile.getBaseUrl(), profile.getModel());
 
             // 2. 解密 API Key
             String apiKey = AesKeyUtil.decrypt(profile.getApiKeyEnc(), getEncryptionKey());
@@ -383,8 +403,15 @@ public class LocalAiEngine implements AutoCloseable {
             // 6. 调用 AI 提供商（流式）
             StringBuilder fullResponse = new StringBuilder();
 
-            // 获取 baseUrl
-            String baseUrl = getBaseUrl(profile.getModelProvider());
+            // 获取 baseUrl：优先使用 profile 配置，否则根据 provider 获取默认值
+            String profileBaseUrl = profile.getBaseUrl();
+            String providerDefaultUrl = getBaseUrl(profile.getModelProvider());
+            String baseUrl = profileBaseUrl != null && !profileBaseUrl.trim().isEmpty()
+                    ? profileBaseUrl.trim()
+                    : providerDefaultUrl;
+
+            LOG.info("AI API baseUrl: profile.baseUrl={}, provider={}, 实际使用={}",
+                    profileBaseUrl, profile.getModelProvider(), baseUrl);
 
             OpenAiClient.StreamConfig streamConfig = new OpenAiClient.StreamConfig(
                     baseUrl,
@@ -520,6 +547,18 @@ public class LocalAiEngine implements AutoCloseable {
      */
     private long generateId() {
         return System.currentTimeMillis() * 1000 + (long) (Math.random() * 1000);
+    }
+
+    /**
+     * 生成随机32位加密密钥
+     */
+    private String generateRandomKey() {
+        StringBuilder sb = new StringBuilder(32);
+        java.security.SecureRandom random = new java.security.SecureRandom();
+        for (int i = 0; i < 32; i++) {
+            sb.append((char) (random.nextInt(26) + 'A'));
+        }
+        return sb.toString();
     }
 
     // ==================== 关闭 ====================

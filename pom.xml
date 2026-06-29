@@ -38,6 +38,9 @@
         <mybatis-plus.version>3.5.15</mybatis-plus.version>
         <jjwt.version>0.12.5</jjwt.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
+        <!-- Redis Lettuce 最新版本 -->
+        <lettuce.version>7.6.0.RELEASE</lettuce.version>
+        <netty.version>4.2.13.Final</netty.version>
     </properties>
 
     <dependencyManagement>
@@ -81,6 +84,33 @@
                 <groupId>org.mapstruct</groupId>
                 <artifactId>mapstruct-processor</artifactId>
                 <version>${mapstruct.version}</version>
+            </dependency>
+            <!-- Redis Lettuce 最新版本（覆盖 Spring Boot 默认版本） -->
+            <dependency>
+                <groupId>io.lettuce</groupId>
+                <artifactId>lettuce-core</artifactId>
+                <version>${lettuce.version}</version>
+            </dependency>
+            <!-- Netty 版本（Lettuce 7.x 需要 Netty 4.2.x） -->
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-common</artifactId>
+                <version>${netty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-handler</artifactId>
+                <version>${netty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-transport</artifactId>
+                <version>${netty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-resolver-dns</artifactId>
+                <version>${netty.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

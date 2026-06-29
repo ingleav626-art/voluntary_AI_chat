@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.stream.Collectors;
 
@@ -48,10 +49,25 @@ public class GlobalExceptionHandler {
         return ApiResult.error(ErrorCode.BAD_REQUEST.getCode(), e.getMessage());
     }
 
+    /**
+     * 处理静态资源/接口未找到异常
+     *
+     * <p>当请求路径没有匹配的 Controller 时，Spring 会回退到静态资源查找，
+     * 查找失败抛出此异常。此前被 {@link #handleException(Exception)} 捕获并返回 500，
+     * 掩盖了"接口不存在"的真实原因。此处单独处理，返回 404 并记录 WARN 日志，
+     * 便于排查 Controller 未注册或路径错误问题。</p>
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ApiResult<Void> handleNoResourceFoundException(NoResourceFoundException e) {
+        log.warn("接口或资源不存在: {}", e.getMessage());
+        return ApiResult.error(ErrorCode.NOT_FOUND.getCode(), "请求的接口不存在");
+    }
+
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResult<Void> handleException(Exception e) {
         log.error("系统异常: {}", e.getMessage(), e);
-        return ApiResult.error(ErrorCode.INTERNAL_ERROR.getCode(), e.getMessage());
+        return ApiResult.error(ErrorCode.INTERNAL_ERROR.getCode(), "服务器内部错误，请稍后重试");
     }
 }

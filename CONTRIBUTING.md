@@ -40,6 +40,48 @@ fix/B/server/message-order          # 开发者B：修复消息顺序
 
 ## 并行开发规范
 
+### 0. 文件拆分规范（强制执行）
+
+**目的**：遵循AGENTS.md文件规范，保持代码可维护性。
+
+**文件行数限制**：
+| 文件类型 | 最大行数 | 检查命令 |
+|---------|---------|---------|
+| Controller | ≤ 300行 | `Get-ChildItem -Path "server\src\main\java\com\voluntary\chat\server\controller" -Filter "*Controller.java" \| ForEach-Object { $lines = (Get-Content $_.FullName \| Measure-Object -Line).Lines; Write-Output "$($_.Name): $lines lines" }` |
+| Service | ≤ 400行 | `Get-ChildItem -Path "server\src\main\java\com\voluntary\chat\server\service" -Filter "*Service.java" \| ForEach-Object { $lines = (Get-Content $_.FullName \| Measure-Object -Line).Lines; Write-Output "$($_.Name): $lines lines" }` |
+| Entity/DTO | ≤ 150行 | 自动符合规范 |
+
+**拆分原则**：
+1. **单一职责**：每个服务类只负责一个功能领域
+2. **避免循环依赖**：使用@Lazy注解或重构依赖关系
+3. **清晰命名**：拆分后的服务类命名应清晰表达其职责
+
+**拆分示例**（已执行）：
+```
+GroupService (584行) → 拆分为：
+├── GroupCoreService (260行) - 核心群组操作（创建、查询、修改、解散）
+├── GroupMemberService (264行) - 成员管理（邀请、移除、退出、成员列表、昵称）
+└── GroupRoleService (139行) - 权限管理（转让群主、设置管理员、角色验证）
+```
+
+**拆分流程**：
+1. 检查文件行数是否超限
+2. 分析文件功能，按职责拆分
+3. 创建新服务类，迁移对应功能代码
+4. 更新Controller调用新服务
+5. 更新测试文件，mock新服务
+6. 编译验证无循环依赖
+7. 运行测试确保功能完整
+
+**检查工具**：
+```bash
+# 检查Controller文件行数
+Get-ChildItem -Path "server\src\main\java\com\voluntary\chat\server\controller" -Filter "*Controller.java" | ForEach-Object { $lines = (Get-Content $_.FullName | Measure-Object -Line).Lines; Write-Output "$($_.Name): $lines lines" }
+
+# 检查Service文件行数
+Get-ChildItem -Path "server\src\main\java\com\voluntary\chat\server\service" -Filter "*Service.java" | ForEach-Object { $lines = (Get-Content $_.FullName | Measure-Object -Line).Lines; Write-Output "$($_.Name): $lines lines" }
+```
+
 ### 1. 接口先行
 - 在开发新功能前，先定义好接口契约
 - 使用 `docs/API.md` 文档化 API

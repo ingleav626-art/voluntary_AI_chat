@@ -140,6 +140,7 @@ CREATE TABLE IF NOT EXISTS `ai_profile` (
     `model_provider` VARCHAR(20) NOT NULL COMMENT '模型提供商：openai, deepseek, qwen, zhipu, custom',
     `model` VARCHAR(50) NOT NULL COMMENT '模型名称',
     `api_key_enc` VARCHAR(500) NOT NULL COMMENT 'API Key（AES-256-GCM 加密）',
+    `base_url` VARCHAR(500) DEFAULT NULL COMMENT 'API 基准地址（可选，用于自定义 API endpoint）',
     `is_group` TINYINT DEFAULT 0 COMMENT '是否可用于群聊：0-否，1-是',
     `temperature` DECIMAL(3,2) DEFAULT 0.70 COMMENT 'AI 回复创造性参数（0.0-2.0）',
     `max_tokens` INT DEFAULT 2048 COMMENT 'AI 回复最大长度',

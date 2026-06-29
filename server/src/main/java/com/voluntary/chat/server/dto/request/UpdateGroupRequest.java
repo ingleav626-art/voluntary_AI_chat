@@ -14,4 +14,5 @@ public class UpdateGroupRequest {
     private String name;
     private String announcement;
     private Boolean announcementPinned;
+    private String avatar;
 }

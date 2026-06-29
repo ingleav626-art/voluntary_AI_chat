@@ -344,11 +344,12 @@ public final class AiController implements Initializable {
     /**
      * AI 记忆列表 Cell
      */
-    private static final class AiMemoryCell extends ListCell<AiMemory> {
+    private final class AiMemoryCell extends ListCell<AiMemory> {
         private final VBox cell;
         private final Label summary;
         private final Label keywords;
         private final Label time;
+        private final Button deleteBtn;
 
         AiMemoryCell() {
             cell = new VBox(4);
@@ -371,7 +372,11 @@ public final class AiController implements Initializable {
             time = new Label();
             time.getStyleClass().add("ai-memory-time");
 
-            bottomBox.getChildren().addAll(keywords, spacer, time);
+            deleteBtn = new Button("删除");
+            deleteBtn.getStyleClass().add("btn-ai-memory-delete");
+            deleteBtn.setStyle("-fx-text-fill: #e74c3c; -fx-background-color: transparent; -fx-cursor: hand;");
+
+            bottomBox.getChildren().addAll(keywords, spacer, time, deleteBtn);
 
             cell.getChildren().addAll(summary, bottomBox);
         }
@@ -390,8 +395,34 @@ public final class AiController implements Initializable {
             keywords.setText(item.getKeywords() != null ? item.getKeywords() : "");
             time.setText(item.getCreateTime() != null ? item.getCreateTime() : "");
 
+            deleteBtn.setOnAction(e -> handleDeleteMemory(item));
+
             setGraphic(cell);
             setText(null);
         }
+    }
+
+    /**
+     * 处理删除记忆
+     *
+     * @param memory 要删除的记忆
+     */
+    private void handleDeleteMemory(final AiMemory memory) {
+        if (memory == null || memory.getMemoryId() == null) {
+            return;
+        }
+
+        final javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                javafx.scene.control.Alert.AlertType.CONFIRMATION);
+        alert.setTitle("确认删除");
+        alert.setHeaderText("删除 AI 记忆");
+        alert.setContentText("确定要删除这条记忆吗？");
+
+        alert.showAndWait().ifPresent(response -> {
+            if (response == javafx.scene.control.ButtonType.OK) {
+                LOG.info("确认删除AI记忆: memoryId={}", memory.getMemoryId());
+                viewModel.deleteMemory(memory.getMemoryId());
+            }
+        });
     }
 }

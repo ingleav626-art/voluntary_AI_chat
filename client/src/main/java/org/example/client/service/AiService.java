@@ -239,6 +239,86 @@ public final class AiService extends BaseHttpService {
     }
 
     /**
+     * 删除 AI 记忆
+     *
+     * @param aiId     AI 角色ID
+     * @param memoryId 记忆ID
+     * @return 异步结果
+     */
+    public CompletableFuture<ApiResponse<Void>> deleteMemory(final Long aiId, final Long memoryId) {
+        if (!checkLoginStatus()) {
+            return CompletableFuture.completedFuture(createNotLoggedInResponse());
+        }
+
+        final HttpRequest httpRequest = buildDeleteRequest(
+                AI_PATH + "/" + aiId + "/memories/" + memoryId).build();
+
+        LOG.info("删除AI记忆: aiId={}, memoryId={}", aiId, memoryId);
+
+        return sendRequest(httpRequest, getTypeFactory().constructParametricType(
+                ApiResponse.class, Void.class));
+    }
+
+    /**
+     * 修改群 AI 配置
+     *
+     * @param groupId  群组ID
+     * @param configId 配置ID
+     * @param config   修改内容
+     * @return 异步结果
+     */
+    public CompletableFuture<ApiResponse<Void>> updateGroupConfig(
+            final Long groupId, final Long configId, final AiGroupConfig config) {
+        if (!checkLoginStatus()) {
+            return CompletableFuture.completedFuture(createNotLoggedInResponse());
+        }
+
+        final Map<String, Object> body = new HashMap<>();
+        if (config.getAiId() != null) {
+            body.put("aiId", config.getAiId());
+        }
+        if (config.getTriggerKeywords() != null) {
+            body.put("triggerKeywords", config.getTriggerKeywords());
+        }
+        if (config.getTriggerProbability() != null) {
+            body.put("triggerProbability", config.getTriggerProbability());
+        }
+        if (config.getIsEnabled() != null) {
+            body.put("isEnabled", config.getIsEnabled());
+        }
+
+        final HttpRequest httpRequest = buildPutRequest(
+                AI_PATH + "/group/" + groupId + "/config/" + configId, body).build();
+
+        LOG.info("修改群AI配置: groupId={}, configId={}", groupId, configId);
+
+        return sendRequest(httpRequest, getTypeFactory().constructParametricType(
+                ApiResponse.class, Void.class));
+    }
+
+    /**
+     * 删除群 AI 配置
+     *
+     * @param groupId  群组ID
+     * @param configId 配置ID
+     * @return 异步结果
+     */
+    public CompletableFuture<ApiResponse<Void>> deleteGroupConfig(
+            final Long groupId, final Long configId) {
+        if (!checkLoginStatus()) {
+            return CompletableFuture.completedFuture(createNotLoggedInResponse());
+        }
+
+        final HttpRequest httpRequest = buildDeleteRequest(
+                AI_PATH + "/group/" + groupId + "/config/" + configId).build();
+
+        LOG.info("删除群AI配置: groupId={}, configId={}", groupId, configId);
+
+        return sendRequest(httpRequest, getTypeFactory().constructParametricType(
+                ApiResponse.class, Void.class));
+    }
+
+    /**
      * 获取群 AI 配置列表
      *
      * @param groupId 群组ID

@@ -142,9 +142,6 @@ public final class ProfileController implements Initializable {
     @FXML
     private Label securityMessageLabel;
 
-    @FXML
-    private Button closeButton;
-
     // ========== ViewModel ==========
 
     private ProfileViewModel viewModel;
@@ -438,6 +435,13 @@ public final class ProfileController implements Initializable {
                         if (response != null && response.isSuccess() && response.getData() != null) {
                             // 更新头像 URL 到 ViewModel
                             final String avatarUrl = response.getData().getUrl();
+                            // 防御性校验：服务端返回的 URL 为空时不应写入 ViewModel，
+                            // 否则保存时空字符串会覆盖原头像，导致头像被清空
+                            if (avatarUrl == null || avatarUrl.trim().isEmpty()) {
+                                showError("头像上传失败：服务端未返回有效URL");
+                                LOG.warn("头像上传响应缺少 url 字段: {}", response.getData());
+                                return;
+                            }
                             viewModel.avatarProperty().set(avatarUrl);
                             showSuccess("头像上传成功，请点击保存按钮保存");
 
@@ -459,18 +463,21 @@ public final class ProfileController implements Initializable {
                             LOG.warn("头像上传失败: {}", msg);
                         }
                     });
+                })
+                .exceptionally(throwable -> {
+                    // 上传过程发生异常（如文件读取失败、网络中断、响应解析异常等），
+                    // 必须重置 UI 状态，否则加载指示器不消失、保存按钮一直禁用，导致头像无法保存
+                    Platform.runLater(() -> {
+                        profileLoadingIndicator.setVisible(false);
+                        saveProfileButton.setDisable(false);
+                        final String msg = "头像上传失败: "
+                                + (throwable.getCause() != null
+                                        ? throwable.getCause().getMessage() : throwable.getMessage());
+                        showError(msg);
+                        LOG.error("头像上传异常", throwable);
+                    });
+                    return null;
                 });
-    }
-
-    /**
-     * 处理关闭对话框
-     */
-    @FXML
-    private void handleClose() {
-        LOG.info("关闭个人设置对话框");
-        if (dialogStage != null) {
-            dialogStage.close();
-        }
     }
 
     // ========== Setter ==========

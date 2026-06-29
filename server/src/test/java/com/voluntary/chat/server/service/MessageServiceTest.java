@@ -1,6 +1,8 @@
 package com.voluntary.chat.server.service;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.voluntary.chat.common.dto.PageResult;
 import com.voluntary.chat.common.exception.BusinessException;
 import com.voluntary.chat.common.exception.ErrorCode;
@@ -14,6 +16,8 @@ import com.voluntary.chat.server.entity.User;
 import com.voluntary.chat.server.mapper.GroupMemberMapper;
 import com.voluntary.chat.server.mapper.MessageMapper;
 import com.voluntary.chat.server.mapper.MessageReadMapper;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -61,6 +65,14 @@ class MessageServiceTest {
 
     private Message mockMessage;
     private User mockSender;
+
+    @BeforeAll
+    static void initMybatisPlusLambdaCache() {
+        TableInfoHelper.initTableInfo(
+                new MapperBuilderAssistant(new MybatisConfiguration(), ""),
+                Message.class
+        );
+    }
 
     @BeforeEach
     void setUp() {
@@ -514,6 +526,211 @@ class MessageServiceTest {
 
         assertNotNull(response);
         verify(messageMapper).insert(any(Message.class));
+    }
+
+    @Test
+    @DisplayName("获取用户会话ID列表-包含群组补充")
+    void getUserSessionIds_shouldIncludeGroupSessions() {
+        Message msg = new Message();
+        msg.setSessionId("p_1001_1002");
+
+        when(messageMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(msg));
+        when(groupMemberMapper.selectGroupIdsByUserId(1001L)).thenReturn(List.of(2001L, 2002L));
+
+        List<String> sessionIds = messageService.getUserSessionIds(1001L);
+
+        assertNotNull(sessionIds);
+        assertTrue(sessionIds.contains("p_1001_1002"));
+        assertTrue(sessionIds.contains("g_2001"));
+        assertTrue(sessionIds.contains("g_2002"));
+    }
+
+    @Test
+    @DisplayName("获取用户会话ID列表-无消息无群组")
+    void getUserSessionIds_shouldReturnEmpty_whenNoData() {
+        when(messageMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Collections.emptyList());
+        when(groupMemberMapper.selectGroupIdsByUserId(1001L)).thenReturn(Collections.emptyList());
+
+        List<String> sessionIds = messageService.getUserSessionIds(1001L);
+
+        assertNotNull(sessionIds);
+        assertTrue(sessionIds.isEmpty());
+    }
+
+    @Test
+    @DisplayName("获取用户会话ID列表-群组已存在不重复添加")
+    void getUserSessionIds_shouldNotDuplicateGroupSession() {
+        Message msg = new Message();
+        msg.setSessionId("g_2001");
+
+        when(messageMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(msg));
+        when(groupMemberMapper.selectGroupIdsByUserId(1001L)).thenReturn(List.of(2001L));
+
+        List<String> sessionIds = messageService.getUserSessionIds(1001L);
+
+        long count = sessionIds.stream().filter("g_2001"::equals).count();
+        assertEquals(1, count);
+    }
+
+    @Test
+    @DisplayName("获取离线消息-有新消息")
+    void getOfflineMessages_shouldReturnMessages() {
+        Message msg = new Message();
+        msg.setId(3001L);
+        msg.setSessionId("p_1001_1002");
+        msg.setSenderId(1001L);
+        msg.setSenderType(0);
+        msg.setType(0);
+        msg.setContent("新消息");
+        msg.setCreateTime(LocalDateTime.now());
+        msg.setIsDeleted(0);
+
+        when(messageMapper.selectList(any(LambdaQueryWrapper.class)))
+                .thenReturn(List.of(msg))
+                .thenReturn(List.of(msg));
+        when(groupMemberMapper.selectGroupIdsByUserId(1001L)).thenReturn(Collections.emptyList());
+        when(userService.findByIds(any(Set.class))).thenReturn(Map.of(1001L, mockSender));
+
+        List<MessageResponse> result = messageService.getOfflineMessages(1001L, 2000L);
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals("新消息", result.get(0).getContent());
+    }
+
+    @Test
+    @DisplayName("获取离线消息-无会话返回空")
+    void getOfflineMessages_shouldReturnEmpty_whenNoSession() {
+        when(messageMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Collections.emptyList());
+        when(groupMemberMapper.selectGroupIdsByUserId(1001L)).thenReturn(Collections.emptyList());
+
+        List<MessageResponse> result = messageService.getOfflineMessages(1001L, 2000L);
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    @DisplayName("获取离线消息-无新消息返回空")
+    void getOfflineMessages_shouldReturnEmpty_whenNoNewMessage() {
+        Message msg = new Message();
+        msg.setSessionId("p_1001_1002");
+
+        when(messageMapper.selectList(any(LambdaQueryWrapper.class)))
+                .thenReturn(List.of(msg))
+                .thenReturn(Collections.emptyList());
+        when(groupMemberMapper.selectGroupIdsByUserId(1001L)).thenReturn(Collections.emptyList());
+
+        List<MessageResponse> result = messageService.getOfflineMessages(1001L, 2000L);
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    @DisplayName("查找消息发送者-正常返回")
+    void findMessageSenders_shouldReturnSenderIds() {
+        Message msg1 = new Message();
+        msg1.setSenderId(1001L);
+        Message msg2 = new Message();
+        msg2.setSenderId(1002L);
+        Message msg3 = new Message();
+        msg3.setSenderId(1001L);
+
+        when(messageMapper.selectList(any(LambdaQueryWrapper.class)))
+                .thenReturn(List.of(msg1, msg2, msg3));
+
+        List<Long> senders = messageService.findMessageSenders(List.of(2001L, 2002L, 2003L));
+
+        assertNotNull(senders);
+        assertEquals(2, senders.size());
+        assertTrue(senders.contains(1001L));
+        assertTrue(senders.contains(1002L));
+    }
+
+    @Test
+    @DisplayName("查找消息发送者-空列表返回空")
+    void findMessageSenders_shouldReturnEmpty_whenEmptyInput() {
+        List<Long> senders = messageService.findMessageSenders(Collections.emptyList());
+
+        assertNotNull(senders);
+        assertTrue(senders.isEmpty());
+        verify(messageMapper, never()).selectList(any(LambdaQueryWrapper.class));
+    }
+
+    @Test
+    @DisplayName("查找消息发送者-null返回空")
+    void findMessageSenders_shouldReturnEmpty_whenNullInput() {
+        List<Long> senders = messageService.findMessageSenders(null);
+
+        assertNotNull(senders);
+        assertTrue(senders.isEmpty());
+    }
+
+    @Test
+    @DisplayName("发送消息-无效的单聊sessionId格式（部分数量错误）")
+    void sendMessage_shouldFail_whenPrivateSessionIdHasWrongParts() {
+        SendMessageRequest request = new SendMessageRequest();
+        request.setSessionId("p_1001");
+        request.setType("TEXT");
+        request.setContent("你好");
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> messageService.sendMessage(1001L, request));
+        assertEquals(ErrorCode.BAD_REQUEST, exception.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("发送消息-无效的群聊sessionId格式（部分数量错误）")
+    void sendMessage_shouldFail_whenGroupSessionIdHasWrongParts() {
+        SendMessageRequest request = new SendMessageRequest();
+        request.setSessionId("g_2001_3001");
+        request.setType("TEXT");
+        request.setContent("你好");
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> messageService.sendMessage(1001L, request));
+        assertEquals(ErrorCode.BAD_REQUEST, exception.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("发送消息-无效的AI会话sessionId格式（部分数量错误）")
+    void sendMessage_shouldFail_whenAiSessionIdHasWrongParts() {
+        SendMessageRequest request = new SendMessageRequest();
+        request.setSessionId("a_3001");
+        request.setType("TEXT");
+        request.setContent("你好");
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> messageService.sendMessage(1001L, request));
+        assertEquals(ErrorCode.BAD_REQUEST, exception.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("撤回消息-已删除的消息")
+    void recallMessage_shouldFail_whenMessageDeleted() {
+        mockMessage.setIsDeleted(1);
+
+        when(messageMapper.selectById(MESSAGE_ID)).thenReturn(mockMessage);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> messageService.recallMessage(USER_ID, MESSAGE_ID));
+        assertEquals(ErrorCode.NOT_FOUND, exception.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("群消息撤回-管理员可撤回他人消息")
+    void recallMessage_group_adminCanRecallOthers() {
+        mockMessage.setSessionId("g_" + GROUP_ID);
+        mockMessage.setSenderId(OTHER_USER_ID);
+        mockMessage.setCreateTime(LocalDateTime.now().minusMinutes(10));
+
+        when(messageMapper.selectById(MESSAGE_ID)).thenReturn(mockMessage);
+        when(groupMemberMapper.selectRoleByGroupIdAndUserId(GROUP_ID, USER_ID))
+                .thenReturn(1); // ADMIN
+
+        assertDoesNotThrow(() -> messageService.recallMessage(USER_ID, MESSAGE_ID));
+        verify(messageMapper).updateById(any(Message.class));
     }
 
 }

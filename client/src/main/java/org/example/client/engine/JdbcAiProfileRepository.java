@@ -63,6 +63,9 @@ public class JdbcAiProfileRepository implements AutoCloseable {
                 "    PRIMARY KEY (id)\n" +
                 ")");
 
+        // 兼容已有数据库：添加 base_url 字段（如果不存在）
+        executeSql("ALTER TABLE ai_profile ADD COLUMN IF NOT EXISTS base_url VARCHAR(500) DEFAULT NULL");
+
         executeSql("CREATE TABLE IF NOT EXISTS message (\n" +
                 "    id BIGINT NOT NULL,\n" +
                 "    session_id VARCHAR(100) NOT NULL,\n" +
@@ -139,9 +142,9 @@ public class JdbcAiProfileRepository implements AutoCloseable {
 
     public void insertAiProfile(AiProfile profile) {
         String sql = "INSERT INTO ai_profile (id, user_id, name, avatar, persona, system_prompt, " +
-                "model_provider, model, api_key_enc, is_group, temperature, max_tokens, " +
+                "model_provider, model, api_key_enc, base_url, is_group, temperature, max_tokens, " +
                 "status, create_time, update_time, is_deleted) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setLong(1, profile.getId());
             ps.setLong(2, profile.getUserId());
@@ -152,13 +155,14 @@ public class JdbcAiProfileRepository implements AutoCloseable {
             ps.setString(7, profile.getModelProvider());
             ps.setString(8, profile.getModel());
             ps.setString(9, profile.getApiKeyEnc());
-            ps.setBoolean(10, profile.getIsGroup() != null ? profile.getIsGroup() : false);
-            ps.setDouble(11, profile.getTemperature() != null ? profile.getTemperature() : 0.7);
-            ps.setInt(12, profile.getMaxTokens() != null ? profile.getMaxTokens() : 2048);
-            ps.setInt(13, 0);
-            ps.setTimestamp(14, Timestamp.valueOf(LocalDateTime.now()));
+            ps.setString(10, profile.getBaseUrl());
+            ps.setBoolean(11, profile.getIsGroup() != null ? profile.getIsGroup() : false);
+            ps.setDouble(12, profile.getTemperature() != null ? profile.getTemperature() : 0.7);
+            ps.setInt(13, profile.getMaxTokens() != null ? profile.getMaxTokens() : 2048);
+            ps.setInt(14, 0);
             ps.setTimestamp(15, Timestamp.valueOf(LocalDateTime.now()));
-            ps.setInt(16, 0);
+            ps.setTimestamp(16, Timestamp.valueOf(LocalDateTime.now()));
+            ps.setInt(17, 0);
             ps.executeUpdate();
         } catch (SQLException e) {
             LOG.error("插入AI角色失败", e);
@@ -168,20 +172,22 @@ public class JdbcAiProfileRepository implements AutoCloseable {
 
     public void updateAiProfile(AiProfile profile) {
         String sql = "UPDATE ai_profile SET name = ?, avatar = ?, persona = ?, system_prompt = ?, " +
-                "model = ?, api_key_enc = ?, is_group = ?, temperature = ?, max_tokens = ?, " +
-                "update_time = ? WHERE id = ?";
+                "model_provider = ?, model = ?, api_key_enc = ?, base_url = ?, is_group = ?, " +
+                "temperature = ?, max_tokens = ?, update_time = ? WHERE id = ?";
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setString(1, profile.getName());
             ps.setString(2, profile.getAvatar());
             ps.setString(3, profile.getPersona());
             ps.setString(4, profile.getSystemPrompt());
-            ps.setString(5, profile.getModel());
-            ps.setString(6, profile.getApiKeyEnc());
-            ps.setBoolean(7, profile.getIsGroup() != null ? profile.getIsGroup() : false);
-            ps.setDouble(8, profile.getTemperature() != null ? profile.getTemperature() : 0.7);
-            ps.setInt(9, profile.getMaxTokens() != null ? profile.getMaxTokens() : 2048);
-            ps.setTimestamp(10, Timestamp.valueOf(LocalDateTime.now()));
-            ps.setLong(11, profile.getId());
+            ps.setString(5, profile.getModelProvider());
+            ps.setString(6, profile.getModel());
+            ps.setString(7, profile.getApiKeyEnc());
+            ps.setString(8, profile.getBaseUrl());
+            ps.setBoolean(9, profile.getIsGroup() != null ? profile.getIsGroup() : false);
+            ps.setDouble(10, profile.getTemperature() != null ? profile.getTemperature() : 0.7);
+            ps.setInt(11, profile.getMaxTokens() != null ? profile.getMaxTokens() : 2048);
+            ps.setTimestamp(12, Timestamp.valueOf(LocalDateTime.now()));
+            ps.setLong(13, profile.getId());
             ps.executeUpdate();
         } catch (SQLException e) {
             LOG.error("更新AI角色失败: aiId={}", profile.getId(), e);
@@ -303,6 +309,7 @@ public class JdbcAiProfileRepository implements AutoCloseable {
         profile.setModelProvider(rs.getString("model_provider"));
         profile.setModel(rs.getString("model"));
         profile.setApiKeyEnc(rs.getString("api_key_enc"));
+        profile.setBaseUrl(rs.getString("base_url"));
         profile.setIsGroup(rs.getBoolean("is_group"));
         profile.setTemperature(rs.getDouble("temperature"));
         profile.setMaxTokens(rs.getInt("max_tokens"));
