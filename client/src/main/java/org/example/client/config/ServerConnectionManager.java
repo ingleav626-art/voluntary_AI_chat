@@ -212,7 +212,7 @@ public class ServerConnectionManager {
 
             case LOCAL:
                 // 本地模式：默认使用本地，根据异步检查目标决定覆盖策略
-                final String checkTarget = System.getProperty("app.async-check-target", "cloud");
+                final String checkTarget = System.getProperty("app.async-check-target", "hotspot");
                 if ("hotspot".equals(checkTarget)) {
                     // 测试包：检查热点服务器，热点可用时覆盖本地
                     final String hotspot = discoverHotspotServer();

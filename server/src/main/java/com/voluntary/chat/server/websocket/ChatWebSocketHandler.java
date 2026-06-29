@@ -435,6 +435,66 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
         broadcastToGroup("g_" + groupId, message);
     }
 
+    // ======================== 通知推送 ========================
+
+    /**
+     * 向指定用户推送系统通知
+     * <p>
+     * 支持多种通知场景：新消息提醒、AI 主动问候、待办提醒、系统事件。
+     * 客户端收到后根据 type 显示对应的通知样式（托盘气泡/应用内横幅）。
+     * </p>
+     *
+     * @param userId    目标用户ID
+     * @param notifType 通知子类型（NOTIFICATION_NEW_MESSAGE / NOTIFICATION_AI_GREETING 等）
+     * @param title     通知标题
+     * @param content   通知正文
+     * @param sessionId 可选，关联的会话ID，点击通知后跳转
+     */
+    public void sendNotification(final Long userId, final String notifType,
+                                  final String title, final String content,
+                                  final String sessionId) {
+        final Map<String, Object> data = new LinkedHashMap<>();
+        data.put("notifType", notifType);
+        data.put("title", title);
+        data.put("content", content);
+        if (sessionId != null) {
+            data.put("sessionId", sessionId);
+        }
+
+        final WebSocketMessage message = WebSocketMessage.builder()
+                .id(String.valueOf(System.currentTimeMillis()))
+                .type(MessageTypes.NOTIFICATION)
+                .data(data)
+                .build();
+        sendToUser(userId, message);
+    }
+
+    /**
+     * 向指定用户推送待办提醒通知
+     */
+    public void sendTodoNotification(final Long userId, final String title,
+                                      final String content) {
+        sendNotification(userId, MessageTypes.NOTIFICATION_TODO_REMINDER,
+                title, content, null);
+    }
+
+    /**
+     * 向指定用户推送通知设置已变更通知
+     * <p>
+     * 当其他设备修改了通知设置时，通知当前设备刷新设置。
+     * </p>
+     *
+     * @param userId 目标用户ID
+     */
+    public void sendSettingsChangedNotification(final Long userId) {
+        final WebSocketMessage message = WebSocketMessage.builder()
+                .id(String.valueOf(System.currentTimeMillis()))
+                .type(MessageTypes.NOTIFICATION_SETTINGS_CHANGED)
+                .data(Map.of("message", "通知设置已在其他设备修改"))
+                .build();
+        sendToUser(userId, message);
+    }
+
     // ======================== 其他工具 ========================
 
     @Override

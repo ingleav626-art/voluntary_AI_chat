@@ -26,4 +26,13 @@ public class MessageTypes {
     public static final String GROUP_MEMBER_ROLE_CHANGE = "GROUP_MEMBER_ROLE_CHANGE";
     public static final String GROUP_INFO_CHANGE = "GROUP_INFO_CHANGE";
     public static final String GROUP_DISMISSED = "GROUP_DISMISSED";
+
+    // 通知消息（服务端 → 客户端）
+    public static final String NOTIFICATION = "NOTIFICATION";
+    public static final String NOTIFICATION_NEW_MESSAGE = "NOTIFICATION_NEW_MESSAGE";
+    public static final String NOTIFICATION_AI_GREETING = "NOTIFICATION_AI_GREETING";
+    public static final String NOTIFICATION_TODO_REMINDER = "NOTIFICATION_TODO_REMINDER";
+    public static final String NOTIFICATION_SYSTEM_EVENT = "NOTIFICATION_SYSTEM_EVENT";
+    // 通知设置变更（其他设备修改了通知设置，当前设备需刷新）
+    public static final String NOTIFICATION_SETTINGS_CHANGED = "NOTIFICATION_SETTINGS_CHANGED";
 }

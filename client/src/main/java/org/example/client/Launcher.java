@@ -189,6 +189,8 @@ public final class Launcher {
                 props.setProperty("server.tomcat.threads.max", "2");
                 props.setProperty("server.tomcat.threads.min-spare", "1");
                 props.setProperty("server.tomcat.accept-count", "5");
+                // 本地测试包模式：启用 UDP 广播服务地址，让局域网其他设备发现
+                props.setProperty("server.broadcast.enabled", "true");
                 // 禁用 devtools 文件系统扫描
                 props.setProperty("spring.devtools.restart.enabled", "false");
                 app.setDefaultProperties(props);

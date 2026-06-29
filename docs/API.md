@@ -632,7 +632,82 @@ GET /api/conversation/list
 
 ---
 
-## 七、WebSocket 实时通信
+## 七、通知模块 `/api/notification`
+
+### 7.1 获取通知设置
+
+```
+GET /api/notification/settings
+```
+
+**Header**：`Authorization: Bearer <token>`
+
+**响应**：
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "messageNotification": true,
+    "messageSound": true,
+    "aiGreetingNotification": true,
+    "aiGreetingSound": true,
+    "todoReminder": true,
+    "todoSound": true,
+    "doNotDisturb": false,
+    "dndStartTime": "22:00:00",
+    "dndEndTime": "09:00:00",
+    "mergeWindowSeconds": 5
+  }
+}
+```
+
+**字段说明**：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| messageNotification | boolean | 新消息通知开关 |
+| messageSound | boolean | 新消息声音开关 |
+| aiGreetingNotification | boolean | AI 主动问候通知开关 |
+| aiGreetingSound | boolean | AI 问候声音开关 |
+| todoReminder | boolean | 待办提醒开关 |
+| todoSound | boolean | 待办声音开关 |
+| doNotDisturb | boolean | 免打扰模式开关 |
+| dndStartTime | string | 免打扰开始时间（HH:mm:ss） |
+| dndEndTime | string | 免打扰结束时间（HH:mm:ss） |
+| mergeWindowSeconds | int | 通知合并窗口（秒），范围 1-300 |
+
+> **说明**：未设置过通知的用户返回系统默认值（如上所示）。
+
+### 7.2 更新通知设置
+
+```
+PUT /api/notification/settings
+```
+
+**Header**：`Authorization: Bearer <token>`
+
+**请求体**（部分更新，只需传入要修改的字段）：
+```json
+{
+  "messageNotification": false,
+  "doNotDisturb": true,
+  "dndStartTime": "23:00:00",
+  "dndEndTime": "08:00:00",
+  "mergeWindowSeconds": 10
+}
+```
+
+**响应**：返回更新后的完整通知设置（同 GET 响应格式）。
+
+**校验规则**：
+- `mergeWindowSeconds`：范围 1-300，超出返回 400 参数校验错误
+- 其他 boolean 字段：`true` / `false`
+- 时间字段格式：`HH:mm:ss`
+
+---
+
+## 八、WebSocket 实时通信
 
 ### 连接地址
 
@@ -673,8 +748,45 @@ wss://your-cloud-server.com/ws?token=<accessToken>
 | `GROUP_MEMBER_ROLE_CHANGE` | 服务端 → 客户端 | 成员角色变更 |
 | `GROUP_INFO_CHANGE` | 服务端 → 客户端 | 群信息变更 |
 | `GROUP_DISMISSED` | 服务端 → 客户端 | 群被解散 |
+| `NOTIFICATION` | 服务端 → 客户端 | 系统通知（含新消息、AI问候、待办等子类型） |
+| `NOTIFICATION_SETTINGS_CHANGED` | 服务端 → 客户端 | 通知设置已在其他设备修改，需刷新 |
 
-### 消息 payload 格式
+### 新消息类型 payload 格式
+
+**NOTIFICATION（系统通知）**
+```json
+{
+  "type": "NOTIFICATION",
+  "id": "1719398400000",
+  "data": {
+    "notifType": "NOTIFICATION_NEW_MESSAGE",
+    "title": "张三",
+    "content": "你好，明天见",
+    "sessionId": "p_1001_1002"
+  }
+}
+```
+
+`notifType` 取值：
+
+| notifType | 场景 | 建议的客户端展示方式 |
+|-----------|------|---------------------|
+| `NOTIFICATION_NEW_MESSAGE` | 收到新消息 | 托盘气泡 / 应用内横幅 + 声音 |
+| `NOTIFICATION_AI_GREETING` | AI 主动问候 | 托盘气泡 / 应用内横幅 + 柔和声音 |
+| `NOTIFICATION_TODO_REMINDER` | 待办提醒 | 托盘气泡 + 持续提示音（不可忽略）|
+| `NOTIFICATION_SYSTEM_EVENT` | 系统事件（断线、强制下线等）| 托盘气泡 / 应用内横幅 |
+
+**NOTIFICATION_SETTINGS_CHANGED**
+```json
+{
+  "type": "NOTIFICATION_SETTINGS_CHANGED",
+  "id": "1719398400000",
+  "data": {
+    "message": "通知设置已在其他设备修改"
+  }
+}
+```
+> 客户端收到此消息后应自动调用 `GET /api/notification/settings` 刷新本地通知配置。
 
 **SEND_MESSAGE / RECEIVE_MESSAGE**
 ```json
