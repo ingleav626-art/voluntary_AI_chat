@@ -230,6 +230,19 @@ public final class ChatViewModel {
             final String sessionId = conversation.getSessionId();
             final String content = text.trim();
 
+            // 创建 AI 占位消息（用于流式更新）
+            final MessageInfo aiPlaceholder = new MessageInfo();
+            aiPlaceholder.setMessageId(-2L);
+            aiPlaceholder.setSessionId(sessionId);
+            aiPlaceholder.setSenderId(aiId);
+            aiPlaceholder.setSenderName(conversation.getTargetName());
+            aiPlaceholder.setSenderType("AI");
+            aiPlaceholder.setType(MSG_TYPE_TEXT);
+            aiPlaceholder.setContent("");
+            aiPlaceholder.setCreateTime(java.time.LocalDateTime.now());
+            aiPlaceholder.setSentByMe(false);
+            messages.add(aiPlaceholder);
+
             LocalAiEngine.getInstance().chat(aiId, userId, content, new AiStreamCallback() {
                 private final StringBuilder fullContent = new StringBuilder();
 

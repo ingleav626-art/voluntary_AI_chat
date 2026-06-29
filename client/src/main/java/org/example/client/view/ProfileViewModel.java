@@ -254,15 +254,17 @@ public final class ProfileViewModel {
         // 调用新接口，后端会根据当前登录用户自动获取手机号
         UserService.getInstance().sendPasswordSms()
                 .thenAcceptAsync(response -> {
-                    if (response != null && response.isSuccess()) {
-                        successMessage.set("验证码已发送");
-                        startCountdown(sendButton);
-                        LOG.info("验证码发送成功");
-                    } else {
-                        final String msg = response != null ? response.getMessage() : "验证码发送失败";
-                        errorMessage.set(msg);
-                        LOG.warn("验证码发送失败: {}", msg);
-                    }
+                    Platform.runLater(() -> {
+                        if (response != null && response.isSuccess()) {
+                            successMessage.set("验证码已发送");
+                            startCountdown(sendButton);
+                            LOG.info("验证码发送成功");
+                        } else {
+                            final String msg = response != null ? response.getMessage() : "验证码发送失败";
+                            errorMessage.set(msg);
+                            LOG.warn("验证码发送失败: {}", msg);
+                        }
+                    });
                 })
                 .exceptionally(ex -> {
                     LOG.error("发送验证码异常", ex);

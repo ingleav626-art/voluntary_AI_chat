@@ -6,7 +6,7 @@ spring:
     name: voluntary-ai-chat-server
 
   datasource:
-    url: jdbc:mysql://localhost:3306/voluntary_ai_chat?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://localhost:3306/voluntary_ai_chat?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: root
     password: 123456
     driver-class-name: com.mysql.cj.jdbc.Driver

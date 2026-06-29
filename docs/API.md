@@ -595,7 +595,7 @@ POST /api/message/read
 ```json
 {
   "sessionId": "p_1001_1002",
-  "lastMessageId": 5001
+  "messageIds": [5001, 5002]
 }
 ```
 
@@ -928,6 +928,57 @@ engine.chat(request, new AiStreamCallback() {
 | POST | `/api/ai/group/{groupId}/config` | 更新群 AI 配置 |
 | GET | `/api/ai/group/{groupId}/configs` | 获取群 AI 配置 |
 | GET | `/api/ai/{aiId}/memories` | 获取 AI 记忆 |
+
+#### AI 角色字段
+
+**CreateAiProfileRequest（POST `/api/ai/create`）**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| name | String | 是 | AI 名称（最长 50 字符） |
+| avatar | String | 否 | AI 头像 URL |
+| persona | String | 否 | AI 人设/性格描述（最长 2000 字符） |
+| systemPrompt | String | 否 | 系统提示词 |
+| modelProvider | String | 是 | 模型提供商：openai/deepseek/qwen/zhipu/custom |
+| model | String | 是 | 模型名称 |
+| apiKey | String | 是 | API Key（明文传输，服务端加密存储） |
+| baseUrl | String | 否 | API 基准地址（可选，用于自定义 API endpoint） |
+| isGroup | Boolean | 否 | 是否可用于群聊（默认 false） |
+| temperature | Double | 否 | 温度参数（默认 0.7） |
+| maxTokens | Integer | 否 | 最大 Token 数（默认 2048） |
+
+**UpdateAiProfileRequest（PUT `/api/ai/{aiId}`）**
+
+所有字段均为可选，非 null 字段才会更新。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| name | String | AI 名称 |
+| avatar | String | AI 头像 URL |
+| persona | String | AI 人设 |
+| systemPrompt | String | 系统提示词 |
+| model | String | 模型名称 |
+| apiKey | String | API Key（明文，服务端加密存储） |
+| baseUrl | String | API 基准地址 |
+| isGroup | Boolean | 是否可用于群聊 |
+| temperature | Double | 温度参数 |
+| maxTokens | Integer | 最大 Token 数 |
+
+**AiProfileResponse**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| aiId | Long | AI 角色 ID |
+| name | String | AI 名称 |
+| avatar | String | AI 头像 URL |
+| persona | String | AI 人设 |
+| systemPrompt | String | 系统提示词 |
+| modelProvider | String | 模型提供商 |
+| model | String | 模型名称 |
+| baseUrl | String | API 基准地址 |
+| isGroup | Boolean | 是否可用于群聊 |
+| temperature | Double | 温度参数 |
+| maxTokens | Integer | 最大 Token 数 |
 
 ### 本地健康检查端点（ai-core 模块）
 

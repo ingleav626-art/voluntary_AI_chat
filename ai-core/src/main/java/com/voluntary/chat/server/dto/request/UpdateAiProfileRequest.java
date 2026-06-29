@@ -23,6 +23,8 @@ public class UpdateAiProfileRequest {
 
     private String apiKey;
 
+    private String baseUrl;
+
     private Boolean isGroup;
 
     private Double temperature;

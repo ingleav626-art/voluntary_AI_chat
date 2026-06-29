@@ -20,4 +20,5 @@ public class AiGroupConfigResponse {
     private String triggerKeywords;
     private Double triggerProbability;
     private Boolean isEnabled;
+    private Integer cooldownSeconds;
 }
