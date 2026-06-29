@@ -35,6 +35,9 @@ public final class UserService extends BaseHttpService {
     /** 修改密码接口路径 */
     private static final String USER_PASSWORD_PATH = "/user/password";
 
+    /** 发送密码修改验证码接口路径 */
+    private static final String USER_PASSWORD_SMS_PATH = "/user/password/sms";
+
     /** 修改手机号接口路径 */
     private static final String USER_PHONE_PATH = "/user/phone";
 
@@ -166,6 +169,30 @@ public final class UserService extends BaseHttpService {
         LOG.info("修改用户信息（完整版）: username={}", profile.getUsername());
 
         return sendRequest(putRequest, getTypeFactory().constructParametricType(
+                ApiResponse.class, Void.class));
+    }
+
+    /**
+     * 发送密码修改验证码（自动获取当前用户手机号）
+     *
+     * @return 异步结果
+     */
+    public CompletableFuture<ApiResponse<Void>> sendPasswordSms() {
+        final String url = org.example.client.config.ClientConfig.getInstance().getBaseUrl()
+                + USER_PASSWORD_SMS_PATH;
+
+        final HttpRequest postRequest = HttpRequest.newBuilder()
+                .uri(java.net.URI.create(url))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + TokenStorage.load().getAccessToken())
+                .timeout(java.time.Duration.ofSeconds(
+                        org.example.client.config.ClientConfig.getInstance().getReadTimeout()))
+                .POST(HttpRequest.BodyPublishers.ofString("{}"))
+                .build();
+
+        LOG.info("发送密码修改验证码");
+
+        return sendRequest(postRequest, getTypeFactory().constructParametricType(
                 ApiResponse.class, Void.class));
     }
 

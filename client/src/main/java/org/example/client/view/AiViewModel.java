@@ -121,6 +121,7 @@ public final class AiViewModel {
                 entity.getIsGroup(),
                 entity.getSystemPrompt(),
                 null, // apiKey (不返回加密密钥)
+                entity.getBaseUrl(),
                 entity.getTemperature(),
                 entity.getMaxTokens());
     }
@@ -335,8 +336,10 @@ public final class AiViewModel {
                         profile.getAvatar(),
                         profile.getPersona(),
                         profile.getSystemPrompt(),
+                        profile.getModelProvider(),
                         profile.getModel(),
                         profile.getApiKey(),
+                        profile.getBaseUrl(),
                         profile.getIsGroup(),
                         profile.getTemperature(),
                         profile.getMaxTokens());

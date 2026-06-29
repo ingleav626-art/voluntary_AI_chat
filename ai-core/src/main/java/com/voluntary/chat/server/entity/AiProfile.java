@@ -44,6 +44,9 @@ public class AiProfile {
     /** API Key（AES-256-GCM 加密） */
     private String apiKeyEnc;
 
+    /** API 基准地址（可选，用于自定义 API endpoint） */
+    private String baseUrl;
+
     /** 是否可用于群聊 */
     private Boolean isGroup;
 

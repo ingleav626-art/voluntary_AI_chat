@@ -49,7 +49,7 @@
     <HBox alignment="CENTER_RIGHT" spacing="12.0" styleClass="group-create-footer">
         <Label fx:id="errorLabel" styleClass="error-message" text="" HBox.hgrow="ALWAYS"/>
         <Button fx:id="cancelButton" mnemonicParsing="false"
-                onAction="#handleCancel" text="取消"/>
+                onAction="#handleCancel" styleClass="btn-secondary" text="取消"/>
         <Button fx:id="confirmButton" mnemonicParsing="false"
                 onAction="#handleConfirm" styleClass="btn-primary" text="保存修改"/>
     </HBox>

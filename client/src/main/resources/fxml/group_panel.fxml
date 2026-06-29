@@ -69,10 +69,10 @@
                                 onAction="#handleEditGroupInfo" styleClass="btn-icon" text="修改群信息"
                                 visible="false" managed="false"/>
                         <Button fx:id="dismissGroupButton" mnemonicParsing="false"
-                                onAction="#handleDismissGroup" styleClass="btn-danger-sm" text="解散群组"
+                                onAction="#handleDismissGroup" styleClass="btn-icon" text="解散群组"
                                 visible="false" managed="false"/>
                         <Button fx:id="leaveGroupButton" mnemonicParsing="false"
-                                onAction="#handleLeaveGroup" styleClass="btn-danger-sm" text="退出群组"
+                                onAction="#handleLeaveGroup" styleClass="btn-icon" text="退出群组"
                                 visible="false" managed="false"/>
                     </HBox>
                 </VBox>

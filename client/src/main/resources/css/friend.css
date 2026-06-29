@@ -133,29 +133,33 @@
     -fx-border-width: 1 0 0 0;
 }
 
-/* 小型按钮 - 粉红色 */
-.btn-success-sm {
+/* 小型按钮 - 粉红色（统一宽度，独立类名避免 group.css 覆盖） */
+.btn-accept {
     -fx-background-color: #FF6B9D;
     -fx-text-fill: white;
-    -fx-font-size: 12;
-    -fx-background-radius: 8;
-    -fx-padding: 4 12;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 4px;
+    -fx-padding: 8px 16px;
+    -fx-min-width: 80px;
     -fx-cursor: hand;
 }
 
-.btn-success-sm:hover {
+.btn-accept:hover {
     -fx-background-color: #E8507A;
 }
 
-.btn-danger-sm {
+.btn-reject {
     -fx-background-color: #FF6B9D;
     -fx-text-fill: white;
-    -fx-font-size: 12;
-    -fx-background-radius: 8;
-    -fx-padding: 4 12;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 4px;
+    -fx-padding: 8px 16px;
+    -fx-min-width: 80px;
     -fx-cursor: hand;
 }
 
-.btn-danger-sm:hover {
+.btn-reject:hover {
     -fx-background-color: #E8507A;
 }

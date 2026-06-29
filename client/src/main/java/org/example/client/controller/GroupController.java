@@ -500,6 +500,8 @@ public final class GroupController implements Initializable {
         confirm.setTitle("退出群组");
         confirm.setHeaderText("确认退出群组");
         confirm.setContentText("确定要退出群「" + selected.getName() + "」吗？");
+        // 应用粉色风格样式
+        applyDialogStyle(confirm);
         confirm.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
                 viewModel.leaveGroup(selected.getGroupId());
@@ -525,6 +527,8 @@ public final class GroupController implements Initializable {
         confirm.setTitle("解散群组");
         confirm.setHeaderText("确认解散群组");
         confirm.setContentText("解散群「" + selected.getName() + "」后，所有成员将被移除，且不可恢复。\n确定要解散吗？");
+        // 应用粉色风格样式
+        applyDialogStyle(confirm);
         confirm.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
                 viewModel.dismissGroup(selected.getGroupId());
@@ -534,6 +538,20 @@ public final class GroupController implements Initializable {
                 setActionButtonsVisible(false);
             }
         });
+    }
+
+    /**
+     * 为 Alert 对话框应用粉色风格样式
+     *
+     * @param alert Alert 对话框
+     */
+    private void applyDialogStyle(final Alert alert) {
+        final javafx.scene.control.DialogPane dialogPane = alert.getDialogPane();
+        final java.net.URL cssUrl = getClass().getResource("/css/default.css");
+        if (cssUrl != null) {
+            dialogPane.getStylesheets().add(cssUrl.toExternalForm());
+        }
+        dialogPane.getStyleClass().add("dialog-container");
     }
 
     /**

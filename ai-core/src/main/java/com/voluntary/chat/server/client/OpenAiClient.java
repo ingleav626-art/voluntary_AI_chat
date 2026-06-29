@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -208,11 +210,17 @@ public class OpenAiClient {
         HttpURLConnection conn = null;
         try {
             final URL url = new URL(config.getBaseUrl() + "/chat/completions");
-            conn = (HttpURLConnection) url.openConnection();
+            final Proxy proxy = getProxy();
+            conn = (HttpURLConnection) (proxy != null ? url.openConnection(proxy) : url.openConnection());
+            
+            log.info("AI API 连接: url={}, proxy={}", url, proxy != null ? proxy.address() : "无代理");
+            
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Authorization", "Bearer " + config.getApiKey());
             conn.setRequestProperty("Accept", "text/event-stream");
+            conn.setConnectTimeout(30000);  // 30秒连接超时
+            conn.setReadTimeout(60000);     // 60秒读取超时
             conn.setDoOutput(true);
 
             final String requestBody = objectMapper.writeValueAsString(request);
@@ -320,6 +328,86 @@ public class OpenAiClient {
                 body.append(line);
             }
             return body.toString();
+        }
+    }
+
+    /**
+     * 获取 HTTP 代理（从 JVM 系统属性或环境变量）
+     */
+    private Proxy getProxy() {
+        // 诊断：打印所有代理相关的属性和环境变量
+        log.info("【代理诊断】系统属性: disableProxy={}, https.proxyHost={}, https.proxyPort={}", 
+            System.getProperty("disableProxy"), 
+            System.getProperty("https.proxyHost"), 
+            System.getProperty("https.proxyPort"));
+        log.info("【代理诊断】环境变量: NO_PROXY={}, DISABLE_PROXY={}, HTTPS_PROXY={}, HTTP_PROXY={}", 
+            System.getenv("NO_PROXY"), 
+            System.getenv("DISABLE_PROXY"), 
+            System.getenv("HTTPS_PROXY"), 
+            System.getenv("HTTP_PROXY"));
+        
+        // 优先检查是否强制禁用代理
+        String disableProxy = System.getProperty("disableProxy");
+        if (disableProxy == null) {
+            disableProxy = System.getenv("NO_PROXY");
+        }
+        if (disableProxy == null) {
+            disableProxy = System.getenv("DISABLE_PROXY");
+        }
+        if ("true".equalsIgnoreCase(disableProxy) || "1".equals(disableProxy) || "*".equals(disableProxy)) {
+            log.info("已禁用代理，直连访问");
+            return null;
+        }
+        
+        // 检查 JVM 系统属性
+        String host = System.getProperty("https.proxyHost");
+        String portStr = System.getProperty("https.proxyPort");
+        
+        // 如果系统属性明确设置为空，表示禁用代理
+        if (host != null && host.isEmpty()) {
+            log.info("JVM 系统属性禁用代理，直连访问");
+            return null;
+        }
+        
+        if (host != null && !host.isEmpty()) {
+            int port = portStr != null ? Integer.parseInt(portStr) : 7890;
+            log.info("使用 JVM 配置的 HTTP 代理: {}:{}", host, port);
+            return new Proxy(Proxy.Type.HTTP, new InetSocketAddress(host, port));
+        }
+        
+        // 其次使用环境变量
+        String proxyUrl = System.getenv("HTTPS_PROXY");
+        if (proxyUrl == null || proxyUrl.isEmpty()) {
+            proxyUrl = System.getenv("HTTP_PROXY");
+        }
+        
+        if (proxyUrl == null || proxyUrl.isEmpty()) {
+            log.info("未配置 HTTP 代理，直连访问");
+            return null;
+        }
+        
+        try {
+            // 解析代理地址（格式: http://host:port 或 host:port）
+            String parsedUrl = proxyUrl;
+            int port = 7890;  // 默认端口
+            
+            if (parsedUrl.startsWith("http://") || parsedUrl.startsWith("https://")) {
+                parsedUrl = parsedUrl.replaceFirst("^https?://", "");
+            }
+            
+            if (parsedUrl.contains(":")) {
+                final String[] parts = parsedUrl.split(":");
+                host = parts[0];
+                port = Integer.parseInt(parts[1]);
+            } else {
+                host = parsedUrl;
+            }
+            
+            log.info("使用环境变量配置的 HTTP 代理: {}:{}", host, port);
+            return new Proxy(Proxy.Type.HTTP, new InetSocketAddress(host, port));
+        } catch (Exception e) {
+            log.warn("解析代理地址失败: {}", proxyUrl, e);
+            return null;
         }
     }
 

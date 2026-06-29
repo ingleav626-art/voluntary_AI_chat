@@ -45,6 +45,9 @@ public class TopBarController implements Initializable {
     }
 
     @FXML
+    private HBox avatarBox;
+
+    @FXML
     private Circle avatarCircle;
 
     @FXML
@@ -133,10 +136,13 @@ public class TopBarController implements Initializable {
     private void setupAvatarMenu() {
         avatarMenu = new ContextMenu();
 
-        final MenuItem settingsItem = new MenuItem("设置（个人）");
+        final MenuItem settingsItem = new MenuItem("个人设置");
         settingsItem.setOnAction(e -> handleSettings());
 
-        avatarMenu.getItems().addAll(settingsItem);
+        final MenuItem logoutItem = new MenuItem("退出登录");
+        logoutItem.setOnAction(e -> handleLogout());
+
+        avatarMenu.getItems().addAll(settingsItem, logoutItem);
     }
 
     /**
@@ -144,7 +150,15 @@ public class TopBarController implements Initializable {
      */
     @FXML
     private void handleAvatarClick() {
-        avatarMenu.show(avatarCircle, javafx.geometry.Side.BOTTOM, 0, 0);
+        try {
+            if (avatarBox != null && avatarBox.getScene() != null) {
+                avatarMenu.show(avatarBox, javafx.geometry.Side.BOTTOM, 0, 0);
+            } else {
+                LOG.warn("avatarBox 或其 Scene 为空，无法显示菜单");
+            }
+        } catch (final Exception e) {
+            LOG.error("显示头像菜单失败", e);
+        }
     }
 
     /**
@@ -166,16 +180,114 @@ public class TopBarController implements Initializable {
             dialogStage.initOwner(topBar.getScene().getWindow());
 
             final javafx.scene.Scene scene = new javafx.scene.Scene(root);
-            scene.getStylesheets().add(getClass().getResource("/css/default.css").toExternalForm());
+            final java.net.URL cssUrl = getClass().getResource("/css/default.css");
+            if (cssUrl != null) {
+                scene.getStylesheets().add(cssUrl.toExternalForm());
+            } else {
+                LOG.warn("未找到默认样式表 /css/default.css");
+            }
             dialogStage.setScene(scene);
 
             controller.setDialogStage(dialogStage);
             dialogStage.showAndWait();
 
-        } catch (final java.io.IOException e) {
+        } catch (final Exception e) {
             LOG.error("加载个人设置对话框失败", e);
             NotificationDialog.showWarning("无法打开设置面板", "请稍后重试");
         }
+    }
+
+    /**
+     * 处理退出登录
+     */
+    private void handleLogout() {
+        LOG.info("退出登录");
+        final javafx.scene.control.Alert confirm = new javafx.scene.control.Alert(
+                javafx.scene.control.Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("退出登录");
+        confirm.setHeaderText("确认退出登录");
+        confirm.setContentText("确定要退出登录吗？");
+
+        // 应用粉色主题样式
+        final javafx.scene.control.DialogPane dialogPane = confirm.getDialogPane();
+        dialogPane.setStyle("-fx-background-color: #FFF0F4; "
+                + "-fx-border-color: #FFB6C1; "
+                + "-fx-border-width: 2; "
+                + "-fx-border-radius: 12; "
+                + "-fx-background-radius: 12;");
+
+        // 标题样式
+        dialogPane.lookup(".header-panel").setStyle(
+                "-fx-background-color: #FFE0EC; "
+                        + "-fx-text-fill: #FF6B9D;");
+        dialogPane.lookup(".header-panel .label").setStyle(
+                "-fx-text-fill: #FF6B9D; "
+                        + "-fx-font-size: 16; "
+                        + "-fx-font-weight: bold;");
+
+        // 内容样式
+        dialogPane.lookup(".content.label").setStyle(
+                "-fx-text-fill: #333333; "
+                        + "-fx-font-size: 14;");
+
+        // 确认按钮样式（粉色）
+        final javafx.scene.control.Button okButton = (javafx.scene.control.Button) dialogPane.lookupButton(
+                javafx.scene.control.ButtonType.OK);
+        okButton.setStyle("-fx-background-color: #FF6B9D; "
+                + "-fx-text-fill: white; "
+                + "-fx-font-size: 13; "
+                + "-fx-font-weight: bold; "
+                + "-fx-background-radius: 8; "
+                + "-fx-padding: 8 20; "
+                + "-fx-cursor: hand;");
+        okButton.setOnMouseEntered(e -> okButton.setStyle("-fx-background-color: #E8507A; "
+                + "-fx-text-fill: white; "
+                + "-fx-font-size: 13; "
+                + "-fx-font-weight: bold; "
+                + "-fx-background-radius: 8; "
+                + "-fx-padding: 8 20; "
+                + "-fx-cursor: hand;"));
+        okButton.setOnMouseExited(e -> okButton.setStyle("-fx-background-color: #FF6B9D; "
+                + "-fx-text-fill: white; "
+                + "-fx-font-size: 13; "
+                + "-fx-font-weight: bold; "
+                + "-fx-background-radius: 8; "
+                + "-fx-padding: 8 20; "
+                + "-fx-cursor: hand;"));
+
+        // 取消按钮样式（浅粉色）
+        final javafx.scene.control.Button cancelButton = (javafx.scene.control.Button) dialogPane.lookupButton(
+                javafx.scene.control.ButtonType.CANCEL);
+        cancelButton.setStyle("-fx-background-color: #FFE0EC; "
+                + "-fx-text-fill: #FF6B9D; "
+                + "-fx-font-size: 13; "
+                + "-fx-background-radius: 8; "
+                + "-fx-padding: 8 20; "
+                + "-fx-cursor: hand; "
+                + "-fx-border-color: #FFB6C1; "
+                + "-fx-border-width: 1;");
+        cancelButton.setOnMouseEntered(e -> cancelButton.setStyle("-fx-background-color: #FFB6C1; "
+                + "-fx-text-fill: white; "
+                + "-fx-font-size: 13; "
+                + "-fx-background-radius: 8; "
+                + "-fx-padding: 8 20; "
+                + "-fx-cursor: hand; "
+                + "-fx-border-color: #FF6B9D; "
+                + "-fx-border-width: 1;"));
+        cancelButton.setOnMouseExited(e -> cancelButton.setStyle("-fx-background-color: #FFE0EC; "
+                + "-fx-text-fill: #FF6B9D; "
+                + "-fx-font-size: 13; "
+                + "-fx-background-radius: 8; "
+                + "-fx-padding: 8 20; "
+                + "-fx-cursor: hand; "
+                + "-fx-border-color: #FFB6C1; "
+                + "-fx-border-width: 1;"));
+
+        confirm.showAndWait().ifPresent(response -> {
+            if (response == javafx.scene.control.ButtonType.OK) {
+                org.example.client.App.switchToLogin();
+            }
+        });
     }
 
     /**

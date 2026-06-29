@@ -79,9 +79,6 @@ class ChatWebSocketHandlerTest {
     @Mock
     private WebSocketSession session2;
 
-    @Mock
-    private AiGroupConfigService aiGroupConfigService;
-
     private static final Long USER_ID_1 = 1001L;
     private static final Long USER_ID_2 = 1002L;
     private static final Long GROUP_ID = 2001L;

@@ -2,6 +2,7 @@ package org.example.client.view;
 
 import java.util.function.Consumer;
 
+import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.LongProperty;
@@ -250,18 +251,8 @@ public final class ProfileViewModel {
     public void sendSmsCodeForPassword(final Button sendButton) {
         errorMessage.set("");
 
-        // 使用当前手机号发送验证码
-        final String phoneValue = phone.get();
-        if (phoneValue == null || phoneValue.isEmpty()) {
-            errorMessage.set("请先加载用户信息");
-            return;
-        }
-
-        // 获取真实手机号（去除脱敏）
-        // 注意：后端会根据当前登录用户自动获取手机号
-        final org.example.client.model.SmsSendRequest smsRequest =
-                new org.example.client.model.SmsSendRequest(phoneValue.replaceAll("\\*", ""));
-        AuthService.getInstance().sendSmsCode(smsRequest)
+        // 调用新接口，后端会根据当前登录用户自动获取手机号
+        UserService.getInstance().sendPasswordSms()
                 .thenAcceptAsync(response -> {
                     if (response != null && response.isSuccess()) {
                         successMessage.set("验证码已发送");
@@ -272,6 +263,13 @@ public final class ProfileViewModel {
                         errorMessage.set(msg);
                         LOG.warn("验证码发送失败: {}", msg);
                     }
+                })
+                .exceptionally(ex -> {
+                    LOG.error("发送验证码异常", ex);
+                    Platform.runLater(() -> {
+                        errorMessage.set("网络异常，发送失败");
+                    });
+                    return null;
                 });
     }
 

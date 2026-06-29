@@ -9,8 +9,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.example.client.config.ServerConnectionManager;
-import org.example.client.config.ServerMode;
 import org.example.client.engine.AiStreamCallback;
 import org.example.client.engine.LocalAiEngine;
 import org.example.client.model.ConversationInfo;
@@ -226,15 +224,14 @@ public final class ChatViewModel {
         data.put("content", text.trim());
 
         if ("AI".equals(conversation.getTargetType())) {
-            if (ServerConnectionManager.getInstance().getCurrentMode() == ServerMode.LOCAL) {
-                // 本地模式：直接调用 LocalAiEngine，无需 WebSocket
-                final Long aiId = conversation.getTargetId();
-                final Long userId = currentUser != null ? currentUser.getUserId() : 0L;
-                final String sessionId = conversation.getSessionId();
-                final String content = text.trim();
+            // AI 对话始终使用本地引擎（API.md 架构：客户包不走 HTTP/WS 回环）
+            final Long aiId = conversation.getTargetId();
+            final Long userId = currentUser != null ? currentUser.getUserId() : 0L;
+            final String sessionId = conversation.getSessionId();
+            final String content = text.trim();
 
-                LocalAiEngine.getInstance().chat(aiId, userId, content, new AiStreamCallback() {
-                    private final StringBuilder fullContent = new StringBuilder();
+            LocalAiEngine.getInstance().chat(aiId, userId, content, new AiStreamCallback() {
+                private final StringBuilder fullContent = new StringBuilder();
 
                     @Override
                     public void onChunk(String chunk) {
@@ -288,11 +285,20 @@ public final class ChatViewModel {
                     public void onError(String error) {
                         Platform.runLater(() -> {
                             LOG.warn("AI 回复失败（本地）: error={}", error);
+                            // 生成更友好的错误提示
+                            String userMsg;
+                            if (error != null && error.contains("authentication_error")) {
+                                userMsg = "API Key 无效，请在 AI 设置中更新有效的 API Key";
+                            } else if (error != null && error.contains("invalid_request_error")) {
+                                userMsg = "API 请求失败，请检查 AI 角色的模型配置是否正确";
+                            } else {
+                                userMsg = "AI 回复失败: " + error;
+                            }
                             // 更新占位消息为错误提示
                             for (MessageInfo msg : messages) {
                                 if (msg.getMessageId() != null && msg.getMessageId() < 0
                                         && "AI".equals(msg.getSenderType())) {
-                                    msg.setContent("AI 回复失败: " + error);
+                                    msg.setContent(userMsg);
                                     final int idx = messages.indexOf(msg);
                                     if (idx >= 0) {
                                         messages.set(idx, msg);
@@ -303,11 +309,6 @@ public final class ChatViewModel {
                         });
                     }
                 });
-            } else {
-                // 云端/热点模式：使用 WebSocket 转发
-                data.put("aiId", conversation.getTargetId());
-                WebSocketClient.getInstance().send(MessageTypes.AI_CHAT, data);
-            }
         } else {
             WebSocketClient.getInstance().send(MessageTypes.SEND_MESSAGE, data);
         }

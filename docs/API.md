@@ -609,38 +609,6 @@ POST /api/message/read
 GET /api/conversation/list
 ```
 
-<<<<<<< HEAD
-**请求参数**:
-```json
-{
-  "name": "技术交流群",
-  "memberIds": [1002, 1003, 1004]
-}
-```
-
-**字段说明**:
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| name | String | 是 | 群组名称（最长50字符） |
-| memberIds | Long[] | 否 | 初始成员ID列表。可为空或省略，此时仅创建者自己入群，后续可通过邀请接口添加成员 |
-
-**响应**:
-```json
-{
-  "code": 200,
-  "message": "创建成功",
-  "data": {
-    "groupId": "group_001",
-    "name": "技术交流群"
-  }
-}
-```
-
-### 5.2 获取群列表
-```
-GET /group/list?page=1&size=20
-```
-
 **响应**：
 ```json
 {

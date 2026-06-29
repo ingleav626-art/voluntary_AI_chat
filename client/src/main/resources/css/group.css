@@ -149,6 +149,7 @@
     -fx-font-size: 13px;
     -fx-font-weight: bold;
     -fx-cursor: hand;
+    -fx-min-width: 80px;
 }
 
 .btn-icon:hover {
@@ -177,9 +178,11 @@
     -fx-text-fill: #ffffff;
     -fx-border-radius: 4px;
     -fx-background-radius: 4px;
-    -fx-padding: 6px 14px;
+    -fx-padding: 8px 16px;
     -fx-font-size: 13px;
+    -fx-font-weight: bold;
     -fx-cursor: hand;
+    -fx-min-width: 80px;
 }
 
 .btn-danger-sm:hover {
@@ -231,4 +234,50 @@
 .btn-action-sm:hover {
     -fx-background-color: #FFE0EC;
     -fx-border-color: #FF6B9D;
+}
+
+/* ===== 确认对话框粉色风格 ===== */
+.dialog-container {
+    -fx-background-color: #FFF5F8;
+}
+
+.dialog-container .content.label {
+    -fx-text-fill: #333333;
+    -fx-font-size: 13px;
+}
+
+.dialog-container .header-panel {
+    -fx-background-color: linear-gradient(from 0% 0% to 100% 0%, #FF6B9D, #FF8CB3);
+}
+
+.dialog-container .header-panel .label {
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+
+.dialog-container .button-bar .button {
+    -fx-background-color: #FF6B9D;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-padding: 6px 20px;
+    -fx-cursor: hand;
+}
+
+.dialog-container .button-bar .button:hover {
+    -fx-background-color: #E8507A;
+}
+
+.dialog-container .button-bar .button:pressed {
+    -fx-background-color: #D04570;
+}
+
+.dialog-container .button-bar .button.cancel-button {
+    -fx-background-color: #E0E0E0;
+    -fx-text-fill: #555555;
+}
+
+.dialog-container .button-bar .button.cancel-button:hover {
+    -fx-background-color: #CCCCCC;
 }

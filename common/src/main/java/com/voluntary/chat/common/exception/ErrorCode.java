@@ -20,6 +20,7 @@ public enum ErrorCode {
     ACCOUNT_OR_PASSWORD_ERROR(1004, "账号或密码错误"),
     ACCOUNT_LOCKED(1005, "登录次数过多，账号已锁定"),
     REFRESH_TOKEN_INVALID(1006, "Refresh Token 已失效"),
+    USER_NOT_FOUND(1007, "用户不存在"),
 
     FRIEND_APPLY_EXISTS(2001, "好友申请已存在（待处理）"),
     ALREADY_FRIENDS(2002, "已是好友关系"),
