@@ -401,6 +401,21 @@ GET /api/friend/list
 DELETE /api/friend/{friendId}
 ```
 
+### 3.6 修改好友备注
+
+```
+PUT /api/friend/{friendId}/remark
+```
+
+**请求**：
+```json
+{
+  "remark": "四哥"
+}
+```
+
+`remark` 最长 50 字符，传空字符串可清除备注。
+
 ---
 
 ## 四、群组模块 `/api/group`
@@ -632,9 +647,45 @@ GET /api/conversation/list
 
 ---
 
-## 七、通知模块 `/api/notification`
+## 七、文件上传模块 `/api/file`
 
-### 7.1 获取通知设置
+### 7.1 上传用户头像
+
+```
+POST /api/file/upload/avatar
+Content-Type: multipart/form-data
+
+file: <binary>
+```
+
+**响应**：
+```json
+{
+  "code": 200,
+  "message": "上传成功",
+  "data": "http://your-server.com/avatars/abc123.jpg"
+}
+```
+
+上传后返回头像 URL，前端需再调用 `PUT /api/user/profile` 将 URL 保存到用户信息。
+图片自动裁剪为 256×256 正方形（取中心区域）。支持 JPEG/PNG/GIF/WebP，最大 10MB。
+
+### 7.2 上传群组头像
+
+```
+POST /api/file/upload/group-avatar
+Content-Type: multipart/form-data
+
+file: <binary>
+```
+
+**响应**：同 7.1，返回头像 URL。前端需再调用 `PUT /api/group/{groupId}` 将 URL 保存到群信息。
+
+---
+
+## 八、通知模块 `/api/notification`
+
+### 8.1 获取通知设置
 
 ```
 GET /api/notification/settings
@@ -679,7 +730,7 @@ GET /api/notification/settings
 
 > **说明**：未设置过通知的用户返回系统默认值（如上所示）。
 
-### 7.2 更新通知设置
+### 8.2 更新通知设置
 
 ```
 PUT /api/notification/settings
@@ -707,7 +758,7 @@ PUT /api/notification/settings
 
 ---
 
-## 八、WebSocket 实时通信
+## 九、WebSocket 实时通信
 
 ### 连接地址
 
@@ -872,7 +923,7 @@ wss://your-cloud-server.com/ws?token=<accessToken>
 
 ---
 
-## 八、本地 AI 引擎 API（客户包独有）
+## 十、本地 AI 引擎 API（客户包独有）
 
 **客户包不启动内嵌服务器**。以下 API 通过 `LocalAiEngine` POJO 方法调用实现。
 
@@ -990,7 +1041,7 @@ engine.chat(request, new AiStreamCallback() {
 
 ---
 
-## 九、错误处理
+## 十一、错误处理
 
 ### 成功响应 (code=200)
 

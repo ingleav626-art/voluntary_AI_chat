@@ -28,9 +28,11 @@ import java.util.UUID;
 /**
  * 图片上传服务
  *
- * <p>支持 JPEG/PNG/GIF/WebP 格式，最大 10MB。
+ * <p>
+ * 支持 JPEG/PNG/GIF/WebP 格式，最大 10MB。
  * 上传后自动压缩（最大宽度 1080px）并生成缩略图。
- * 当前使用本地文件存储，后续可替换为 MinIO。</p>
+ * 当前使用本地文件存储，后续可替换为 MinIO。
+ * </p>
  *
  * @author voluntary-ai-chat
  * @since 1.0.0
@@ -52,14 +54,91 @@ public class ImageUploadService {
     /** 缩略图最大宽度 */
     private static final int THUMBNAIL_WIDTH = 200;
 
+    /** 头像最大宽度 */
+    private static final int AVATAR_MAX_WIDTH = 400;
+
+    /** 头像目标尺寸（正方形） */
+    private static final int AVATAR_SIZE = 256;
+
     private final String uploadDir;
+    private final String avatarDir;
     private final String baseUrl;
+    private final String avatarBaseUrl;
 
     public ImageUploadService(
             @Value("${upload.image.dir:uploads/chat/images}") String uploadDir,
-            @Value("${upload.image.base-url:http://localhost:8080/files}") String baseUrl) {
+            @Value("${upload.avatar.dir:uploads/avatars}") String avatarDir,
+            @Value("${upload.image.base-url:http://localhost:8080/files}") String baseUrl,
+            @Value("${upload.avatar.base-url:http://localhost:8080/avatars}") String avatarBaseUrl) {
         this.uploadDir = uploadDir;
+        this.avatarDir = avatarDir;
         this.baseUrl = baseUrl;
+        this.avatarBaseUrl = avatarBaseUrl;
+    }
+
+    /**
+     * 上传头像
+     *
+     * <p>
+     * 将图片裁剪压缩为 256×256 正方形，保存到头像专用目录。
+     * 支持 JPEG/PNG/GIF/WebP 格式，最大 10MB。
+     * </p>
+     *
+     * @param file 头像图片文件
+     * @return 可访问的头像 URL
+     */
+    public String uploadAvatar(final MultipartFile file) {
+        // 1. 校验文件类型
+        final String contentType = file.getContentType();
+        if (contentType == null || !SUPPORTED_FORMATS.contains(contentType)) {
+            throw new BusinessException(ErrorCode.IMAGE_FORMAT_NOT_SUPPORTED);
+        }
+
+        // 2. 校验文件大小
+        if (file.getSize() > MAX_FILE_SIZE) {
+            throw new BusinessException(ErrorCode.IMAGE_SIZE_EXCEEDED);
+        }
+
+        // 3. 读取图片
+        BufferedImage originalImage;
+        try (InputStream is = file.getInputStream()) {
+            originalImage = ImageIO.read(is);
+            if (originalImage == null) {
+                throw new BusinessException(ErrorCode.IMAGE_FORMAT_NOT_SUPPORTED, "无法解析图片文件");
+            }
+        } catch (IOException e) {
+            log.error("读取头像文件失败: {}", e.getMessage(), e);
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "图片读取失败");
+        }
+
+        try {
+            // 4. 裁剪为正方形（取中心区域）
+            final int size = Math.min(originalImage.getWidth(), originalImage.getHeight());
+            final int x = (originalImage.getWidth() - size) / 2;
+            final int y = (originalImage.getHeight() - size) / 2;
+            final BufferedImage cropped = originalImage.getSubimage(x, y, size, size);
+
+            // 5. 缩放到目标尺寸
+            final BufferedImage resized = resizeImage(cropped, AVATAR_SIZE, AVATAR_SIZE);
+
+            // 6. 生成唯一文件名
+            final String fileId = UUID.randomUUID().toString().replace("-", "");
+            final String extension = getExtension(contentType);
+            final String fileName = fileId + extension;
+
+            // 7. 保存文件
+            final Path uploadPath = Paths.get(avatarDir);
+            Files.createDirectories(uploadPath);
+            ImageIO.write(resized, getFormatName(contentType), uploadPath.resolve(fileName).toFile());
+
+            // 8. 返回 URL
+            final String url = avatarBaseUrl + "/" + fileName;
+            log.info("头像上传成功: fileId={}, url={}", fileId, url);
+            return url;
+        } catch (IOException e) {
+            log.error("保存头像失败: {}", e.getMessage(), e);
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "头像保存失败");
+        }
     }
 
     /**

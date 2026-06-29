@@ -146,6 +146,9 @@ public final class AiService extends BaseHttpService {
         if (profile.getApiKey() != null) {
             body.put("apiKey", profile.getApiKey());
         }
+        if (profile.getBaseUrl() != null) {
+            body.put("baseUrl", profile.getBaseUrl());
+        }
         if (profile.getIsGroup() != null) {
             body.put("isGroup", profile.getIsGroup());
         }

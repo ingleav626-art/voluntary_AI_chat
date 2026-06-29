@@ -33,6 +33,7 @@ public class SecurityConfig {
     private static final String[] PUBLIC_URLS = {
             "/api/auth/**",
             "/files/**",
+            "/avatars/**",
             "/ws/**"
     };
 

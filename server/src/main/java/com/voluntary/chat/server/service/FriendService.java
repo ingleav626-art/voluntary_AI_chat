@@ -265,6 +265,31 @@ public class FriendService {
     }
 
     /**
+     * 修改好友备注
+     *
+     * @param userId   当前用户ID
+     * @param friendId 好友ID
+     * @param remark   新备注（可为空字符串，表示清除备注）
+     */
+    @Transactional
+    public void updateRemark(final Long userId, final Long friendId, final String remark) {
+        if (!isFriend(userId, friendId)) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "好友关系不存在");
+        }
+
+        final LambdaQueryWrapper<Friend> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Friend::getUserId, userId).eq(Friend::getFriendId, friendId);
+        final Friend friend = friendMapper.selectOne(wrapper);
+        if (friend == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "好友关系不存在");
+        }
+
+        friend.setRemark(remark != null ? remark : "");
+        friendMapper.updateById(friend);
+        log.info("好友备注已修改: userId={}, friendId={}, remark={}", userId, friendId, remark);
+    }
+
+    /**
      * 判断是否为好友关系
      *
      * <p>

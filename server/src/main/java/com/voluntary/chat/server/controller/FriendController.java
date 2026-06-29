@@ -3,6 +3,7 @@ package com.voluntary.chat.server.controller;
 import com.voluntary.chat.server.common.ApiResult;
 import com.voluntary.chat.server.dto.request.FriendApplyHandleRequest;
 import com.voluntary.chat.server.dto.request.FriendApplyRequest;
+import com.voluntary.chat.server.dto.request.UpdateRemarkRequest;
 import com.voluntary.chat.server.dto.response.FriendApplyResponse;
 import com.voluntary.chat.server.dto.response.FriendResponse;
 import com.voluntary.chat.server.security.SecurityUtils;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -57,7 +59,7 @@ public class FriendController {
      */
     @PostMapping("/apply/{applyId}/handle")
     public ApiResult<Void> handleApply(@PathVariable Long applyId,
-                                       @Valid @RequestBody FriendApplyHandleRequest request) {
+            @Valid @RequestBody FriendApplyHandleRequest request) {
         Long userId = SecurityUtils.getCurrentUserId();
         friendService.handleApply(userId, applyId, request.getAction());
         return ApiResult.ok("ACCEPT".equals(request.getAction()) ? "已同意" : "已拒绝", null);
@@ -71,6 +73,21 @@ public class FriendController {
         Long userId = SecurityUtils.getCurrentUserId();
         List<FriendResponse> list = friendService.getFriendList(userId);
         return ApiResult.ok(list);
+    }
+
+    /**
+     * 修改好友备注
+     *
+     * @param friendId 好友ID
+     * @param request  备注请求
+     */
+    @PutMapping("/{friendId}/remark")
+    public ApiResult<Void> updateRemark(
+            @PathVariable Long friendId,
+            @Valid @RequestBody UpdateRemarkRequest request) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        friendService.updateRemark(userId, friendId, request.getRemark());
+        return ApiResult.ok("备注修改成功", null);
     }
 
     /**

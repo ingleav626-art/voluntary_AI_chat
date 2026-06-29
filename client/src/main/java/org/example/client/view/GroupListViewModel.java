@@ -311,11 +311,11 @@ public final class GroupListViewModel {
      * @param groupId      群组ID
      * @param name         新群名称
      * @param announcement 新群公告
-     * @param announcementPinned 是否置顶公告
+     * @param announcementPinned 是否置顶公告（null 表示不修改）
      * @param avatar       群头像URL
      */
     public void updateGroupInfo(final Long groupId, final String name,
-                                 final String announcement, final boolean announcementPinned,
+                                 final String announcement, final Boolean announcementPinned,
                                  final String avatar) {
         if (groupId == null) {
             return;

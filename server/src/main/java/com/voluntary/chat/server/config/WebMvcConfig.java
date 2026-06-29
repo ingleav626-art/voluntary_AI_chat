@@ -26,6 +26,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Value("${upload.image.dir:uploads/chat/images}")
     private String uploadDir;
 
+    @Value("${upload.avatar.dir:uploads/avatars}")
+    private String avatarDir;
+
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         // 将相对路径转为绝对路径，确保资源映射可靠
@@ -35,5 +38,11 @@ public class WebMvcConfig implements WebMvcConfigurer {
         // 映射 /files/** 到上传目录，使上传的图片可通过 URL 访问
         registry.addResourceHandler("/files/**")
                 .addResourceLocations("file:" + absolutePath + "/");
+
+        // 映射 /avatars/** 到头像目录
+        final Path avatarPath = Paths.get(avatarDir).toAbsolutePath();
+        LOG.info("头像资源映射: /avatars/** -> file:{}/", avatarPath);
+        registry.addResourceHandler("/avatars/**")
+                .addResourceLocations("file:" + avatarPath + "/");
     }
 }
