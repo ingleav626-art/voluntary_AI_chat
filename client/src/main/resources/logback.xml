@@ -8,7 +8,7 @@
       - 通过 system property app.log.dir 可自定义（默认 ${user.home}/.voluntary-ai-chat/logs）
     -->
 
-    <property name="LOG_DIR" value="${app.log.dir:-${user.home}/.voluntary-ai-chat/logs}"/>
+    <property name="LOG_DIR" value="${app.log.dir:-./logs}"/>
     <property name="LOG_FILE" value="${LOG_DIR}/client.log"/>
     <property name="ERROR_FILE" value="${LOG_DIR}/client-error.log"/>
 
