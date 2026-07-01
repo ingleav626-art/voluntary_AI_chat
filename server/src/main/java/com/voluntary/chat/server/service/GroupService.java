@@ -1,15 +1,12 @@
 package com.voluntary.chat.server.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.voluntary.chat.common.dto.PageResult;
 import com.voluntary.chat.common.enums.GroupRole;
 import com.voluntary.chat.common.enums.MessageType;
 import com.voluntary.chat.common.enums.SenderType;
 import com.voluntary.chat.common.exception.BusinessException;
 import com.voluntary.chat.common.exception.ErrorCode;
-import com.voluntary.chat.server.dto.request.AdminActionRequest;
 import com.voluntary.chat.server.dto.request.CreateGroupRequest;
 import com.voluntary.chat.server.dto.request.InviteMemberRequest;
 import com.voluntary.chat.server.dto.request.UpdateGroupRequest;
@@ -23,7 +20,6 @@ import com.voluntary.chat.server.entity.User;
 import com.voluntary.chat.server.mapper.GroupMapper;
 import com.voluntary.chat.server.mapper.GroupMemberMapper;
 import com.voluntary.chat.server.mapper.MessageMapper;
-import com.voluntary.chat.server.service.GroupCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

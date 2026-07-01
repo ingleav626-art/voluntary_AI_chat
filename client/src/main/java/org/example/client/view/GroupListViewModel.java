@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import org.example.client.model.CreateGroupRequest;
-import org.example.client.model.CreateGroupResponse;
 import org.example.client.model.GroupInfo;
 import org.example.client.model.GroupMemberInfo;
 import org.example.client.model.LoginResponse;
@@ -28,7 +27,9 @@ import javafx.collections.ObservableList;
 /**
  * 群组列表视图模型
  *
- * <p>管理群组列表、群成员列表、创建群组、退出/解散群组等操作。</p>
+ * <p>
+ * 管理群组列表、群成员列表、创建群组、退出/解散群组等操作。
+ * </p>
  *
  * @author voluntary-ai-chat
  * @since 1.0.0
@@ -71,12 +72,10 @@ public final class GroupListViewModel {
     }
 
     /** 群组列表 */
-    private final ListProperty<GroupInfo> groups =
-            new SimpleListProperty<>(FXCollections.observableArrayList());
+    private final ListProperty<GroupInfo> groups = new SimpleListProperty<>(FXCollections.observableArrayList());
 
     /** 群成员列表 */
-    private final ListProperty<GroupMemberInfo> members =
-            new SimpleListProperty<>(FXCollections.observableArrayList());
+    private final ListProperty<GroupMemberInfo> members = new SimpleListProperty<>(FXCollections.observableArrayList());
 
     /** 加载状态 */
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
@@ -308,15 +307,15 @@ public final class GroupListViewModel {
     /**
      * 修改群信息（仅群主可操作）
      *
-     * @param groupId      群组ID
-     * @param name         新群名称
-     * @param announcement 新群公告
+     * @param groupId            群组ID
+     * @param name               新群名称
+     * @param announcement       新群公告
      * @param announcementPinned 是否置顶公告（null 表示不修改）
-     * @param avatar       群头像URL
+     * @param avatar             群头像URL
      */
     public void updateGroupInfo(final Long groupId, final String name,
-                                 final String announcement, final Boolean announcementPinned,
-                                 final String avatar) {
+            final String announcement, final Boolean announcementPinned,
+            final String avatar) {
         if (groupId == null) {
             return;
         }

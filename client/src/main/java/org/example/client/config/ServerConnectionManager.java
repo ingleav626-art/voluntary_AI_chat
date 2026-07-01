@@ -345,6 +345,16 @@ public class ServerConnectionManager {
     }
 
     /**
+     * 设置热点服务器地址（用于 Launcher 在 HOTSPOT 模式下发现后设置）
+     *
+     * @param url 热点服务器地址
+     */
+    public void setHotspotServerUrl(final String url) {
+        this.hotspotServerUrl = url;
+        LOG.info("热点服务器地址已设置: {}", url);
+    }
+
+    /**
      * 发现热点服务器
      *
      * <p>

@@ -19,7 +19,6 @@ import com.voluntary.chat.server.entity.User;
 import com.voluntary.chat.server.mapper.GroupMemberMapper;
 import com.voluntary.chat.server.mapper.MessageMapper;
 import com.voluntary.chat.server.mapper.MessageReadMapper;
-import com.voluntary.chat.server.service.ConversationCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

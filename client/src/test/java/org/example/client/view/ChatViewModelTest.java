@@ -1,7 +1,5 @@
 package org.example.client.view;
 
-import java.time.LocalDateTime;
-
 import org.example.client.model.ConversationInfo;
 import org.example.client.model.MessageInfo;
 import org.example.client.model.UserInfo;
@@ -47,8 +45,8 @@ class ChatViewModelTest {
             final java.lang.reflect.Field pendingField = ChatViewModel.class.getDeclaredField("pendingSystemMessages");
             pendingField.setAccessible(true);
             @SuppressWarnings("unchecked")
-            final java.util.Map<String, java.util.List<MessageInfo>> map =
-                    (java.util.Map<String, java.util.List<MessageInfo>>) pendingField.get(null);
+            final java.util.Map<String, java.util.List<MessageInfo>> map = (java.util.Map<String, java.util.List<MessageInfo>>) pendingField
+                    .get(null);
             map.clear();
         } catch (final Exception e) {
             // 忽略清理失败
@@ -465,8 +463,8 @@ class ChatViewModelTest {
         try {
             final java.lang.reflect.Field field = ChatViewModel.class.getDeclaredField("pendingMessages");
             field.setAccessible(true);
-            final java.util.Map<String, MessageInfo> pendingMessages =
-                    (java.util.Map<String, MessageInfo>) field.get(chatViewModel);
+            final java.util.Map<String, MessageInfo> pendingMessages = (java.util.Map<String, MessageInfo>) field
+                    .get(chatViewModel);
             pendingMessages.put(clientId, msg);
         } catch (final Exception e) {
             throw new RuntimeException(e);

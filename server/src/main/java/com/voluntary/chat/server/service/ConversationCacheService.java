@@ -1,6 +1,5 @@
 package com.voluntary.chat.server.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.voluntary.chat.server.config.CacheProperties;

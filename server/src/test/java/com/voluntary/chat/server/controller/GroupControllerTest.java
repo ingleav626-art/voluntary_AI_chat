@@ -1,14 +1,9 @@
 package com.voluntary.chat.server.controller;
 
 import com.voluntary.chat.common.dto.PageResult;
-import com.voluntary.chat.common.exception.BusinessException;
-import com.voluntary.chat.common.exception.ErrorCode;
 import com.voluntary.chat.server.common.GlobalExceptionHandler;
-import com.voluntary.chat.server.dto.request.AdminActionRequest;
 import com.voluntary.chat.server.dto.request.CreateGroupRequest;
 import com.voluntary.chat.server.dto.request.InviteMemberRequest;
-import com.voluntary.chat.server.dto.request.SetNicknameRequest;
-import com.voluntary.chat.server.dto.request.TransferOwnerRequest;
 import com.voluntary.chat.server.dto.request.UpdateGroupRequest;
 import com.voluntary.chat.server.dto.response.CreateGroupResponse;
 import com.voluntary.chat.server.dto.response.GroupMemberResponse;
@@ -61,13 +56,13 @@ class GroupControllerTest {
                 ChatWebSocketHandler webSocketHandler = mock(ChatWebSocketHandler.class);
                 UserService userService = mock(UserService.class);
                 GroupController controller = new GroupController(
-                        groupCoreService, groupMemberService, groupRoleService, userService);
+                                groupCoreService, groupMemberService, groupRoleService, userService);
                 try {
-                    java.lang.reflect.Field wsField = GroupController.class.getDeclaredField("webSocketHandler");
-                    wsField.setAccessible(true);
-                    wsField.set(controller, webSocketHandler);
+                        java.lang.reflect.Field wsField = GroupController.class.getDeclaredField("webSocketHandler");
+                        wsField.setAccessible(true);
+                        wsField.set(controller, webSocketHandler);
                 } catch (NoSuchFieldException | IllegalAccessException e) {
-                    throw new RuntimeException(e);
+                        throw new RuntimeException(e);
                 }
                 mockMvc = MockMvcBuilders
                                 .standaloneSetup(controller)
@@ -140,7 +135,8 @@ class GroupControllerTest {
         @Test
         @DisplayName("POST /api/group/{groupId}/invite - 邀请成员成功")
         void inviteMembers_shouldReturnOk() throws Exception {
-                doNothing().when(groupMemberService).inviteMembers(eq(USER_ID), eq(GROUP_ID), any(InviteMemberRequest.class));
+                doNothing().when(groupMemberService).inviteMembers(eq(USER_ID), eq(GROUP_ID),
+                                any(InviteMemberRequest.class));
 
                 mockMvc.perform(post("/api/group/{groupId}/invite", GROUP_ID)
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -197,7 +193,8 @@ class GroupControllerTest {
         @Test
         @DisplayName("PUT /api/group/{groupId} - 修改群信息成功")
         void updateGroup_shouldReturnOk() throws Exception {
-                doNothing().when(groupCoreService).updateGroup(eq(USER_ID), eq(GROUP_ID), any(UpdateGroupRequest.class));
+                doNothing().when(groupCoreService).updateGroup(eq(USER_ID), eq(GROUP_ID),
+                                any(UpdateGroupRequest.class));
 
                 mockMvc.perform(put("/api/group/{groupId}", GROUP_ID)
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -207,85 +204,85 @@ class GroupControllerTest {
                                 .andExpect(jsonPath("$.message").value("修改成功"));
 
                 verify(groupCoreService).updateGroup(eq(USER_ID), eq(GROUP_ID), any(UpdateGroupRequest.class));
-    }
+        }
 
-    // ==================== 新增功能端点测试 ====================
+        // ==================== 新增功能端点测试 ====================
 
-    @Test
-    @DisplayName("POST /api/group/{groupId}/transfer - 转让群主成功")
-    void transferOwner_shouldReturnOk() throws Exception {
-        doNothing().when(groupRoleService).transferOwner(USER_ID, GROUP_ID, 1002L);
+        @Test
+        @DisplayName("POST /api/group/{groupId}/transfer - 转让群主成功")
+        void transferOwner_shouldReturnOk() throws Exception {
+                doNothing().when(groupRoleService).transferOwner(USER_ID, GROUP_ID, 1002L);
 
-        mockMvc.perform(post("/api/group/{groupId}/transfer", GROUP_ID)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"targetUserId\":1002}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.message").value("转让成功"));
+                mockMvc.perform(post("/api/group/{groupId}/transfer", GROUP_ID)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"targetUserId\":1002}"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.code").value(200))
+                                .andExpect(jsonPath("$.message").value("转让成功"));
 
-        verify(groupRoleService).transferOwner(USER_ID, GROUP_ID, 1002L);
-    }
+                verify(groupRoleService).transferOwner(USER_ID, GROUP_ID, 1002L);
+        }
 
-    @Test
-    @DisplayName("POST /api/group/{groupId}/transfer - 参数校验失败（targetUserId为空）")
-    void transferOwner_shouldReturnBadRequest_whenTargetUserIdNull() throws Exception {
-        mockMvc.perform(post("/api/group/{groupId}/transfer", GROUP_ID)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(400));
-    }
+        @Test
+        @DisplayName("POST /api/group/{groupId}/transfer - 参数校验失败（targetUserId为空）")
+        void transferOwner_shouldReturnBadRequest_whenTargetUserIdNull() throws Exception {
+                mockMvc.perform(post("/api/group/{groupId}/transfer", GROUP_ID)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}"))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.code").value(400));
+        }
 
-    @Test
-    @DisplayName("DELETE /api/group/{groupId} - 解散群组成功")
-    void dismissGroup_shouldReturnOk() throws Exception {
-        doNothing().when(groupCoreService).dismissGroup(USER_ID, GROUP_ID);
+        @Test
+        @DisplayName("DELETE /api/group/{groupId} - 解散群组成功")
+        void dismissGroup_shouldReturnOk() throws Exception {
+                doNothing().when(groupCoreService).dismissGroup(USER_ID, GROUP_ID);
 
-        mockMvc.perform(delete("/api/group/{groupId}", GROUP_ID))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.message").value("群组已解散"));
+                mockMvc.perform(delete("/api/group/{groupId}", GROUP_ID))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.code").value(200))
+                                .andExpect(jsonPath("$.message").value("群组已解散"));
 
-        verify(groupCoreService).dismissGroup(USER_ID, GROUP_ID);
-    }
+                verify(groupCoreService).dismissGroup(USER_ID, GROUP_ID);
+        }
 
-    @Test
-    @DisplayName("POST /api/group/{groupId}/admin - 设置管理员成功")
-    void setAdmin_shouldReturnOk() throws Exception {
-        doNothing().when(groupRoleService).setAdmin(USER_ID, GROUP_ID, 1002L, "SET");
+        @Test
+        @DisplayName("POST /api/group/{groupId}/admin - 设置管理员成功")
+        void setAdmin_shouldReturnOk() throws Exception {
+                doNothing().when(groupRoleService).setAdmin(USER_ID, GROUP_ID, 1002L, "SET");
 
-        mockMvc.perform(post("/api/group/{groupId}/admin", GROUP_ID)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"targetUserId\":1002,\"action\":\"SET\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.message").value("操作成功"));
+                mockMvc.perform(post("/api/group/{groupId}/admin", GROUP_ID)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"targetUserId\":1002,\"action\":\"SET\"}"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.code").value(200))
+                                .andExpect(jsonPath("$.message").value("操作成功"));
 
-        verify(groupRoleService).setAdmin(USER_ID, GROUP_ID, 1002L, "SET");
-    }
+                verify(groupRoleService).setAdmin(USER_ID, GROUP_ID, 1002L, "SET");
+        }
 
-    @Test
-    @DisplayName("POST /api/group/{groupId}/admin - 参数校验失败（action为空）")
-    void setAdmin_shouldReturnBadRequest_whenActionBlank() throws Exception {
-        mockMvc.perform(post("/api/group/{groupId}/admin", GROUP_ID)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"targetUserId\":1002,\"action\":\"\"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(400));
-    }
+        @Test
+        @DisplayName("POST /api/group/{groupId}/admin - 参数校验失败（action为空）")
+        void setAdmin_shouldReturnBadRequest_whenActionBlank() throws Exception {
+                mockMvc.perform(post("/api/group/{groupId}/admin", GROUP_ID)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"targetUserId\":1002,\"action\":\"\"}"))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.code").value(400));
+        }
 
-    @Test
-    @DisplayName("PUT /api/group/{groupId}/nickname - 设置群昵称成功")
-    void setNickname_shouldReturnOk() throws Exception {
-        doNothing().when(groupMemberService).setNickname(USER_ID, GROUP_ID, "我的群昵称");
+        @Test
+        @DisplayName("PUT /api/group/{groupId}/nickname - 设置群昵称成功")
+        void setNickname_shouldReturnOk() throws Exception {
+                doNothing().when(groupMemberService).setNickname(USER_ID, GROUP_ID, "我的群昵称");
 
-        mockMvc.perform(put("/api/group/{groupId}/nickname", GROUP_ID)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"nickname\":\"我的群昵称\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.message").value("设置成功"));
+                mockMvc.perform(put("/api/group/{groupId}/nickname", GROUP_ID)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"nickname\":\"我的群昵称\"}"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.code").value(200))
+                                .andExpect(jsonPath("$.message").value("设置成功"));
 
-        verify(groupMemberService).setNickname(USER_ID, GROUP_ID, "我的群昵称");
-    }
+                verify(groupMemberService).setNickname(USER_ID, GROUP_ID, "我的群昵称");
+        }
 }

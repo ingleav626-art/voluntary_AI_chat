@@ -96,8 +96,22 @@ public final class Launcher {
             // 根据启动模式决定启动策略
             switch (mode) {
                 case HOTSPOT:
-                    // 热点模式：跳过内嵌后端，连接局域网测试服务器
-                    LOG.info("热点模式：跳过内嵌后端启动，将连接热点服务器");
+                    // 热点模式：先监听 UDP 发现局域网服务器，未发现则启动本地后端做主机
+                    LOG.info("热点模式：开始监听局域网服务器广播...");
+                    final String discoveredHotspot = org.example.client.util.ServerDiscovery.discoverByBroadcast();
+                    if (discoveredHotspot != null) {
+                        // 发现其他服务器，做客机，不启动本地后端
+                        LOG.info("热点模式（客机）：发现服务器 {}，将连接该服务器", discoveredHotspot);
+                        connectionManager.setHotspotServerUrl(discoveredHotspot);
+                    } else if (isServerModuleAvailable()) {
+                        // 未发现且含 server 模块，启动本地后端做主机
+                        LOG.info("热点模式（主机）：未发现其他服务器，启动本地后端做主机");
+                        startEmbeddedServer();
+                    } else {
+                        // 未发现且无 server 模块，回退到本地 AI 引擎
+                        LOG.warn("热点模式：未发现服务器且无内嵌后端，回退到本地 AI 引擎");
+                        initLocalAiEngineAsync();
+                    }
                     break;
 
                 case CLOUD:

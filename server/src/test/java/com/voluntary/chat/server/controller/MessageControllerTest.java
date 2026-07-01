@@ -2,7 +2,6 @@ package com.voluntary.chat.server.controller;
 
 import com.voluntary.chat.common.dto.PageResult;
 import com.voluntary.chat.server.dto.request.MarkReadRequest;
-import com.voluntary.chat.server.dto.request.RecallMessageRequest;
 import com.voluntary.chat.server.dto.request.SendMessageRequest;
 import com.voluntary.chat.server.dto.response.ImageUploadResponse;
 import com.voluntary.chat.server.dto.response.MessageResponse;

@@ -1,14 +1,15 @@
 package com.voluntary.chat.server.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
  * 修改密码请求
  *
- * <p>已登录用户通过短信验证码修改密码。</p>
+ * <p>
+ * 已登录用户通过短信验证码修改密码。
+ * </p>
  *
  * @author voluntary-ai-chat
  * @since 1.0.0

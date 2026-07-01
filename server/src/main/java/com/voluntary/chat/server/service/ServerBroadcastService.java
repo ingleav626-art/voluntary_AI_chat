@@ -149,7 +149,7 @@ public class ServerBroadcastService {
                     // 26.x.x.x - Radmin VPN
                     // 172.16-31.x.x - Hyper-V/Docker私有网络
                     if (isVirtualNetworkAddress(ipAddress)) {
-                        LOG.debug("跳过虚拟网络地址: {}", ipAddress);
+                        LOG.trace("跳过虚拟网络地址: {}", ipAddress);
                         continue;
                     }
 
@@ -162,7 +162,7 @@ public class ServerBroadcastService {
                         final DatagramPacket packet = new DatagramPacket(data, data.length,
                                 broadcastAddress, BROADCAST_PORT);
                         socket.send(packet);
-                        LOG.debug("广播服务器地址: {} -> {}", ipAddress, broadcastAddress);
+                        LOG.trace("广播服务器地址: {} -> {}", ipAddress, broadcastAddress);
                     }
                 }
             }

@@ -15,7 +15,6 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.shape.Circle;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-import org.example.client.model.ApiResponse;
 import org.example.client.service.UserService;
 import org.example.client.util.ImageUtils;
 import org.example.client.view.GroupListViewModel;

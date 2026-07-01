@@ -19,12 +19,9 @@ import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
-import javafx.scene.layout.StackPane;
 import javafx.scene.paint.ImagePattern;
 import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
-
-import org.example.client.model.UserInfo;
 import org.example.client.view.ProfileViewModel;
 import org.example.client.view.MainViewModel;
 import org.slf4j.Logger;

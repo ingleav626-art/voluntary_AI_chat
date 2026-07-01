@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -13,15 +12,22 @@ import java.util.stream.Collectors;
 /**
  * 群成员缓存服务
  *
- * <p>缓存群成员列表，避免群消息广播时每次查询 group_member 表。</p>
+ * <p>
+ * 缓存群成员列表，避免群消息广播时每次查询 group_member 表。
+ * </p>
  *
- * <p>Key 设计：</p>
+ * <p>
+ * Key 设计：
+ * </p>
  * <ul>
- *   <li>{@code group:members:{groupId}} → Set [userId1, userId2, ...] — 无 TTL（成员变更时更新）</li>
- *   <li>{@code group:member_count:{groupId}} → 数字 — 无 TTL</li>
+ * <li>{@code group:members:{groupId}} → Set [userId1, userId2, ...] — 无
+ * TTL（成员变更时更新）</li>
+ * <li>{@code group:member_count:{groupId}} → 数字 — 无 TTL</li>
  * </ul>
  *
- * <p>Redis 不可用时自动降级为查库。</p>
+ * <p>
+ * Redis 不可用时自动降级为查库。
+ * </p>
  */
 @Slf4j
 @Service

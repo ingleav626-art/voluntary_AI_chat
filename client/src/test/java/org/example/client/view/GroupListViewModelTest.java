@@ -1,6 +1,5 @@
 package org.example.client.view;
 
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -363,8 +362,8 @@ class GroupListViewModelTest {
     @Test
     @DisplayName("setGroupEventListener 和 notifyMemberChanged")
     void testGroupEventListener() {
-        final boolean[] called = {false};
-        final Long[] groupId = {null};
+        final boolean[] called = { false };
+        final Long[] groupId = { null };
 
         GroupListViewModel.setGroupEventListener(g -> {
             called[0] = true;

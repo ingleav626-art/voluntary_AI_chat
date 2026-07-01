@@ -1,6 +1,7 @@
 package com.voluntary.chat.server.config.redis;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -8,6 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(name = "app.sms.storage", havingValue = "memory", matchIfMissing = true)
 public class MemorySmsCodeStorage implements SmsCodeStorage {
 
     private final Map<String, String> store = new ConcurrentHashMap<>();

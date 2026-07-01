@@ -6,8 +6,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import javafx.application.Platform;
-import javafx.fxml.FXMLLoader;
-import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
@@ -19,7 +17,6 @@ import javafx.scene.control.SpinnerValueFactory;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
-import javafx.scene.layout.StackPane;
 import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
 
@@ -27,7 +24,6 @@ import org.example.client.model.LoginResponse;
 import org.example.client.model.UserInfo;
 import org.example.client.util.TokenStorage;
 import org.example.client.view.ProfileViewModel;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,7 +33,9 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * ProfileController 单元测试
  *
- * <p>测试控制器初始化、FXML 加载等功能。</p>
+ * <p>
+ * 测试控制器初始化、FXML 加载等功能。
+ * </p>
  *
  * @author voluntary-ai-chat
  * @since 1.0.0

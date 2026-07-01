@@ -1,6 +1,5 @@
 package org.example.client.view;
 
-import javafx.beans.property.StringProperty;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -120,8 +119,8 @@ class RegisterViewModelTest {
     @Test
     @DisplayName("回调设置")
     void testCallbacks() {
-        final boolean[] successCalled = {false};
-        final boolean[] backCalled = {false};
+        final boolean[] successCalled = { false };
+        final boolean[] backCalled = { false };
 
         viewModel.setOnRegisterSuccess(response -> successCalled[0] = true);
         viewModel.setOnBackToLogin(() -> backCalled[0] = true);

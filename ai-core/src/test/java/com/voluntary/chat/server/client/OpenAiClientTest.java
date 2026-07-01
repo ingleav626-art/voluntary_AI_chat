@@ -1,6 +1,5 @@
 package com.voluntary.chat.server.client;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.voluntary.chat.server.config.AiConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -15,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
