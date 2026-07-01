@@ -30,17 +30,20 @@ class WebMvcConfigTest {
         config = new WebMvcConfig();
         // 手动注入 @Value 字段（单元测试无 Spring 上下文）
         ReflectionTestUtils.setField(config, "uploadDir", "uploads/chat/images");
+        ReflectionTestUtils.setField(config, "avatarDir", "uploads/avatars");
     }
 
     @Test
     @DisplayName("addResourceHandlers 正确映射文件路径")
     void addResourceHandlers_shouldMapFileUrl() {
         when(registry.addResourceHandler("/files/**")).thenReturn(registration);
+        when(registry.addResourceHandler("/avatars/**")).thenReturn(registration);
         when(registration.addResourceLocations(anyString())).thenReturn(registration);
 
         config.addResourceHandlers(registry);
 
         verify(registry).addResourceHandler("/files/**");
-        verify(registration, atLeastOnce()).addResourceLocations(anyString());
+        verify(registry).addResourceHandler("/avatars/**");
+        verify(registration, atLeast(2)).addResourceLocations(anyString());
     }
 }

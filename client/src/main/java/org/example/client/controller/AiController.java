@@ -288,10 +288,15 @@ public final class AiController implements Initializable {
                 return;
             }
 
-            // 头像：显示首字母
+            // 头像：显示首字母或加载真实头像
             final String displayName = item.getName() != null ? item.getName() : "AI";
             avatarText.setText(!displayName.isEmpty() ? String.valueOf(displayName.charAt(0)) : "A");
             avatarCircle.setFill(javafx.scene.paint.Color.valueOf("#E76F51"));
+
+            // 加载AI头像图片（如果有）
+            if (item.getAvatar() != null && !item.getAvatar().isEmpty()) {
+                org.example.client.util.ImageUtils.loadAvatarToPane(item.getAvatar(), avatarPane, 36);
+            }
 
             // 头像点击 → 打开编辑对话框
             avatarPane.setOnMouseClicked(e -> handleEditAvatar(item));

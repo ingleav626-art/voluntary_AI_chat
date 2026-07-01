@@ -1,8 +1,10 @@
 package org.example.client.controller;
 
+import java.io.File;
 import java.net.URL;
 import java.util.ResourceBundle;
 
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
@@ -12,9 +14,12 @@ import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
 import org.example.client.model.AiProfile;
+import org.example.client.model.ApiResponse;
+import org.example.client.service.UserService;
 import org.example.client.view.AiViewModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +27,7 @@ import org.slf4j.LoggerFactory;
 /**
  * AI 角色编辑对话框控制器
  *
- * <p>处理创建和编辑 AI 角色的表单逻辑。</p>
+ * <p>处理创建和编辑 AI 角色的表单逻辑，支持头像文件上传。</p>
  */
 public final class AiEditController implements Initializable {
 
@@ -47,7 +52,10 @@ public final class AiEditController implements Initializable {
     private TextField baseUrlField;
 
     @FXML
-    private TextField avatarField;
+    private Button chooseAvatarButton;
+
+    @FXML
+    private Label avatarFileNameLabel;
 
     @FXML
     private TextArea openingMessageField;
@@ -81,6 +89,12 @@ public final class AiEditController implements Initializable {
     private AiProfile editTarget;
 
     private boolean isEditMode = false;
+
+    /** 已有的头像URL（编辑模式时保留） */
+    private String existingAvatarUrl;
+
+    /** 新选择的头像文件 */
+    private File selectedAvatarFile;
 
     @Override
     public void initialize(final URL location, final ResourceBundle resources) {
@@ -121,7 +135,15 @@ public final class AiEditController implements Initializable {
         // 编辑模式下不回填 API Key（安全考虑）
         apiKeyField.setPromptText("留空则不修改");
         baseUrlField.setText(profile.getBaseUrl() != null ? profile.getBaseUrl() : "");
-        avatarField.setText(profile.getAvatar() != null ? profile.getAvatar() : "");
+
+        // 保留已有头像
+        existingAvatarUrl = profile.getAvatar();
+        if (existingAvatarUrl != null && !existingAvatarUrl.isEmpty()) {
+            avatarFileNameLabel.setText("已有头像（点击更换）");
+        } else {
+            avatarFileNameLabel.setText("未设置头像");
+        }
+
         openingMessageField.setText(profile.getOpeningMessage() != null ? profile.getOpeningMessage() : "");
         personaField.setText(profile.getPersona() != null ? profile.getPersona() : "");
         systemPromptField.setText(profile.getSystemPrompt() != null ? profile.getSystemPrompt() : "");
@@ -140,7 +162,9 @@ public final class AiEditController implements Initializable {
         apiKeyField.clear();
         apiKeyField.setPromptText("输入 API Key");
         baseUrlField.clear();
-        avatarField.clear();
+        avatarFileNameLabel.setText("未选择头像");
+        selectedAvatarFile = null;
+        existingAvatarUrl = null;
         openingMessageField.clear();
         personaField.clear();
         systemPromptField.clear();
@@ -148,6 +172,28 @@ public final class AiEditController implements Initializable {
         maxTokensField.clear();
         isGroupCheck.setSelected(false);
         errorLabel.setText("");
+    }
+
+    /**
+     * 选择头像文件
+     */
+    @FXML
+    private void handleChooseAvatar() {
+        final FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("选择AI头像");
+        fileChooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("图片文件", "*.jpg", "*.jpeg", "*.png", "*.gif", "*.webp"),
+                new FileChooser.ExtensionFilter("所有文件", "*.*")
+        );
+
+        final Stage stage = (Stage) chooseAvatarButton.getScene().getWindow();
+        final File file = fileChooser.showOpenDialog(stage);
+
+        if (file != null) {
+            selectedAvatarFile = file;
+            avatarFileNameLabel.setText(file.getName());
+            errorLabel.setText("");
+        }
     }
 
     /**
@@ -208,7 +254,52 @@ public final class AiEditController implements Initializable {
             }
         }
 
-        // 构建 AiProfile 对象
+        // 禁用按钮防止重复提交
+        saveButton.setDisable(true);
+        errorLabel.setText("");
+
+        // 如果选择了新头像，先上传
+        if (selectedAvatarFile != null) {
+            LOG.info("【AI头像上传】开始上传: file={}", selectedAvatarFile.getName());
+            final Double finalTemperature = temperature;
+            final Integer finalMaxTokens = maxTokens;
+
+            UserService.getInstance().uploadAvatar(selectedAvatarFile.toPath())
+                    .thenAcceptAsync(response -> {
+                        if (response != null && response.isSuccess() && response.getData() != null) {
+                            final String avatarUrl = response.getData();
+                            LOG.info("【AI头像上传】上传成功: avatarUrl={}", avatarUrl);
+                            Platform.runLater(() -> saveAiProfile(name, provider, model, apiKey,
+                                    finalTemperature, finalMaxTokens, avatarUrl));
+                        } else {
+                            final String msg = response != null ? response.getMessage() : "上传失败";
+                            LOG.warn("【AI头像上传】上传失败: {}", msg);
+                            Platform.runLater(() -> {
+                                errorLabel.setText("头像上传失败: " + msg);
+                                saveButton.setDisable(false);
+                            });
+                        }
+                    })
+                    .exceptionally(throwable -> {
+                        LOG.error("【AI头像上传】上传异常: {}", throwable.getMessage(), throwable);
+                        Platform.runLater(() -> {
+                            errorLabel.setText("头像上传异常: " + throwable.getMessage());
+                            saveButton.setDisable(false);
+                        });
+                        return null;
+                    });
+        } else {
+            // 没有选择新头像，使用已有头像URL
+            saveAiProfile(name, provider, model, apiKey, temperature, maxTokens, existingAvatarUrl);
+        }
+    }
+
+    /**
+     * 保存AI角色配置
+     */
+    private void saveAiProfile(final String name, final String provider, final String model,
+                                final String apiKey, final Double temperature, final Integer maxTokens,
+                                final String avatarUrl) {
         final AiProfile profile = new AiProfile();
         profile.setName(name);
         profile.setModelProvider(provider);
@@ -217,7 +308,7 @@ public final class AiEditController implements Initializable {
             profile.setApiKey(apiKey);
         }
         profile.setBaseUrl(baseUrlField.getText().trim().isEmpty() ? null : baseUrlField.getText().trim());
-        profile.setAvatar(avatarField.getText().trim().isEmpty() ? null : avatarField.getText().trim());
+        profile.setAvatar(avatarUrl);
         profile.setOpeningMessage(openingMessageField.getText().trim().isEmpty()
                 ? null : openingMessageField.getText().trim());
         profile.setPersona(personaField.getText().trim().isEmpty() ? null : personaField.getText().trim());
@@ -234,7 +325,6 @@ public final class AiEditController implements Initializable {
             viewModel.createAiProfile(profile, openingMsg);
         }
 
-        // 关闭对话框
         closeDialog();
     }
 

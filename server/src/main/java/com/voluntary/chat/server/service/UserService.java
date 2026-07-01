@@ -115,14 +115,23 @@ public class UserService {
 
     @Transactional
     public void updateProfile(Long userId, UpdateProfileRequest request) {
+        log.info("【更新用户信息】开始更新用户信息: userId={}, request={}", userId, request);
         User user = findById(userId);
+        log.info("【更新用户信息】查询到用户: userId={}, username={}, currentAvatar={}", user.getId(), user.getUsername(),
+                user.getAvatar());
 
         if (request.getUsername() != null && !request.getUsername().equals(user.getUsername())) {
             checkUsernameNotExists(request.getUsername());
             user.setUsername(request.getUsername());
+            log.info("【更新用户信息】更新用户名: {}", request.getUsername());
         }
+        // avatar 字段支持更新为 null 或空字符串（用于删除头像）
+        // UpdateProfileRequest 中 avatar 字段有 @Size(max=500) 校验，如果传递了值就会在这里更新
+        // 注意：需要配合 User 实体类的 @TableField(updateStrategy = FieldStrategy.ALWAYS) 才能更新到数据库
         if (request.getAvatar() != null) {
+            log.info("【更新用户信息】准备更新 avatar 字段: 旧值={}, 新值={}", user.getAvatar(), request.getAvatar());
             user.setAvatar(request.getAvatar());
+            log.info("【更新用户信息】已设置 user.avatar={}", user.getAvatar());
         }
         if (request.getBio() != null) {
             user.setBio(request.getBio());
@@ -141,7 +150,9 @@ public class UserService {
             user.setDetailBio(request.getDetailBio());
         }
 
-        userMapper.updateById(user);
+        log.info("【更新用户信息】准备保存到数据库: userId={}, avatar={}", user.getId(), user.getAvatar());
+        int updateResult = userMapper.updateById(user);
+        log.info("【更新用户信息】数据库更新结果: affectedRows={}", updateResult);
     }
 
     /**

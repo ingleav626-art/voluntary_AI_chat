@@ -23,7 +23,7 @@
         <Label styleClass="group-create-label" text="当前头像预览"/>
 
         <!-- 头像预览区域 -->
-        <StackPane styleClass="avatar-preview-container">
+        <StackPane fx:id="avatarPreviewContainer" styleClass="avatar-preview-container">
             <Circle fx:id="avatarCircle" radius="50" fill="#E76F51"/>
             <Label fx:id="avatarText" style="-fx-text-fill: white; -fx-font-size: 24; -fx-font-weight: bold;" text="群"/>
             <ImageView fx:id="avatarImage" fitWidth="100" fitHeight="100"
@@ -33,12 +33,15 @@
 
     <Separator/>
 
-    <!-- 头像URL输入 -->
+    <!-- 选择头像文件 -->
     <VBox spacing="6.0" styleClass="group-create-name-section">
-        <Label styleClass="group-create-label" text="头像图片URL"/>
-        <TextField fx:id="avatarUrlField" promptText="输入头像图片URL（支持 jpg/png/gif/webp）"
-                   styleClass="group-create-input"/>
-        <Label styleClass="hint-label" text="提示：可直接粘贴网络图片链接，或使用图片托管服务上传"/>
+        <Label styleClass="group-create-label" text="选择头像图片"/>
+        <HBox spacing="10.0" alignment="CENTER_LEFT">
+            <Button fx:id="chooseFileButton" mnemonicParsing="false"
+                    onAction="#handleChooseFile" styleClass="btn-primary" text="选择文件"/>
+            <Label fx:id="fileNameLabel" styleClass="hint-label" text="未选择文件"/>
+        </HBox>
+        <Label styleClass="hint-label" text="支持 jpg/png/gif/webp 格式，最大 10MB"/>
     </VBox>
 
     <Separator/>

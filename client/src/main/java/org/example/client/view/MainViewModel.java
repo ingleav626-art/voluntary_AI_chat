@@ -228,7 +228,7 @@ public final class MainViewModel {
             return;
         }
 
-        LOG.debug("[WS-RECV] 收到WebSocket消息: type={}", wsMessage.getType());
+        LOG.info("[WS-RECV] 收到WebSocket消息: type={}, messageId={}", wsMessage.getType(), wsMessage.getId());
 
         switch (wsMessage.getType()) {
             case MessageTypes.RECEIVE_MESSAGE -> handleReceiveMessage(wsMessage);

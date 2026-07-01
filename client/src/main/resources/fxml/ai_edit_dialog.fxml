@@ -47,11 +47,15 @@
                            styleClass="ai-form-input"/>
             </VBox>
 
-            <!-- 头像URL -->
+            <!-- 头像 -->
             <VBox spacing="4.0">
-                <Label text="头像URL" styleClass="ai-form-label"/>
-                <TextField fx:id="avatarField" promptText="输入头像图片URL（可选）"
-                           styleClass="ai-form-input"/>
+                <Label text="头像" styleClass="ai-form-label"/>
+                <HBox spacing="10.0" alignment="CENTER_LEFT">
+                    <Button fx:id="chooseAvatarButton" mnemonicParsing="false"
+                            onAction="#handleChooseAvatar" styleClass="btn-primary" text="选择文件"/>
+                    <Label fx:id="avatarFileNameLabel" styleClass="hint-label" text="未选择头像"/>
+                </HBox>
+                <Label text="支持 jpg/png/gif/webp 格式（可选）" styleClass="hint-label"/>
             </VBox>
 
             <!-- 开场白 -->

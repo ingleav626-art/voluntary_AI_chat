@@ -39,7 +39,9 @@ class ImageUploadServiceTest {
     void setUp() {
         imageUploadService = new ImageUploadService(
                 tempDir.toString(),
-                "http://localhost:8080/files");
+                tempDir.toString() + "/avatars",
+                "http://localhost:8080/files",
+                "http://localhost:8080/avatars");
     }
 
     @Test
@@ -167,7 +169,7 @@ class ImageUploadServiceTest {
      * 创建指定格式和尺寸的模拟图片 MultipartFile
      */
     private MultipartFile createMockImageFile(String contentType, String extension,
-                                              int width, int height) throws IOException {
+            int width, int height) throws IOException {
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         String formatName = contentType.substring(contentType.lastIndexOf("/") + 1);

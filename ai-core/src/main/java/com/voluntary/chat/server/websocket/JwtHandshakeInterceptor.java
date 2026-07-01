@@ -31,15 +31,22 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
     @Override
     public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response,
             WebSocketHandler wsHandler, Map<String, Object> attributes) {
-        String token = extractToken(request);
-        if (!StringUtils.hasText(token) || !jwtTokenProvider.validateToken(token)) {
-            log.warn("WebSocket 握手失败：Token 无效");
+        final String remoteAddr = request.getRemoteAddress() != null
+                ? request.getRemoteAddress().getAddress().getHostAddress() : "unknown";
+        final String token = extractToken(request);
+        if (!StringUtils.hasText(token)) {
+            log.warn("[WS-HANDSHAKE] 失败：Token 为空 remoteAddr={}", remoteAddr);
+            return false;
+        }
+        if (!jwtTokenProvider.validateToken(token)) {
+            log.warn("[WS-HANDSHAKE] 失败：Token 无效或过期 remoteAddr={}, tokenPrefix={}",
+                    remoteAddr, token.length() > 12 ? token.substring(0, 12) + "..." : token);
             return false;
         }
 
-        Long userId = jwtTokenProvider.getUserIdFromToken(token);
+        final Long userId = jwtTokenProvider.getUserIdFromToken(token);
         attributes.put(USER_ID_KEY, userId);
-        log.info("WebSocket 握手成功: userId={}", userId);
+        log.info("[WS-HANDSHAKE] 成功 userId={}, remoteAddr={}", userId, remoteAddr);
         return true;
     }
 

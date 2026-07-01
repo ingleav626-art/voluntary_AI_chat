@@ -104,6 +104,24 @@ public class TopBarController implements Initializable {
                     return "?";
                 }, viewModel.currentUserProperty()));
 
+        // 监听用户头像变化，加载真实头像图片
+        viewModel.currentUserProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null && newVal.getAvatar() != null && !newVal.getAvatar().isEmpty()) {
+                org.example.client.util.ImageUtils.loadAvatarToCircle(
+                        newVal.getAvatar(), avatarCircle, avatarCircle.getRadius());
+                avatarText.setVisible(false);
+            } else {
+                avatarText.setVisible(true);
+            }
+        });
+        // 初始加载
+        final UserInfo initUser = viewModel.currentUserProperty().get();
+        if (initUser != null && initUser.getAvatar() != null && !initUser.getAvatar().isEmpty()) {
+            org.example.client.util.ImageUtils.loadAvatarToCircle(
+                    initUser.getAvatar(), avatarCircle, avatarCircle.getRadius());
+            avatarText.setVisible(false);
+        }
+
         // 绑定连接状态
         statusLabel.textProperty().bind(
                 Bindings.createStringBinding(() -> viewModel.connectedProperty().get() ? "在线" : "离线",

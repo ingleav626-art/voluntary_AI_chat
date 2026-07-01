@@ -268,19 +268,19 @@ public final class WebSocketClient {
         try {
             final WebSocketMessage wsMessage = JsonUtils.fromJson(message, WebSocketMessage.class);
             if (wsMessage == null) {
-                LOG.warn("消息解析失败: {}", message);
+                LOG.warn("[WS-RECV] 消息解析失败: raw={}", message);
                 return;
             }
 
             // PONG 消息不触发回调，仅用于心跳确认
             if (MessageTypes.PONG.equals(wsMessage.getType())) {
-                LOG.debug("收到 PONG 心跳响应");
+                LOG.debug("[WS-RECV] PONG 心跳响应");
                 return;
             }
 
             // FORCE_LOGOUT 消息表示被踢下线，停止重连
             if (MessageTypes.FORCE_LOGOUT.equals(wsMessage.getType())) {
-                LOG.warn("收到强制下线通知，停止重连");
+                LOG.warn("[WS-RECV] 强制下线通知，停止重连");
                 manualClose = true;
                 connected = false;
                 stopHeartbeat();
@@ -294,13 +294,13 @@ public final class WebSocketClient {
                 lastMessageId = wsMessage.getId();
             }
 
-            LOG.debug("收到消息: type={}", wsMessage.getType());
+            LOG.info("[WS-RECV] type={}, messageId={}", wsMessage.getType(), wsMessage.getId());
 
             if (onMessage != null) {
                 Platform.runLater(() -> onMessage.accept(wsMessage));
             }
         } catch (final Exception e) {
-            LOG.error("处理消息异常: {}", message, e);
+            LOG.error("[WS-RECV] 处理消息异常: raw={}", message, e);
         }
     }
 
@@ -312,7 +312,7 @@ public final class WebSocketClient {
      */
     public void send(final String type, final Map<String, Object> data) {
         if (!connected || webSocket == null) {
-            LOG.warn("WebSocket 未连接，消息发送失败: type={}", type);
+            LOG.warn("[WS-SEND] 失败：未连接 type={}, data={}", type, data);
             return;
         }
 
@@ -324,15 +324,16 @@ public final class WebSocketClient {
 
         final String json = JsonUtils.toJson(message);
         if (json == null) {
-            LOG.error("消息序列化失败: type={}", type);
+            LOG.error("[WS-SEND] 失败：消息序列化失败 type={}", type);
             return;
         }
 
         try {
             webSocket.sendText(json, true);
-            LOG.debug("发送消息: type={}", type);
+            LOG.info("[WS-SEND] type={}, messageId={}, dataKeys={}",
+                    type, message.getId(), data != null ? data.keySet() : "null");
         } catch (final Exception e) {
-            LOG.error("发送消息失败: type={}", type, e);
+            LOG.error("[WS-SEND] 失败 type={}, messageId={}", type, message.getId(), e);
         }
     }
 

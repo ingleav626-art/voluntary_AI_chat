@@ -11,6 +11,7 @@ import com.voluntary.chat.server.service.AuthService;
 import com.voluntary.chat.server.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/user")
 @RequiredArgsConstructor
@@ -37,7 +39,9 @@ public class UserController {
     @PutMapping("/profile")
     public ApiResult<Void> updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
         Long userId = SecurityUtils.getCurrentUserId();
+        log.info("【UserController-updateProfile】收到请求: userId={}, request={}", userId, request);
         userService.updateProfile(userId, request);
+        log.info("【UserController-updateProfile】更新成功: userId={}", userId);
         return ApiResult.ok("修改成功", null);
     }
 
@@ -53,7 +57,9 @@ public class UserController {
     /**
      * 发送验证码（用于密码修改）
      *
-     * <p>根据当前登录用户自动获取手机号并发送验证码。</p>
+     * <p>
+     * 根据当前登录用户自动获取手机号并发送验证码。
+     * </p>
      */
     @PostMapping("/password/sms")
     public ApiResult<Void> sendPasswordSms() {
@@ -68,7 +74,8 @@ public class UserController {
     @PutMapping("/password")
     public ApiResult<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
         Long userId = SecurityUtils.getCurrentUserId();
-        authService.changePassword(userId, request.getSmsCode(), request.getNewPassword(), request.getConfirmPassword());
+        authService.changePassword(userId, request.getSmsCode(), request.getNewPassword(),
+                request.getConfirmPassword());
         return ApiResult.ok("密码修改成功", null);
     }
 

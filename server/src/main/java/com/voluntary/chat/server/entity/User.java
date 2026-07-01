@@ -1,6 +1,7 @@
 package com.voluntary.chat.server.entity;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -25,6 +26,11 @@ public class User {
 
     private String salt;
 
+    /**
+     * 用户头像URL
+     * 使用 ALWAYS 策略强制包含在所有 UPDATE 语句中（无论值是否为 null）
+     */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String avatar;
 
     private String bio;

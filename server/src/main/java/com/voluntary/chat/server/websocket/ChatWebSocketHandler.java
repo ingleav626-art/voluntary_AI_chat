@@ -123,6 +123,10 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
         request.setType((String) data.get("msgType"));
         request.setContent((String) data.get("content"));
 
+        log.info("[MSG-SEND] senderId={}, sessionId={}, type={}, contentLen={}",
+                senderId, request.getSessionId(), request.getType(),
+                request.getContent() != null ? request.getContent().length() : 0);
+
         final SendMessageResponse response = messageService.sendMessage(senderId, request);
 
         // 更新会话缓存：最后一条消息 + 会话列表排序
@@ -146,7 +150,22 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
                 .build();
         sendToUser(senderId, ackMsg);
 
-        final User sender = userService.findById(senderId);
+        // 关键修复：容错处理发送方用户不存在的情况
+        // 原因：测试阶段可能出现孤儿数据（如解散群时未清理 message 表），
+        // 或者用户因数据库重置/迁移导致 message 中存在但 user 中不存在
+        // 处理：使用 senderId 构造虚拟 User 对象，保证消息路由不中断
+        User sender;
+        try {
+            sender = userService.findById(senderId);
+        } catch (final Exception e) {
+            log.warn("发送方用户不存在，使用虚拟用户继续发送: userId={}, error={}",
+                    senderId, e.getMessage());
+            sender = new User();
+            sender.setId(senderId);
+            final String idStr = senderId.toString();
+            sender.setUsername("用户" + idStr.substring(0, Math.min(4, idStr.length())));
+            sender.setAvatar(null);
+        }
 
         if (request.getSessionId().startsWith("g_")) {
             broadcastGroupMessage(senderId, sender, request, response);
@@ -207,7 +226,7 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
 
         log.info("群消息广播: groupId={}, senderId={}, memberCount={}", groupId, senderId, groupMembers.size());
 
-        triggerGroupAi(groupId, senderId, request.getContent());
+        triggerGroupAi(groupId, senderId, sender.getUsername(), request.getContent());
     }
 
     private void forwardPrivateMessage(final Long senderId, final User sender,
@@ -451,8 +470,8 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
      * @param sessionId 可选，关联的会话ID，点击通知后跳转
      */
     public void sendNotification(final Long userId, final String notifType,
-                                  final String title, final String content,
-                                  final String sessionId) {
+            final String title, final String content,
+            final String sessionId) {
         final Map<String, Object> data = new LinkedHashMap<>();
         data.put("notifType", notifType);
         data.put("title", title);
@@ -473,7 +492,7 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
      * 向指定用户推送待办提醒通知
      */
     public void sendTodoNotification(final Long userId, final String title,
-                                      final String content) {
+            final String content) {
         sendNotification(userId, MessageTypes.NOTIFICATION_TODO_REMINDER,
                 title, content, null);
     }

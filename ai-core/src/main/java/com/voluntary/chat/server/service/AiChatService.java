@@ -71,6 +71,34 @@ public class AiChatService {
         aiTaskExecutor.execute(() -> doHandleAiChat(userId, aiId, sessionId, content, messageId));
     }
 
+    /**
+     * 处理群聊 AI 对话（流式 + 广播）
+     *
+     * <p>
+     * 与私聊不同：完成后以 GROUP_MESSAGE 类型广播给群内所有成员。
+     * 同一 (groupId, aiId) 的请求串行排队，避免上下文互相干扰。
+     * </p>
+     *
+     * @param groupId    群ID
+     * @param senderId   发送者用户ID
+     * @param senderName 发送者用户名（用于上下文区分消息来源）
+     * @param aiId       AI 角色ID
+     * @param content    用户消息内容
+     * @param messageId  消息ID
+     */
+    public void handleGroupAiChat(
+            final Long groupId,
+            final Long senderId,
+            final String senderName,
+            final Long aiId,
+            final String content,
+            final String messageId) {
+
+        final String sessionId = "g_" + groupId + "_a_" + aiId;
+        // ai-core 基础版直接复用私聊逻辑，server 模块会覆盖此方法实现群聊广播
+        handleAiChat(senderId, aiId, sessionId, content, messageId);
+    }
+
     private void doHandleAiChat(
             final Long userId,
             final Long aiId,

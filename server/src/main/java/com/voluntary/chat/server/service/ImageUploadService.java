@@ -131,8 +131,8 @@ public class ImageUploadService {
             Files.createDirectories(uploadPath);
             ImageIO.write(resized, getFormatName(contentType), uploadPath.resolve(fileName).toFile());
 
-            // 8. 返回 URL
-            final String url = avatarBaseUrl + "/" + fileName;
+            // 8. 返回相对路径 URL（前端根据当前服务器地址拼接完整 URL）
+            final String url = "/avatars/" + fileName;
             log.info("头像上传成功: fileId={}, url={}", fileId, url);
             return url;
         } catch (IOException e) {

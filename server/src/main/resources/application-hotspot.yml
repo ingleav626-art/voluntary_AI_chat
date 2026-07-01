@@ -118,3 +118,4 @@ upload:
     base-url: http://localhost:8080/files
   avatar:
     dir: ./data/uploads/avatars
+    base-url: http://localhost:8080/avatars

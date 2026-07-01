@@ -1,18 +1,23 @@
 package org.example.client.controller;
 
+import java.io.File;
 import java.net.URL;
 import java.util.ResourceBundle;
 
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.StackPane;
 import javafx.scene.shape.Circle;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import org.example.client.model.ApiResponse;
+import org.example.client.service.UserService;
+import org.example.client.util.ImageUtils;
 import org.example.client.view.GroupListViewModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +25,7 @@ import org.slf4j.LoggerFactory;
 /**
  * 修改群头像对话框控制器
  *
- * <p>提供群头像的修改功能（仅群主可操作）。</p>
+ * <p>提供群头像的修改功能（仅群主可操作），支持文件上传。</p>
  *
  * @author voluntary-ai-chat
  * @since 1.0.0
@@ -42,7 +47,10 @@ public final class GroupAvatarController implements Initializable {
     private StackPane avatarPreviewContainer;
 
     @FXML
-    private TextField avatarUrlField;
+    private Button chooseFileButton;
+
+    @FXML
+    private Label fileNameLabel;
 
     @FXML
     private Label errorLabel;
@@ -65,6 +73,9 @@ public final class GroupAvatarController implements Initializable {
     /** 当前头像URL */
     private String currentAvatar;
 
+    /** 选择的文件 */
+    private File selectedFile;
+
     /**
      * 初始化对话框数据
      *
@@ -80,16 +91,8 @@ public final class GroupAvatarController implements Initializable {
         this.groupName = groupName;
         this.currentAvatar = currentAvatar;
 
-        // 设置输入框初始值
-        avatarUrlField.setText(currentAvatar != null ? currentAvatar : "");
-
         // 更新头像预览
         updateAvatarPreview(currentAvatar);
-
-        // 监听输入框变化，实时预览
-        avatarUrlField.textProperty().addListener((obs, oldVal, newVal) -> {
-            updateAvatarPreview(newVal);
-        });
     }
 
     @Override
@@ -104,43 +107,56 @@ public final class GroupAvatarController implements Initializable {
      */
     private void updateAvatarPreview(final String url) {
         if (url == null || url.trim().isEmpty()) {
-            // 显示默认头像（群名首字）
-            avatarCircle.setFill(javafx.scene.paint.Color.valueOf("#E76F51"));
-            avatarText.setText(groupName != null && !groupName.isEmpty()
-                    ? String.valueOf(groupName.charAt(0)) : "群");
-            avatarText.setVisible(true);
-            avatarImage.setVisible(false);
+            showDefaultAvatar();
         } else {
-            // 尝试加载图片
-            try {
-                final Image image = new Image(url.trim(), true);
-                image.errorProperty().addListener((obs, oldVal, newVal) -> {
-                    if (newVal) {
-                        // 图片加载失败，显示默认头像
-                        avatarCircle.setFill(javafx.scene.paint.Color.valueOf("#E76F51"));
-                        avatarText.setText(groupName != null && !groupName.isEmpty()
-                                ? String.valueOf(groupName.charAt(0)) : "群");
-                        avatarText.setVisible(true);
-                        avatarImage.setVisible(false);
-                        LOG.warn("头像图片加载失败: {}", url);
-                    }
-                });
+            ImageUtils.loadAvatarToCircle(url, avatarCircle, avatarCircle.getRadius());
+            avatarText.setVisible(false);
+        }
+    }
 
-                // 设置圆形裁剪
+    /**
+     * 显示默认头像
+     */
+    private void showDefaultAvatar() {
+        avatarCircle.setFill(javafx.scene.paint.Color.valueOf("#E76F51"));
+        avatarText.setText(groupName != null && !groupName.isEmpty()
+                ? String.valueOf(groupName.charAt(0)) : "群");
+        avatarText.setVisible(true);
+        avatarImage.setVisible(false);
+    }
+
+    /**
+     * 选择头像文件
+     */
+    @FXML
+    private void handleChooseFile() {
+        final FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("选择群头像");
+        fileChooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("图片文件", "*.jpg", "*.jpeg", "*.png", "*.gif", "*.webp"),
+                new FileChooser.ExtensionFilter("所有文件", "*.*")
+        );
+
+        final Stage stage = (Stage) chooseFileButton.getScene().getWindow();
+        final File file = fileChooser.showOpenDialog(stage);
+
+        if (file != null) {
+            selectedFile = file;
+            fileNameLabel.setText(file.getName());
+            errorLabel.setText("");
+
+            // 预览选中的图片
+            try {
+                final Image preview = new Image(file.toURI().toString());
                 final Circle clip = new Circle(50);
                 avatarImage.setClip(clip);
-
-                avatarImage.setImage(image);
+                avatarImage.setImage(preview);
                 avatarImage.setVisible(true);
                 avatarText.setVisible(false);
-            } catch (final Exception e) {
-                LOG.warn("头像图片URL无效: {}", url, e);
-                // 显示默认头像
                 avatarCircle.setFill(javafx.scene.paint.Color.valueOf("#E76F51"));
-                avatarText.setText(groupName != null && !groupName.isEmpty()
-                        ? String.valueOf(groupName.charAt(0)) : "群");
-                avatarText.setVisible(true);
-                avatarImage.setVisible(false);
+            } catch (final Exception e) {
+                LOG.warn("预览图片失败: {}", file.getName(), e);
+                showDefaultAvatar();
             }
         }
     }
@@ -150,38 +166,53 @@ public final class GroupAvatarController implements Initializable {
      */
     @FXML
     private void handleConfirm() {
-        final String avatarUrl = avatarUrlField.getText();
-        // URL可以为空（表示清除头像）
-
-        // 简单校验URL格式（如果有输入）
-        if (avatarUrl != null && !avatarUrl.trim().isEmpty()) {
-            final String trimmed = avatarUrl.trim();
-            if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
-                errorLabel.setText("头像URL需以 http:// 或 https:// 开头");
-                return;
-            }
-            // 校验图片格式
-            if (!trimmed.matches(".*\\.(jpg|jpeg|png|gif|webp|bmp)(\\?.*)?$")) {
-                errorLabel.setText("请输入有效的图片URL（jpg/png/gif/webp）");
-                return;
-            }
+        if (selectedFile == null) {
+            errorLabel.setText("请先选择头像图片");
+            return;
         }
 
         confirmButton.setDisable(true);
+        chooseFileButton.setDisable(true);
         errorLabel.setText("");
 
-        LOG.info("修改群头像: groupId={}, avatarUrl={}", groupId, avatarUrl);
+        LOG.info("【群头像上传】开始上传: groupId={}, file={}", groupId, selectedFile.getName());
 
-        // 调用 ViewModel 更新群信息（仅更新头像）
-        viewModel.updateGroupInfo(
-                groupId,
-                null,  // 不修改群名称
-                null,  // 不修改公告
-                false, // 不修改置顶状态
-                avatarUrl != null ? avatarUrl.trim() : null
-        );
+        // 先上传头像文件
+        UserService.getInstance().uploadAvatar(selectedFile.toPath())
+                .thenAcceptAsync(response -> {
+                    if (response != null && response.isSuccess() && response.getData() != null) {
+                        final String avatarUrl = response.getData();
+                        LOG.info("【群头像上传】上传成功: avatarUrl={}", avatarUrl);
 
-        closeWindow();
+                        // 调用 ViewModel 更新群信息
+                        viewModel.updateGroupInfo(
+                                groupId,
+                                null,  // 不修改群名称
+                                null,  // 不修改公告
+                                false, // 不修改置顶状态
+                                avatarUrl
+                        );
+
+                        Platform.runLater(this::closeWindow);
+                    } else {
+                        final String msg = response != null ? response.getMessage() : "上传失败";
+                        LOG.warn("【群头像上传】上传失败: {}", msg);
+                        Platform.runLater(() -> {
+                            errorLabel.setText("上传失败: " + msg);
+                            confirmButton.setDisable(false);
+                            chooseFileButton.setDisable(false);
+                        });
+                    }
+                })
+                .exceptionally(throwable -> {
+                    LOG.error("【群头像上传】上传异常: {}", throwable.getMessage(), throwable);
+                    Platform.runLater(() -> {
+                        errorLabel.setText("上传异常: " + throwable.getMessage());
+                        confirmButton.setDisable(false);
+                        chooseFileButton.setDisable(false);
+                    });
+                    return null;
+                });
     }
 
     /**

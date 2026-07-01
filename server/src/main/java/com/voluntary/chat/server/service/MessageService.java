@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -84,6 +85,8 @@ public class MessageService {
      * 获取聊天记录（按会话维度分页）
      */
     public PageResult<MessageResponse> getHistory(String sessionId, Long userId, int page, int size) {
+        log.info("[MSG-HISTORY] sessionId={}, userId={}, page={}, size={}",
+                sessionId, userId, page, size);
         // COUNT 查询不需要 ORDER BY（H2 不支持 COUNT + ORDER BY 组合）
         LambdaQueryWrapper<Message> countWrapper = new LambdaQueryWrapper<>();
         countWrapper.eq(Message::getSessionId, sessionId)
@@ -108,11 +111,53 @@ public class MessageService {
                 .collect(Collectors.toSet());
         Map<Long, User> userMap = userService.findByIds(senderIds);
 
+        // 修复：批量查询当前用户对这些消息的已读状态
+        Set<Long> readMessageIds = getReadMessageIds(userId, messages);
+
         List<MessageResponse> list = messages.stream()
-                .map(msg -> toResponse(msg, userMap))
+                .map(msg -> toResponse(msg, userMap, readMessageIds.contains(msg.getId())))
                 .toList();
 
         return PageResult.of(list, total, page, size);
+    }
+
+    /**
+     * 批量查询当前用户对消息列表的已读状态
+     *
+     * @param userId   当前用户ID
+     * @param messages 消息列表
+     * @return 已读消息ID集合
+     */
+    private Set<Long> getReadMessageIds(final Long userId, final List<Message> messages) {
+        if (userId == null || messages == null || messages.isEmpty()) {
+            return Set.of();
+        }
+        try {
+            // 只查询当前用户发送的消息的已读状态
+            List<Long> myMessageIds = messages.stream()
+                    .filter(m -> userId.equals(m.getSenderId()))
+                    .map(Message::getId)
+                    .toList();
+            if (myMessageIds.isEmpty()) {
+                return Set.of();
+            }
+            // 查询对方（接收方）已读的记录
+            // 注意：这里的"已读"是指接收方读了我发的消息
+            // 对于私聊，接收方读了 → 我能看到"已读"
+            // 对于群聊，发送方只能看到自己消息的群成员已读人数（暂简化为部分已读）
+            LambdaQueryWrapper<MessageRead> wrapper = new LambdaQueryWrapper<>();
+            wrapper.in(MessageRead::getMessageId, myMessageIds);
+            List<MessageRead> reads = messageReadMapper.selectList(wrapper);
+            // 这里假设每条消息至少有一个接收方读了就算已读（实际应更精细）
+            Set<Long> result = new HashSet<>();
+            for (MessageRead r : reads) {
+                result.add(r.getMessageId());
+            }
+            return result;
+        } catch (Exception e) {
+            log.warn("查询已读状态失败: userId={}", userId, e);
+            return Set.of();
+        }
     }
 
     /**
@@ -184,6 +229,8 @@ public class MessageService {
      */
     @Transactional
     public void markRead(Long userId, MarkReadRequest request) {
+        log.info("[MSG-READ] userId={}, sessionId={}, messageIds={}",
+                userId, request.getSessionId(), request.getMessageIds());
         for (Long messageId : request.getMessageIds()) {
             // 检查是否已标记
             LambdaQueryWrapper<MessageRead> wrapper = new LambdaQueryWrapper<>();
@@ -273,7 +320,7 @@ public class MessageService {
         return sessionIds;
     }
 
-    private MessageResponse toResponse(Message message, Map<Long, User> userMap) {
+    private MessageResponse toResponse(Message message, Map<Long, User> userMap, boolean read) {
         MessageResponse.MessageResponseBuilder builder = MessageResponse.builder()
                 .messageId(message.getId())
                 .sessionId(message.getSessionId())
@@ -283,7 +330,8 @@ public class MessageService {
                 .content(message.getContent())
                 .extra(message.getExtra())
                 .createTime(message.getCreateTime())
-                .recalled(message.getRecallTime() != null);
+                .recalled(message.getRecallTime() != null)
+                .read(read);
 
         // 填充发送者信息
         User sender = userMap.get(message.getSenderId());
@@ -364,8 +412,11 @@ public class MessageService {
                 .collect(Collectors.toSet());
         Map<Long, User> userMap = userService.findByIds(senderIds);
 
+        // 批量查询已读状态
+        Set<Long> readMessageIds = getReadMessageIds(userId, messages);
+
         return messages.stream()
-                .map(msg -> toResponse(msg, userMap))
+                .map(msg -> toResponse(msg, userMap, readMessageIds.contains(msg.getId())))
                 .toList();
     }
 
