@@ -1,10 +1,8 @@
 package com.voluntary.chat.server.controller;
 
-import com.voluntary.chat.server.dto.request.ForgotPasswordRequest;
 import com.voluntary.chat.server.dto.request.LoginRequest;
 import com.voluntary.chat.server.dto.request.RefreshTokenRequest;
 import com.voluntary.chat.server.dto.request.RegisterRequest;
-import com.voluntary.chat.server.dto.request.SmsSendRequest;
 import com.voluntary.chat.server.dto.response.LoginResponse;
 import com.voluntary.chat.server.dto.response.RefreshTokenResponse;
 import com.voluntary.chat.server.dto.response.UserResponse;

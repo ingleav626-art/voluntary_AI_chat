@@ -17,7 +17,6 @@ import javafx.scene.control.Button;
 
 import org.example.client.model.ChangePasswordRequest;
 import org.example.client.model.ChangePhoneRequest;
-import org.example.client.model.SmsSendRequest;
 import org.example.client.model.UserInfo;
 import org.example.client.service.AuthService;
 import org.example.client.service.UserService;

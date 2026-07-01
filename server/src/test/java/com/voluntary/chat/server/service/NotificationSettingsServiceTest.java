@@ -4,7 +4,6 @@ import com.voluntary.chat.server.dto.request.UpdateNotificationSettingsRequest;
 import com.voluntary.chat.server.dto.response.NotificationSettingsResponse;
 import com.voluntary.chat.server.entity.NotificationSettings;
 import com.voluntary.chat.server.mapper.NotificationSettingsMapper;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -13,7 +12,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalTime;

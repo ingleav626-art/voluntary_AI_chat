@@ -3,9 +3,6 @@ package org.example.client.controller;
 import java.net.URL;
 import java.util.ResourceBundle;
 
-import javafx.application.Platform;
-import javafx.beans.binding.Bindings;
-import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
@@ -15,11 +12,9 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
-import javafx.util.Callback;
 
 import org.example.client.model.AiMemory;
 import org.example.client.model.AiProfile;
-import org.example.client.model.ConversationInfo;
 import org.example.client.view.AiViewModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

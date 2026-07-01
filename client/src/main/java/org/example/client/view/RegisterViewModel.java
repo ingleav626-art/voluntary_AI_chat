@@ -10,7 +10,6 @@ import javafx.beans.property.StringProperty;
 import org.example.client.config.ServerConnectionManager;
 import org.example.client.config.ServerMode;
 import org.example.client.engine.LocalAiEngine;
-import org.example.client.model.LoginResponse;
 import org.example.client.model.RegisterRequest;
 import org.example.client.model.RegisterResponse;
 import org.example.client.model.SmsSendRequest;

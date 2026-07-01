@@ -9,7 +9,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.example.client.config.ClientConfig;
 import org.example.client.util.JsonUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,8 +25,10 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * WebSocketClient 单元测试
  *
- * <p>测试单例模式、连接状态、消息处理、重连调度等行为。
- * 使用反射测试私有方法，实际连接建立需要集成测试环境。</p>
+ * <p>
+ * 测试单例模式、连接状态、消息处理、重连调度等行为。
+ * 使用反射测试私有方法，实际连接建立需要集成测试环境。
+ * </p>
  *
  * @author voluntary-ai-chat
  * @since 1.0.0
@@ -108,13 +109,15 @@ class WebSocketClientTest {
     @Test
     @DisplayName("设置消息回调不抛异常")
     void testSetOnMessage() {
-        assertDoesNotThrow(() -> client.setOnMessage(msg -> { }));
+        assertDoesNotThrow(() -> client.setOnMessage(msg -> {
+        }));
     }
 
     @Test
     @DisplayName("设置连接状态回调不抛异常")
     void testSetOnConnectionChange() {
-        assertDoesNotThrow(() -> client.setOnConnectionChange(connected -> { }));
+        assertDoesNotThrow(() -> client.setOnConnectionChange(connected -> {
+        }));
     }
 
     @Test
@@ -146,15 +149,19 @@ class WebSocketClientTest {
     @Test
     @DisplayName("重复设置消息回调覆盖之前的回调")
     void testSetOnMessageMultipleTimes() {
-        assertDoesNotThrow(() -> client.setOnMessage(msg -> { }));
-        assertDoesNotThrow(() -> client.setOnMessage(msg -> { }));
+        assertDoesNotThrow(() -> client.setOnMessage(msg -> {
+        }));
+        assertDoesNotThrow(() -> client.setOnMessage(msg -> {
+        }));
     }
 
     @Test
     @DisplayName("重复设置连接回调覆盖之前的回调")
     void testSetOnConnectionChangeMultipleTimes() {
-        assertDoesNotThrow(() -> client.setOnConnectionChange(c -> { }));
-        assertDoesNotThrow(() -> client.setOnConnectionChange(c -> { }));
+        assertDoesNotThrow(() -> client.setOnConnectionChange(c -> {
+        }));
+        assertDoesNotThrow(() -> client.setOnConnectionChange(c -> {
+        }));
     }
 
     @Test
@@ -642,7 +649,8 @@ class WebSocketClientTest {
     void stopHeartbeat_withRunningHeartbeat_shouldNotThrow() throws Exception {
         // 先启动心跳
         final java.net.http.WebSocket mockWs = createMockWebSocket();
-        final Method startMethod = WebSocketClient.class.getDeclaredMethod("startHeartbeat", java.net.http.WebSocket.class);
+        final Method startMethod = WebSocketClient.class.getDeclaredMethod("startHeartbeat",
+                java.net.http.WebSocket.class);
         startMethod.setAccessible(true);
         startMethod.invoke(client, mockWs);
 
@@ -716,27 +724,32 @@ class WebSocketClientTest {
     private java.net.http.WebSocket createMockWebSocket() {
         return new java.net.http.WebSocket() {
             @Override
-            public java.util.concurrent.CompletableFuture<java.net.http.WebSocket> sendText(final CharSequence data, final boolean last) {
+            public java.util.concurrent.CompletableFuture<java.net.http.WebSocket> sendText(final CharSequence data,
+                    final boolean last) {
                 return java.util.concurrent.CompletableFuture.completedFuture(this);
             }
 
             @Override
-            public java.util.concurrent.CompletableFuture<java.net.http.WebSocket> sendPing(final java.nio.ByteBuffer message) {
+            public java.util.concurrent.CompletableFuture<java.net.http.WebSocket> sendPing(
+                    final java.nio.ByteBuffer message) {
                 return java.util.concurrent.CompletableFuture.completedFuture(this);
             }
 
             @Override
-            public java.util.concurrent.CompletableFuture<java.net.http.WebSocket> sendPong(final java.nio.ByteBuffer message) {
+            public java.util.concurrent.CompletableFuture<java.net.http.WebSocket> sendPong(
+                    final java.nio.ByteBuffer message) {
                 return java.util.concurrent.CompletableFuture.completedFuture(this);
             }
 
             @Override
-            public java.util.concurrent.CompletableFuture<java.net.http.WebSocket> sendBinary(final java.nio.ByteBuffer data, final boolean last) {
+            public java.util.concurrent.CompletableFuture<java.net.http.WebSocket> sendBinary(
+                    final java.nio.ByteBuffer data, final boolean last) {
                 return java.util.concurrent.CompletableFuture.completedFuture(this);
             }
 
             @Override
-            public java.util.concurrent.CompletableFuture<java.net.http.WebSocket> sendClose(final int statusCode, final String reason) {
+            public java.util.concurrent.CompletableFuture<java.net.http.WebSocket> sendClose(final int statusCode,
+                    final String reason) {
                 return java.util.concurrent.CompletableFuture.completedFuture(this);
             }
 

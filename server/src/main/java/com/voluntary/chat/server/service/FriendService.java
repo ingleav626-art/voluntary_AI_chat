@@ -17,7 +17,6 @@ import com.voluntary.chat.server.entity.User;
 import com.voluntary.chat.server.mapper.FriendApplyMapper;
 import com.voluntary.chat.server.mapper.FriendMapper;
 import com.voluntary.chat.server.mapper.MessageMapper;
-import com.voluntary.chat.server.service.OnlineStatusService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;

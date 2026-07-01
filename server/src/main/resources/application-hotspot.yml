@@ -1,6 +1,11 @@
 # 热点测试环境配置
 # 用于局域网测试（手机热点连接）
 
+# 启用 Redis 验证码存储
+app:
+  sms:
+    storage: redis
+
 spring:
   application:
     name: voluntary-ai-chat-server

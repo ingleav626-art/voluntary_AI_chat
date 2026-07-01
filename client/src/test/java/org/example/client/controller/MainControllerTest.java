@@ -3,21 +3,16 @@ package org.example.client.controller;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.time.LocalDateTime;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import org.example.client.model.ConversationInfo;
 import org.example.client.model.LoginResponse;
 import org.example.client.model.MessageInfo;
 import org.example.client.model.UserInfo;
-import org.example.client.view.ChatViewModel;
 import org.example.client.view.MainViewModel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
@@ -28,7 +23,6 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -265,8 +259,7 @@ class MainControllerTest extends JavaFxTestBase {
         // 测试环境中没有这些，所以会抛出 NullPointerException 或 IOException
         // 这个测试只是验证方法存在且可以被调用
         final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
-        final java.util.concurrent.atomic.AtomicReference<Exception> exceptionRef =
-                new java.util.concurrent.atomic.AtomicReference<>();
+        final java.util.concurrent.atomic.AtomicReference<Exception> exceptionRef = new java.util.concurrent.atomic.AtomicReference<>();
 
         javafx.application.Platform.runLater(() -> {
             try {
@@ -332,8 +325,8 @@ class MainControllerTest extends JavaFxTestBase {
     @Test
     @DisplayName("handleConversationClick - 选中会话不抛异常")
     void handleConversationClick_shouldNotThrow() throws Exception {
-        final ListView<ConversationInfo> conversationList =
-                (ListView<ConversationInfo>) getField(controller, "conversationList");
+        final ListView<ConversationInfo> conversationList = (ListView<ConversationInfo>) getField(controller,
+                "conversationList");
 
         // 添加一个会话并选中
         final ConversationInfo info = new ConversationInfo();
@@ -350,8 +343,8 @@ class MainControllerTest extends JavaFxTestBase {
     @Test
     @DisplayName("handleConversationClick - 无选中项不抛异常")
     void handleConversationClick_noSelection_shouldNotThrow() throws Exception {
-        final ListView<ConversationInfo> conversationList =
-                (ListView<ConversationInfo>) getField(controller, "conversationList");
+        final ListView<ConversationInfo> conversationList = (ListView<ConversationInfo>) getField(controller,
+                "conversationList");
 
         final MouseEvent clickEvent = new MouseEvent(MouseEvent.MOUSE_CLICKED,
                 0, 0, 0, 0, null, 1, false, false, false, false, true, false, false, false, false, false, null);
@@ -377,8 +370,8 @@ class MainControllerTest extends JavaFxTestBase {
         final Class<?> cellClass = Class.forName("org.example.client.controller.MainController$ConversationCell");
         final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor();
         constructor.setAccessible(true);
-        final javafx.scene.control.ListCell<ConversationInfo> cell =
-                (javafx.scene.control.ListCell<ConversationInfo>) constructor.newInstance();
+        final javafx.scene.control.ListCell<ConversationInfo> cell = (javafx.scene.control.ListCell<ConversationInfo>) constructor
+                .newInstance();
 
         // 测试空项
         callUpdateItem(cell, null, true);
@@ -392,8 +385,8 @@ class MainControllerTest extends JavaFxTestBase {
         final Class<?> cellClass = Class.forName("org.example.client.controller.MainController$ConversationCell");
         final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor();
         constructor.setAccessible(true);
-        final javafx.scene.control.ListCell<ConversationInfo> cell =
-                (javafx.scene.control.ListCell<ConversationInfo>) constructor.newInstance();
+        final javafx.scene.control.ListCell<ConversationInfo> cell = (javafx.scene.control.ListCell<ConversationInfo>) constructor
+                .newInstance();
 
         final ConversationInfo info = new ConversationInfo();
         info.setTargetName("张三");
@@ -413,8 +406,8 @@ class MainControllerTest extends JavaFxTestBase {
         final Class<?> cellClass = Class.forName("org.example.client.controller.MainController$ConversationCell");
         final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor();
         constructor.setAccessible(true);
-        final javafx.scene.control.ListCell<ConversationInfo> cell =
-                (javafx.scene.control.ListCell<ConversationInfo>) constructor.newInstance();
+        final javafx.scene.control.ListCell<ConversationInfo> cell = (javafx.scene.control.ListCell<ConversationInfo>) constructor
+                .newInstance();
 
         final ConversationInfo info = new ConversationInfo();
         info.setTargetName("李四");
@@ -434,8 +427,8 @@ class MainControllerTest extends JavaFxTestBase {
         final Class<?> cellClass = Class.forName("org.example.client.controller.MainController$ConversationCell");
         final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor();
         constructor.setAccessible(true);
-        final javafx.scene.control.ListCell<ConversationInfo> cell =
-                (javafx.scene.control.ListCell<ConversationInfo>) constructor.newInstance();
+        final javafx.scene.control.ListCell<ConversationInfo> cell = (javafx.scene.control.ListCell<ConversationInfo>) constructor
+                .newInstance();
 
         final ConversationInfo info = new ConversationInfo();
         info.setTargetName(null);
@@ -454,8 +447,8 @@ class MainControllerTest extends JavaFxTestBase {
         final Class<?> cellClass = Class.forName("org.example.client.controller.MainController$ConversationCell");
         final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor();
         constructor.setAccessible(true);
-        final javafx.scene.control.ListCell<ConversationInfo> cell =
-                (javafx.scene.control.ListCell<ConversationInfo>) constructor.newInstance();
+        final javafx.scene.control.ListCell<ConversationInfo> cell = (javafx.scene.control.ListCell<ConversationInfo>) constructor
+                .newInstance();
 
         final ConversationInfo info = new ConversationInfo();
         info.setTargetName("王五");
@@ -477,8 +470,8 @@ class MainControllerTest extends JavaFxTestBase {
         final Class<?> cellClass = Class.forName("org.example.client.controller.MainController$MessageCell");
         final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(MainController.class);
         constructor.setAccessible(true);
-        final javafx.scene.control.ListCell<MessageInfo> cell =
-                (javafx.scene.control.ListCell<MessageInfo>) constructor.newInstance(controller);
+        final javafx.scene.control.ListCell<MessageInfo> cell = (javafx.scene.control.ListCell<MessageInfo>) constructor
+                .newInstance(controller);
 
         callUpdateItem(cell, null, true);
         assertNull(cell.getGraphic());
@@ -492,8 +485,8 @@ class MainControllerTest extends JavaFxTestBase {
         final Class<?> cellClass = Class.forName("org.example.client.controller.MainController$MessageCell");
         final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(MainController.class);
         constructor.setAccessible(true);
-        final javafx.scene.control.ListCell<MessageInfo> cell =
-                (javafx.scene.control.ListCell<MessageInfo>) constructor.newInstance(controller);
+        final javafx.scene.control.ListCell<MessageInfo> cell = (javafx.scene.control.ListCell<MessageInfo>) constructor
+                .newInstance(controller);
 
         final MessageInfo info = new MessageInfo();
         info.setMessageId(100L);
@@ -513,8 +506,8 @@ class MainControllerTest extends JavaFxTestBase {
         final Class<?> cellClass = Class.forName("org.example.client.controller.MainController$MessageCell");
         final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(MainController.class);
         constructor.setAccessible(true);
-        final javafx.scene.control.ListCell<MessageInfo> cell =
-                (javafx.scene.control.ListCell<MessageInfo>) constructor.newInstance(controller);
+        final javafx.scene.control.ListCell<MessageInfo> cell = (javafx.scene.control.ListCell<MessageInfo>) constructor
+                .newInstance(controller);
 
         final MessageInfo info = new MessageInfo();
         info.setMessageId(101L);
@@ -534,8 +527,8 @@ class MainControllerTest extends JavaFxTestBase {
         final Class<?> cellClass = Class.forName("org.example.client.controller.MainController$MessageCell");
         final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(MainController.class);
         constructor.setAccessible(true);
-        final javafx.scene.control.ListCell<MessageInfo> cell =
-                (javafx.scene.control.ListCell<MessageInfo>) constructor.newInstance(controller);
+        final javafx.scene.control.ListCell<MessageInfo> cell = (javafx.scene.control.ListCell<MessageInfo>) constructor
+                .newInstance(controller);
 
         final MessageInfo info = new MessageInfo();
         info.setMessageId(102L);
@@ -558,8 +551,8 @@ class MainControllerTest extends JavaFxTestBase {
         final Class<?> cellClass = Class.forName("org.example.client.controller.MainController$MessageCell");
         final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(MainController.class);
         constructor.setAccessible(true);
-        final javafx.scene.control.ListCell<MessageInfo> cell =
-                (javafx.scene.control.ListCell<MessageInfo>) constructor.newInstance(controller);
+        final javafx.scene.control.ListCell<MessageInfo> cell = (javafx.scene.control.ListCell<MessageInfo>) constructor
+                .newInstance(controller);
 
         final MessageInfo info = new MessageInfo();
         info.setMessageId(103L);
@@ -581,8 +574,8 @@ class MainControllerTest extends JavaFxTestBase {
         final Class<?> cellClass = Class.forName("org.example.client.controller.MainController$MessageCell");
         final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(MainController.class);
         constructor.setAccessible(true);
-        final javafx.scene.control.ListCell<MessageInfo> cell =
-                (javafx.scene.control.ListCell<MessageInfo>) constructor.newInstance(controller);
+        final javafx.scene.control.ListCell<MessageInfo> cell = (javafx.scene.control.ListCell<MessageInfo>) constructor
+                .newInstance(controller);
 
         final MessageInfo info = new MessageInfo();
         info.setMessageId(104L);
@@ -604,8 +597,8 @@ class MainControllerTest extends JavaFxTestBase {
         final Class<?> cellClass = Class.forName("org.example.client.controller.MainController$MessageCell");
         final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(MainController.class);
         constructor.setAccessible(true);
-        final javafx.scene.control.ListCell<MessageInfo> cell =
-                (javafx.scene.control.ListCell<MessageInfo>) constructor.newInstance(controller);
+        final javafx.scene.control.ListCell<MessageInfo> cell = (javafx.scene.control.ListCell<MessageInfo>) constructor
+                .newInstance(controller);
 
         final MessageInfo info = new MessageInfo();
         info.setMessageId(105L);
@@ -627,8 +620,8 @@ class MainControllerTest extends JavaFxTestBase {
         final Class<?> cellClass = Class.forName("org.example.client.controller.MainController$MessageCell");
         final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(MainController.class);
         constructor.setAccessible(true);
-        final javafx.scene.control.ListCell<MessageInfo> cell =
-                (javafx.scene.control.ListCell<MessageInfo>) constructor.newInstance(controller);
+        final javafx.scene.control.ListCell<MessageInfo> cell = (javafx.scene.control.ListCell<MessageInfo>) constructor
+                .newInstance(controller);
 
         // AI会话，超过2分钟仍可撤回
         final MessageInfo info = new MessageInfo();
@@ -651,8 +644,8 @@ class MainControllerTest extends JavaFxTestBase {
         final Class<?> cellClass = Class.forName("org.example.client.controller.MainController$MessageCell");
         final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(MainController.class);
         constructor.setAccessible(true);
-        final javafx.scene.control.ListCell<MessageInfo> cell =
-                (javafx.scene.control.ListCell<MessageInfo>) constructor.newInstance(controller);
+        final javafx.scene.control.ListCell<MessageInfo> cell = (javafx.scene.control.ListCell<MessageInfo>) constructor
+                .newInstance(controller);
 
         // 普通会话，超过2分钟不可撤回
         final MessageInfo info = new MessageInfo();
@@ -676,8 +669,8 @@ class MainControllerTest extends JavaFxTestBase {
         final Class<?> cellClass = Class.forName("org.example.client.controller.MainController$MessageCell");
         final java.lang.reflect.Constructor<?> constructor = cellClass.getDeclaredConstructor(MainController.class);
         constructor.setAccessible(true);
-        final javafx.scene.control.ListCell<MessageInfo> cell =
-                (javafx.scene.control.ListCell<MessageInfo>) constructor.newInstance(controller);
+        final javafx.scene.control.ListCell<MessageInfo> cell = (javafx.scene.control.ListCell<MessageInfo>) constructor
+                .newInstance(controller);
 
         final MessageInfo info = new MessageInfo();
         info.setMessageId(108L);
@@ -734,8 +727,7 @@ class MainControllerTest extends JavaFxTestBase {
     @Test
     @DisplayName("MessageCell - updateItem 第一条消息包含时间分割线")
     void messageCell_updateItem_firstMessageHasSeparator() throws Exception {
-        final javafx.scene.control.ListCell<MessageInfo> cell =
-                (javafx.scene.control.ListCell<MessageInfo>) createMessageCell();
+        final javafx.scene.control.ListCell<MessageInfo> cell = (javafx.scene.control.ListCell<MessageInfo>) createMessageCell();
 
         final MessageInfo info = new MessageInfo();
         info.setMessageId(200L);

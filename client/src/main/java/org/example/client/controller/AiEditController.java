@@ -18,7 +18,6 @@ import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
 import org.example.client.model.AiProfile;
-import org.example.client.model.ApiResponse;
 import org.example.client.service.UserService;
 import org.example.client.view.AiViewModel;
 import org.slf4j.Logger;

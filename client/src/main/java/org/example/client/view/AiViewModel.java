@@ -5,14 +5,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 import org.example.client.config.ServerConnectionManager;
 import org.example.client.config.ServerMode;
 import org.example.client.engine.LocalAiEngine;
 import org.example.client.model.AiMemory;
 import org.example.client.model.AiProfile;
-import org.example.client.model.ApiResponse;
 import org.example.client.model.PageResult;
 import org.example.client.service.AiService;
 import org.example.client.service.WebSocketClient;

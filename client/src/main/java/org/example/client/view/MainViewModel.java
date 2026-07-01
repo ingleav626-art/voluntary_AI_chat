@@ -8,7 +8,6 @@ import org.example.client.model.ConversationInfo;
 import org.example.client.model.LoginResponse;
 import org.example.client.model.MessageInfo;
 import org.example.client.model.UserInfo;
-import org.example.client.util.CredentialStorage;
 import org.example.client.util.TokenStorage;
 import org.example.client.service.ChatService;
 import org.example.client.service.WebSocketClient;

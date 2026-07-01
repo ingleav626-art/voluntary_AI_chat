@@ -5,7 +5,6 @@ import com.voluntary.chat.common.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
@@ -37,8 +36,7 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("处理 MethodArgumentNotValidException")
     void handleValidationException() throws Exception {
-        BeanPropertyBindingResult bindingResult =
-                new BeanPropertyBindingResult(new Object(), "target");
+        BeanPropertyBindingResult bindingResult = new BeanPropertyBindingResult(new Object(), "target");
         bindingResult.addError(new FieldError("target", "phone", "手机号不能为空"));
         bindingResult.addError(new FieldError("target", "username", "用户名不能为空"));
         MethodArgumentNotValidException ex = new MethodArgumentNotValidException(null, bindingResult);

@@ -5,14 +5,12 @@ import java.util.List;
 
 import org.example.client.model.AiGroupConfig;
 import org.example.client.model.AiProfile;
-import org.example.client.model.ApiResponse;
 import org.example.client.model.PageResult;
 import org.example.client.service.AiService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javafx.application.Platform;
-import javafx.beans.property.SimpleBooleanProperty;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
@@ -29,7 +27,9 @@ import javafx.stage.Stage;
 /**
  * 群 AI 配置管理控制器
  *
- * <p>管理群聊中的 AI 配置：查看、添加、修改、删除。</p>
+ * <p>
+ * 管理群聊中的 AI 配置：查看、添加、修改、删除。
+ * </p>
  */
 public class GroupAiConfigController {
 
@@ -278,7 +278,8 @@ public class GroupAiConfigController {
 
         triggerKeywordsField.setText(config.getTriggerKeywords() != null ? config.getTriggerKeywords() : "");
         triggerProbabilityField.setText(config.getTriggerProbability() != null
-                ? String.valueOf(config.getTriggerProbability()) : "");
+                ? String.valueOf(config.getTriggerProbability())
+                : "");
         isEnabledCheck.setSelected(config.getIsEnabled() != null ? config.getIsEnabled() : true);
     }
 
