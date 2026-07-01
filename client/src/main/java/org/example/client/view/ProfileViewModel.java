@@ -27,7 +27,9 @@ import org.slf4j.LoggerFactory;
 /**
  * 个人设置视图模型（MVVM）
  *
- * <p>管理用户个人信息状态、密码修改、手机号修改等操作。</p>
+ * <p>
+ * 管理用户个人信息状态、密码修改、手机号修改等操作。
+ * </p>
  *
  * @author voluntary-ai-chat
  * @since 1.0.0
@@ -142,22 +144,24 @@ public final class ProfileViewModel {
 
         UserService.getInstance().getProfile()
                 .thenAcceptAsync(response -> {
-                    loading.set(false);
+                    Platform.runLater(() -> {
+                        loading.set(false);
 
-                    if (response != null && response.isSuccess()) {
-                        final UserInfo user = response.getData();
-                        if (user != null) {
-                            updateUserInfo(user);
-                            LOG.info("用户信息加载成功: userId={}", user.getUserId());
+                        if (response != null && response.isSuccess()) {
+                            final UserInfo user = response.getData();
+                            if (user != null) {
+                                updateUserInfo(user);
+                                LOG.info("用户信息加载成功: userId={}", user.getUserId());
+                            }
+                        } else {
+                            final String msg = response != null ? response.getMessage() : "获取用户信息失败";
+                            errorMessage.set(msg);
+                            LOG.warn("获取用户信息失败: {}", msg);
+                            if (onFailure != null) {
+                                onFailure.accept(msg);
+                            }
                         }
-                    } else {
-                        final String msg = response != null ? response.getMessage() : "获取用户信息失败";
-                        errorMessage.set(msg);
-                        LOG.warn("获取用户信息失败: {}", msg);
-                        if (onFailure != null) {
-                            onFailure.accept(msg);
-                        }
-                    }
+                    });
                 });
     }
 
@@ -183,6 +187,7 @@ public final class ProfileViewModel {
      * 保存用户信息
      */
     public void saveProfile() {
+        LOG.info("【保存用户信息】开始保存用户信息");
         errorMessage.set("");
         successMessage.set("");
 
@@ -208,37 +213,48 @@ public final class ProfileViewModel {
         profile.setBirthday(birthday.get());
         profile.setDetailBio(detailBio.get());
 
+        LOG.info("【保存用户信息】构建用户信息对象: userId={}, username={}, avatar={}, bio={}",
+                profile.getUserId(), profile.getUsername(), profile.getAvatar(), profile.getBio());
+
         UserService.getInstance().updateProfileFull(profile)
                 .thenAcceptAsync(response -> {
-                    loading.set(false);
+                    LOG.info("【保存用户信息】收到响应: success={}, message={}",
+                            response != null ? response.isSuccess() : "null",
+                            response != null ? response.getMessage() : "null");
+                    Platform.runLater(() -> {
+                        loading.set(false);
 
-                    if (response != null && response.isSuccess()) {
-                        successMessage.set("修改成功");
-                        LOG.info("用户信息修改成功");
-                        if (onSuccess != null) {
-                            onSuccess.accept("修改成功");
+                        if (response != null && response.isSuccess()) {
+                            successMessage.set("修改成功");
+                            LOG.info("【保存用户信息】用户信息修改成功");
+                            if (onSuccess != null) {
+                                onSuccess.accept("修改成功");
+                            }
+                            if (onProfileUpdated != null) {
+                                onProfileUpdated.accept(profile);
+                            }
+                        } else {
+                            final String msg = response != null ? response.getMessage() : "修改失败";
+                            errorMessage.set(msg);
+                            LOG.warn("【保存用户信息】用户信息修改失败: {}", msg);
+                            if (onFailure != null) {
+                                onFailure.accept(msg);
+                            }
                         }
-                        if (onProfileUpdated != null) {
-                            onProfileUpdated.accept(profile);
-                        }
-                    } else {
-                        final String msg = response != null ? response.getMessage() : "修改失败";
+                    });
+                })
+                .exceptionally(throwable -> {
+                    Platform.runLater(() -> {
+                        loading.set(false);
+                        final String msg = "保存失败: " + (throwable.getCause() != null
+                                ? throwable.getCause().getMessage()
+                                : throwable.getMessage());
                         errorMessage.set(msg);
-                        LOG.warn("用户信息修改失败: {}", msg);
+                        LOG.error("用户信息修改异常: {}", msg, throwable);
                         if (onFailure != null) {
                             onFailure.accept(msg);
                         }
-                    }
-                })
-                .exceptionally(throwable -> {
-                    loading.set(false);
-                    final String msg = "保存失败: " + (throwable.getCause() != null
-                            ? throwable.getCause().getMessage() : throwable.getMessage());
-                    errorMessage.set(msg);
-                    LOG.error("用户信息修改异常: {}", msg, throwable);
-                    if (onFailure != null) {
-                        onFailure.accept(msg);
-                    }
+                    });
                     return null;
                 });
     }
@@ -254,15 +270,17 @@ public final class ProfileViewModel {
         // 调用新接口，后端会根据当前登录用户自动获取手机号
         UserService.getInstance().sendPasswordSms()
                 .thenAcceptAsync(response -> {
-                    if (response != null && response.isSuccess()) {
-                        successMessage.set("验证码已发送");
-                        startCountdown(sendButton);
-                        LOG.info("验证码发送成功");
-                    } else {
-                        final String msg = response != null ? response.getMessage() : "验证码发送失败";
-                        errorMessage.set(msg);
-                        LOG.warn("验证码发送失败: {}", msg);
-                    }
+                    Platform.runLater(() -> {
+                        if (response != null && response.isSuccess()) {
+                            successMessage.set("验证码已发送");
+                            startCountdown(sendButton);
+                            LOG.info("验证码发送成功");
+                        } else {
+                            final String msg = response != null ? response.getMessage() : "验证码发送失败";
+                            errorMessage.set(msg);
+                            LOG.warn("验证码发送失败: {}", msg);
+                        }
+                    });
                 })
                 .exceptionally(ex -> {
                     LOG.error("发送验证码异常", ex);
@@ -288,7 +306,7 @@ public final class ProfileViewModel {
         }
 
         AuthService.getInstance().sendSmsCode(
-                        new org.example.client.model.SmsSendRequest(phoneValue.replaceAll("\\*", "")))
+                new org.example.client.model.SmsSendRequest(phoneValue.replaceAll("\\*", "")))
                 .thenAcceptAsync(response -> {
                     if (response != null && response.isSuccess()) {
                         successMessage.set("验证码已发送到当前手机");
@@ -322,7 +340,7 @@ public final class ProfileViewModel {
         }
 
         AuthService.getInstance().sendSmsCode(
-                        new org.example.client.model.SmsSendRequest(newPhoneValue))
+                new org.example.client.model.SmsSendRequest(newPhoneValue))
                 .thenAcceptAsync(response -> {
                     if (response != null && response.isSuccess()) {
                         successMessage.set("验证码已发送到新手机");
@@ -343,8 +361,8 @@ public final class ProfileViewModel {
      */
     private void startCountdown(final Button button) {
         button.setDisable(true);
-        final java.util.concurrent.atomic.AtomicInteger seconds =
-                new java.util.concurrent.atomic.AtomicInteger(COUNTDOWN_SECONDS);
+        final java.util.concurrent.atomic.AtomicInteger seconds = new java.util.concurrent.atomic.AtomicInteger(
+                COUNTDOWN_SECONDS);
 
         final javafx.animation.Timeline timeline = new javafx.animation.Timeline(
                 new javafx.animation.KeyFrame(javafx.util.Duration.seconds(1), e -> {

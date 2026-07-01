@@ -193,7 +193,8 @@ public class ServerBroadcastService {
                         return true;
                     }
                 } catch (final NumberFormatException e) {
-                    // 忽略解析错误
+                    // 解析失败说明 IP 格式异常，不属于 172.16-31 段，继续检查
+                    LOG.debug("解析 IP 第二段失败: ip={}", ipAddress, e);
                 }
             }
         }

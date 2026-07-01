@@ -81,6 +81,7 @@ public class AiService {
         profile.setModelProvider(request.getModelProvider());
         profile.setModel(request.getModel());
         profile.setApiKeyEnc(apiKeyEnc);
+        profile.setBaseUrl(request.getBaseUrl());
         profile.setIsGroup(request.getIsGroup() != null ? request.getIsGroup() : false);
         profile.setTemperature(
                 request.getTemperature() != null ? request.getTemperature() : aiConfig.getDefaultTemperature());
@@ -125,6 +126,9 @@ public class AiService {
         if (request.getApiKey() != null) {
             final String apiKeyEnc = AesKeyUtil.encrypt(request.getApiKey(), getEncryptionKey());
             profile.setApiKeyEnc(apiKeyEnc);
+        }
+        if (request.getBaseUrl() != null) {
+            profile.setBaseUrl(request.getBaseUrl());
         }
         if (request.getIsGroup() != null) {
             profile.setIsGroup(request.getIsGroup());
@@ -188,9 +192,13 @@ public class AiService {
                 .name(profile.getName())
                 .avatar(profile.getAvatar())
                 .persona(profile.getPersona())
+                .systemPrompt(profile.getSystemPrompt())
                 .modelProvider(profile.getModelProvider())
                 .model(profile.getModel())
+                .baseUrl(profile.getBaseUrl())
                 .isGroup(profile.getIsGroup())
+                .temperature(profile.getTemperature())
+                .maxTokens(profile.getMaxTokens())
                 .build();
     }
 }

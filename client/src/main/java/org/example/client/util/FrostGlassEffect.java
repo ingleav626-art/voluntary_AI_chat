@@ -11,6 +11,8 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 毛玻璃磨砂效果工具（方案A：Snapshot + GaussianBlur）
@@ -29,6 +31,8 @@ import javafx.scene.paint.Color;
  * @since 1.0.0
  */
 public final class FrostGlassEffect {
+
+    private static final Logger LOG = LoggerFactory.getLogger(FrostGlassEffect.class);
 
     /** 默认高斯模糊半径（像素） */
     private static final double DEFAULT_BLUR_RADIUS = 20.0;
@@ -230,7 +234,8 @@ public final class FrostGlassEffect {
                 blurView.setImage(snapshot);
             }
         } catch (final IllegalStateException e) {
-            // 快照失败时静默处理，避免影响主流程
+            // 快照失败时记录日志，不影响主流程
+            LOG.debug("FrostGlass 快照失败: {}", e.getMessage());
         }
     }
 }

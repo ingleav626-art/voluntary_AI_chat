@@ -119,6 +119,7 @@ public class AiGroupConfigService {
                             .triggerKeywords(config.getTriggerKeywords())
                             .triggerProbability(config.getTriggerProbability())
                             .isEnabled(config.getIsEnabled())
+                            .cooldownSeconds(config.getCooldownSeconds())
                             .build();
                 })
                 .collect(Collectors.toList());

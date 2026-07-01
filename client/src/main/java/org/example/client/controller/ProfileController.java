@@ -33,7 +33,9 @@ import org.slf4j.LoggerFactory;
 /**
  * 个人设置控制器
  *
- * <p>负责个人信息的展示、修改、密码修改、手机号修改等交互。</p>
+ * <p>
+ * 负责个人信息的展示、修改、密码修改、手机号修改等交互。
+ * </p>
  *
  * @author voluntary-ai-chat
  * @since 1.0.0
@@ -163,8 +165,8 @@ public final class ProfileController implements Initializable {
         genderComboBox.getSelectionModel().selectFirst();
 
         // 初始化年龄 Spinner
-        final SpinnerValueFactory.IntegerSpinnerValueFactory ageFactory =
-                new SpinnerValueFactory.IntegerSpinnerValueFactory(0, 200, 0);
+        final SpinnerValueFactory.IntegerSpinnerValueFactory ageFactory = new SpinnerValueFactory.IntegerSpinnerValueFactory(
+                0, 200, 0);
         ageSpinner.setValueFactory(ageFactory);
 
         // 绑定属性
@@ -190,7 +192,8 @@ public final class ProfileController implements Initializable {
         viewModel.avatarProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null && !newVal.isEmpty()) {
                 try {
-                    final Image avatarImage = new Image(newVal, true);
+                    final String fullUrl = resolveImageUrl(newVal);
+                    final Image avatarImage = new Image(fullUrl, true);
                     avatarImage.progressProperty().addListener((o, oldP, newP) -> {
                         if (newP.doubleValue() >= 1.0 && !avatarImage.isError()) {
                             avatarCircle.setFill(new ImagePattern(avatarImage));
@@ -300,9 +303,9 @@ public final class ProfileController implements Initializable {
      */
     private void showError(final String message) {
         profileMessageLabel.setStyle("-fx-text-fill: #e74c3c;");
-        profileMessageLabel.setText(message);
         securityMessageLabel.setStyle("-fx-text-fill: #e74c3c;");
-        securityMessageLabel.setText(message);
+        // 通过 ViewModel 设置消息，而不是直接设置 label（因为 label 已经绑定）
+        viewModel.errorMessageProperty().set(message);
     }
 
     /**
@@ -312,9 +315,9 @@ public final class ProfileController implements Initializable {
      */
     private void showSuccess(final String message) {
         profileMessageLabel.setStyle("-fx-text-fill: #27ae60;");
-        profileMessageLabel.setText(message);
         securityMessageLabel.setStyle("-fx-text-fill: #27ae60;");
-        securityMessageLabel.setText(message);
+        // 通过 ViewModel 设置消息，而不是直接设置 label（因为 label 已经绑定）
+        viewModel.successMessageProperty().set(message);
     }
 
     // ========== 事件处理 ==========
@@ -383,8 +386,7 @@ public final class ProfileController implements Initializable {
         final javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
         fileChooser.setTitle("选择头像图片");
         fileChooser.getExtensionFilters().addAll(
-                new javafx.stage.FileChooser.ExtensionFilter("图片文件", "*.jpg", "*.jpeg", "*.png", "*.gif", "*.webp")
-        );
+                new javafx.stage.FileChooser.ExtensionFilter("图片文件", "*.jpg", "*.jpeg", "*.png", "*.gif", "*.webp"));
 
         final java.io.File selectedFile = fileChooser.showOpenDialog(dialogStage);
         if (selectedFile != null) {
@@ -399,7 +401,8 @@ public final class ProfileController implements Initializable {
      * @param file 图片文件
      */
     private void uploadAvatar(final java.io.File file) {
-        LOG.info("上传头像: {}", file.getName());
+        LOG.info("【头像上传】开始上传头像: fileName={}, filePath={}, fileSize={}", file.getName(), file.getAbsolutePath(),
+                file.length());
 
         // 检查文件大小（最大 10MB）
         final long maxSize = 10 * 1024 * 1024;
@@ -420,34 +423,37 @@ public final class ProfileController implements Initializable {
             LOG.warn("头像预览失败", e);
         }
 
-        // 显示加载状态
-        profileLoadingIndicator.setVisible(true);
-        saveProfileButton.setDisable(true);
+        // 显示加载状态（通过 ViewModel 控制，因为 UI 组件已绑定）
+        viewModel.loadingProperty().set(true);
 
-        // 调用图片上传接口
-        org.example.client.service.ChatService.getInstance()
-                .uploadImage(file.toPath())
+        // 调用专用头像上传接口
+        LOG.info("【头像上传】调用 UserService.uploadAvatar 接口: {}", file.toPath());
+        org.example.client.service.UserService.getInstance()
+                .uploadAvatar(file.toPath())
                 .thenAcceptAsync(response -> {
+                    LOG.info("【头像上传】收到响应: success={}, message={}", response != null ? response.isSuccess() : "null",
+                            response != null ? response.getMessage() : "null");
                     Platform.runLater(() -> {
-                        profileLoadingIndicator.setVisible(false);
-                        saveProfileButton.setDisable(false);
+                        // 隐藏加载状态（通过 ViewModel 控制，因为 UI 组件已绑定）
+                        viewModel.loadingProperty().set(false);
 
                         if (response != null && response.isSuccess() && response.getData() != null) {
-                            // 更新头像 URL 到 ViewModel
-                            final String avatarUrl = response.getData().getUrl();
-                            // 防御性校验：服务端返回的 URL 为空时不应写入 ViewModel，
-                            // 否则保存时空字符串会覆盖原头像，导致头像被清空
-                            if (avatarUrl == null || avatarUrl.trim().isEmpty()) {
+                            // 服务端返回相对路径 URL（如 /avatars/xxx.jpg）
+                            final String avatarRelativeUrl = response.getData();
+                            LOG.info("【头像上传】服务端返回的 avatar URL: {}", avatarRelativeUrl);
+                            if (avatarRelativeUrl == null || avatarRelativeUrl.trim().isEmpty()) {
                                 showError("头像上传失败：服务端未返回有效URL");
-                                LOG.warn("头像上传响应缺少 url 字段: {}", response.getData());
+                                LOG.warn("【头像上传】响应缺少 url 字段");
                                 return;
                             }
-                            viewModel.avatarProperty().set(avatarUrl);
+                            viewModel.avatarProperty().set(avatarRelativeUrl);
+                            LOG.info("【头像上传】已设置 viewModel.avatarProperty: {}", avatarRelativeUrl);
                             showSuccess("头像上传成功，请点击保存按钮保存");
 
-                            // 用服务端 URL 重新加载头像
+                            // 用完整 URL 重新加载头像
+                            final String fullUrl = resolveImageUrl(avatarRelativeUrl);
                             try {
-                                final Image serverImage = new Image(avatarUrl, true);
+                                final Image serverImage = new Image(fullUrl, true);
                                 serverImage.progressProperty().addListener((o, oldP, newP) -> {
                                     if (newP.doubleValue() >= 1.0 && !serverImage.isError()) {
                                         avatarCircle.setFill(new ImagePattern(serverImage));
@@ -456,7 +462,7 @@ public final class ProfileController implements Initializable {
                             } catch (final Exception e) {
                                 LOG.warn("从服务端加载头像失败", e);
                             }
-                            LOG.info("头像上传成功: {}", avatarUrl);
+                            LOG.info("头像上传成功: {}", avatarRelativeUrl);
                         } else {
                             final String msg = response != null ? response.getMessage() : "上传失败";
                             showError(msg);
@@ -465,19 +471,34 @@ public final class ProfileController implements Initializable {
                     });
                 })
                 .exceptionally(throwable -> {
-                    // 上传过程发生异常（如文件读取失败、网络中断、响应解析异常等），
-                    // 必须重置 UI 状态，否则加载指示器不消失、保存按钮一直禁用，导致头像无法保存
+                    LOG.error("【头像上传】上传异常: {}", throwable.getMessage(), throwable);
                     Platform.runLater(() -> {
-                        profileLoadingIndicator.setVisible(false);
-                        saveProfileButton.setDisable(false);
+                        // 隐藏加载状态（通过 ViewModel 控制，因为 UI 组件已绑定）
+                        viewModel.loadingProperty().set(false);
                         final String msg = "头像上传失败: "
                                 + (throwable.getCause() != null
-                                        ? throwable.getCause().getMessage() : throwable.getMessage());
+                                        ? throwable.getCause().getMessage()
+                                        : throwable.getMessage());
                         showError(msg);
-                        LOG.error("头像上传异常", throwable);
+                        LOG.error("【头像上传】显示错误消息: {}", msg);
                     });
                     return null;
                 });
+    }
+
+    /**
+     * 将相对路径 URL 解析为完整的可访问 URL
+     *
+     * <p>
+     * 服务端返回的 avatar URL 是相对路径（如 /avatars/xxx.jpg），
+     * 需要拼接服务器地址才能在 JavaFX Image 中加载。
+     * </p>
+     *
+     * @param relativeUrl 相对路径 URL
+     * @return 完整 URL
+     */
+    private static String resolveImageUrl(final String relativeUrl) {
+        return org.example.client.util.ImageUtils.resolveImageUrl(relativeUrl);
     }
 
     // ========== Setter ==========

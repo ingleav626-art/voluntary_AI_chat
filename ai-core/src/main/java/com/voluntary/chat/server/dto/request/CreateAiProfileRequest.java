@@ -30,6 +30,8 @@ public class CreateAiProfileRequest {
     @NotBlank(message = "API Key 不能为空")
     private String apiKey;
 
+    private String baseUrl;
+
     private Boolean isGroup;
 
     private Double temperature;

@@ -43,16 +43,21 @@ import java.util.stream.Collectors;
  * 处理群组的创建、管理、成员操作等业务逻辑。
  * </p>
  *
- * <p>原GroupService.java已拆分为三个更小的服务类，符合AGENTS.md的文件规范（≤400行）：</p>
+ * <p>
+ * 原GroupService.java已拆分为三个更小的服务类，符合AGENTS.md的文件规范（≤400行）：
+ * </p>
  * <ul>
- *   <li><strong>GroupCoreService</strong>：核心群组操作（创建、查询、修改、解散）</li>
- *   <li><strong>GroupMemberService</strong>：成员管理（邀请、移除、退出、成员列表、昵称）</li>
- *   <li><strong>GroupRoleService</strong>：权限管理（转让群主、设置管理员、角色验证）</li>
+ * <li><strong>GroupCoreService</strong>：核心群组操作（创建、查询、修改、解散）</li>
+ * <li><strong>GroupMemberService</strong>：成员管理（邀请、移除、退出、成员列表、昵称）</li>
+ * <li><strong>GroupRoleService</strong>：权限管理（转让群主、设置管理员、角色验证）</li>
  * </ul>
  *
- * <p>请直接使用上述三个服务类，不要使用GroupService。</p>
+ * <p>
+ * 请直接使用上述三个服务类，不要使用GroupService。
+ * </p>
  *
- * @deprecated 已拆分为 {@link GroupCoreService}、{@link GroupMemberService}、{@link GroupRoleService}
+ * @deprecated 已拆分为
+ *             {@link GroupCoreService}、{@link GroupMemberService}、{@link GroupRoleService}
  * @author voluntary-ai-chat
  * @since 1.0.0
  */
@@ -559,6 +564,24 @@ public class GroupService {
 
         // 逻辑删除所有群成员
         groupMemberMapper.logicalDeleteByGroupId(groupId);
+
+        // 修复：逻辑删除该群的所有历史消息（避免孤儿消息）
+        // 修复原因：解散群时如果不删除消息，会留下"幽灵消息"，
+        // 后续 message 表里还能查到，但 group/chat_group 中已不存在该群
+        // 导致用户能看到群ID但群已不存在，逻辑不一致
+        try {
+            final LambdaQueryWrapper<Message> msgWrapper = new LambdaQueryWrapper<>();
+            msgWrapper.eq(Message::getSessionId, "g_" + groupId);
+            final List<Message> groupMessages = messageMapper.selectList(msgWrapper);
+            if (!groupMessages.isEmpty()) {
+                for (final Message msg : groupMessages) {
+                    messageMapper.deleteById(msg.getId());
+                }
+                log.info("群组 {} 解散时，清理了 {} 条历史消息", groupId, groupMessages.size());
+            }
+        } catch (Exception e) {
+            log.warn("清理群历史消息失败: groupId={}", groupId, e);
+        }
 
         // 删除群缓存
         groupCacheService.deleteGroupCache(groupId);

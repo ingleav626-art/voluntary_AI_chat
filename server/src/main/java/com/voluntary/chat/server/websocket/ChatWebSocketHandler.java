@@ -179,6 +179,10 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
         request.setType((String) data.get("msgType"));
         request.setContent((String) data.get("content"));
 
+        log.info("[MSG-SEND] senderId={}, sessionId={}, type={}, contentLen={}",
+                senderId, request.getSessionId(), request.getType(),
+                request.getContent() != null ? request.getContent().length() : 0);
+
         final SendMessageResponse response = messageService.sendMessage(senderId, request);
 
         // 更新会话缓存：最后一条消息 + 会话列表排序
@@ -202,7 +206,22 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
                 .build();
         sendToUser(senderId, ackMsg);
 
-        final User sender = userService.findById(senderId);
+        // 关键修复：容错处理发送方用户不存在的情况
+        // 原因：测试阶段可能出现孤儿数据（如解散群时未清理 message 表），
+        // 或者用户因数据库重置/迁移导致 message 中存在但 user 中不存在
+        // 处理：使用 senderId 构造虚拟 User 对象，保证消息路由不中断
+        User sender;
+        try {
+            sender = userService.findById(senderId);
+        } catch (final Exception e) {
+            log.warn("发送方用户不存在，使用虚拟用户继续发送: userId={}, error={}",
+                    senderId, e.getMessage());
+            sender = new User();
+            sender.setId(senderId);
+            final String idStr = senderId.toString();
+            sender.setUsername("用户" + idStr.substring(0, Math.min(4, idStr.length())));
+            sender.setAvatar(null);
+        }
 
         if (request.getSessionId().startsWith("g_")) {
             broadcastGroupMessage(senderId, sender, request, response);
@@ -263,7 +282,7 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
 
         log.info("群消息广播: groupId={}, senderId={}, memberCount={}", groupId, senderId, groupMembers.size());
 
-        triggerGroupAi(groupId, senderId, request.getContent());
+        triggerGroupAi(groupId, senderId, sender.getUsername(), request.getContent());
     }
 
     private void forwardPrivateMessage(final Long senderId, final User sender,
@@ -565,6 +584,66 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
                 .data(Map.of("groupId", groupId))
                 .build();
         broadcastToGroup("g_" + groupId, message);
+    }
+
+    // ======================== 通知推送 ========================
+
+    /**
+     * 向指定用户推送系统通知
+     * <p>
+     * 支持多种通知场景：新消息提醒、AI 主动问候、待办提醒、系统事件。
+     * 客户端收到后根据 type 显示对应的通知样式（托盘气泡/应用内横幅）。
+     * </p>
+     *
+     * @param userId    目标用户ID
+     * @param notifType 通知子类型（NOTIFICATION_NEW_MESSAGE / NOTIFICATION_AI_GREETING 等）
+     * @param title     通知标题
+     * @param content   通知正文
+     * @param sessionId 可选，关联的会话ID，点击通知后跳转
+     */
+    public void sendNotification(final Long userId, final String notifType,
+            final String title, final String content,
+            final String sessionId) {
+        final Map<String, Object> data = new LinkedHashMap<>();
+        data.put("notifType", notifType);
+        data.put("title", title);
+        data.put("content", content);
+        if (sessionId != null) {
+            data.put("sessionId", sessionId);
+        }
+
+        final WebSocketMessage message = WebSocketMessage.builder()
+                .id(String.valueOf(System.currentTimeMillis()))
+                .type(MessageTypes.NOTIFICATION)
+                .data(data)
+                .build();
+        sendToUser(userId, message);
+    }
+
+    /**
+     * 向指定用户推送待办提醒通知
+     */
+    public void sendTodoNotification(final Long userId, final String title,
+            final String content) {
+        sendNotification(userId, MessageTypes.NOTIFICATION_TODO_REMINDER,
+                title, content, null);
+    }
+
+    /**
+     * 向指定用户推送通知设置已变更通知
+     * <p>
+     * 当其他设备修改了通知设置时，通知当前设备刷新设置。
+     * </p>
+     *
+     * @param userId 目标用户ID
+     */
+    public void sendSettingsChangedNotification(final Long userId) {
+        final WebSocketMessage message = WebSocketMessage.builder()
+                .id(String.valueOf(System.currentTimeMillis()))
+                .type(MessageTypes.NOTIFICATION_SETTINGS_CHANGED)
+                .data(Map.of("message", "通知设置已在其他设备修改"))
+                .build();
+        sendToUser(userId, message);
     }
 
     // ======================== 其他工具 ========================

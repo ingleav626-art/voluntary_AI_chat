@@ -239,6 +239,7 @@ class AiServiceTest {
         request.setModelProvider("deepseek");
         request.setModel("deepseek-chat");
         request.setApiKey("sk-test-key");
+        request.setBaseUrl("https://custom.api.com/v1");
         request.setIsGroup(true);
         request.setTemperature(0.5);
         request.setMaxTokens(4096);
@@ -258,6 +259,7 @@ class AiServiceTest {
         assertTrue(savedProfile.getIsGroup());
         assertEquals(0.5, savedProfile.getTemperature());
         assertEquals(4096, savedProfile.getMaxTokens());
+        assertEquals("https://custom.api.com/v1", savedProfile.getBaseUrl());
     }
 
     @Test
@@ -276,6 +278,7 @@ class AiServiceTest {
         request.setSystemPrompt("新system prompt");
         request.setModel("gpt-4-turbo");
         request.setApiKey("sk-new-key");
+        request.setBaseUrl("https://new.api.com/v1");
         request.setIsGroup(true);
         request.setTemperature(0.8);
         request.setMaxTokens(8192);
@@ -295,6 +298,7 @@ class AiServiceTest {
         assertTrue(updated.getIsGroup());
         assertEquals(0.8, updated.getTemperature());
         assertEquals(8192, updated.getMaxTokens());
+        assertEquals("https://new.api.com/v1", updated.getBaseUrl());
     }
 
     @Test

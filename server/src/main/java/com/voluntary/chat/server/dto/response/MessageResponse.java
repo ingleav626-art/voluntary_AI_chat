@@ -20,4 +20,9 @@ public class MessageResponse {
     private String extra;
     private LocalDateTime createTime;
     private boolean recalled;
+    /**
+     * 是否已读（仅对当前用户发送的消息有效）
+     * 修复：解决已读未读状态丢失问题，需要从 message_read 表查询
+     */
+    private boolean read;
 }

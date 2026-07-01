@@ -69,6 +69,7 @@ public class AiWebSocketHandler extends TextWebSocketHandler implements AiStream
     protected void handleTextMessage(WebSocketSession session, TextMessage textMessage) throws Exception {
         final Long userId = getUserId(session);
         if (userId == null) {
+            log.warn("WebSocket 收到消息但 userId 为空: sessionId={}", session.getId());
             return;
         }
 
@@ -76,9 +77,13 @@ public class AiWebSocketHandler extends TextWebSocketHandler implements AiStream
         try {
             wsMessage = objectMapper.readValue(textMessage.getPayload(), WebSocketMessage.class);
         } catch (final JsonProcessingException e) {
-            log.warn("WebSocket 消息解析失败: userId={}, error={}", userId, e.getMessage());
+            log.warn("WebSocket 消息解析失败: userId={}, error={}, payload={}",
+                    userId, e.getMessage(), textMessage.getPayload());
             return;
         }
+
+        log.debug("[WS-RECV] userId={}, type={}, messageId={}",
+                userId, wsMessage.getType(), wsMessage.getId());
 
         switch (wsMessage.getType()) {
             case MessageTypes.AI_CHAT -> handleAiChat(userId, wsMessage);
@@ -162,7 +167,8 @@ public class AiWebSocketHandler extends TextWebSocketHandler implements AiStream
     /**
      * 群聊 AI 触发检查
      */
-    protected void triggerGroupAi(final Long groupId, final Long senderId, final String content) {
+    protected void triggerGroupAi(final Long groupId, final Long senderId,
+            final String senderName, final String content) {
         try {
             final List<AiGroupConfig> enabledConfigs = aiGroupConfigService.getEnabledConfigs(groupId);
             if (enabledConfigs == null || enabledConfigs.isEmpty()) {
@@ -172,10 +178,9 @@ public class AiWebSocketHandler extends TextWebSocketHandler implements AiStream
             for (final AiGroupConfig config : enabledConfigs) {
                 final Long aiId = config.getAiId();
                 if (aiGroupConfigService.checkTrigger(groupId, content, aiId)) {
-                    final String sessionId = "g_" + groupId + "_a_" + aiId;
                     final String messageId = "group_ai_" + System.currentTimeMillis() + "_" + aiId;
                     log.info("群聊AI触发: groupId={}, aiId={}, senderId={}", groupId, aiId, senderId);
-                    aiChatService.handleAiChat(senderId, aiId, sessionId, content, messageId);
+                    aiChatService.handleGroupAiChat(groupId, senderId, senderName, aiId, content, messageId);
                 }
             }
         } catch (final Exception e) {

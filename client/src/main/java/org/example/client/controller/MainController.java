@@ -37,8 +37,12 @@ import org.slf4j.LoggerFactory;
 /**
  * 主界面控制器
  *
- * <p>负责会话列表展示、会话切换、聊天区域交互。</p>
- * <p>顶部标题栏和功能侧边栏由 TopBarController 和 FunctionBarController 分别管理。</p>
+ * <p>
+ * 负责会话列表展示、会话切换、聊天区域交互。
+ * </p>
+ * <p>
+ * 顶部标题栏和功能侧边栏由 TopBarController 和 FunctionBarController 分别管理。
+ * </p>
  *
  * @author voluntary-ai-chat
  * @since 1.0.0
@@ -225,9 +229,11 @@ public final class MainController implements Initializable {
     /**
      * 挂载毛玻璃效果到顶栏和功能栏
      *
-     * <p>方案A 实现：截取根节点快照并应用高斯模糊，
+     * <p>
+     * 方案A 实现：截取根节点快照并应用高斯模糊，
      * 在顶栏和功能栏底层显示模糊背景，模拟 Win11/macOS 毛玻璃质感。
-     * 仅在窗口尺寸变化时更新快照，避免性能问题。</p>
+     * 仅在窗口尺寸变化时更新快照，避免性能问题。
+     * </p>
      */
     private void setupFrostGlass() {
         try {
@@ -544,6 +550,12 @@ public final class MainController implements Initializable {
             }
             avatarText.setText(!displayName.isEmpty() ? String.valueOf(displayName.charAt(0)) : "?");
 
+            // 加载真实头像图片（如果有）
+            if (item.getTargetAvatar() != null && !item.getTargetAvatar().isEmpty()) {
+                org.example.client.util.ImageUtils.loadAvatarToPane(
+                        item.getTargetAvatar(), avatarPane, 36);
+            }
+
             name.setText(displayName);
             time.setText(formatTime(item.getLastMessageTime()));
             lastMsg.setText(item.getLastMessage() != null ? item.getLastMessage() : "");
@@ -720,8 +732,10 @@ public final class MainController implements Initializable {
                                 sizeText = fileSize + " B";
                             }
                         }
-                    } catch (final Exception ignored) {
-                        // 忽略解析错误
+                    } catch (final Exception e) {
+                        // 解析 extra 失败，记录日志不影响 UI 显示
+                        LOG.debug("解析消息 extra 字段失败: messageId={}, extra={}",
+                                item.getMessageId(), item.getExtra(), e);
                     }
                 }
                 final Label sizeLabel = new Label(sizeText);
@@ -829,7 +843,9 @@ public final class MainController implements Initializable {
         /**
          * 判断是否需要显示时间分割线
          *
-         * <p>规则：第一条消息、跨日期、或与上一条间隔超过5分钟时显示。</p>
+         * <p>
+         * 规则：第一条消息、跨日期、或与上一条间隔超过5分钟时显示。
+         * </p>
          *
          * @param current 当前消息
          * @return 是否显示分割线
@@ -889,7 +905,9 @@ public final class MainController implements Initializable {
         /**
          * 格式化分割线时间文字
          *
-         * <p>今天显示 HH:mm，昨天显示"昨天 HH:mm"，同年显示"MM月dd日 HH:mm"，跨年显示完整日期。</p>
+         * <p>
+         * 今天显示 HH:mm，昨天显示"昨天 HH:mm"，同年显示"MM月dd日 HH:mm"，跨年显示完整日期。
+         * </p>
          *
          * @param time 消息时间
          * @return 格式化后的时间文字

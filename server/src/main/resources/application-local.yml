@@ -117,3 +117,5 @@ upload:
   image:
     dir: ${app.data.dir}/uploads/chat/images
     base-url: http://localhost:8080/files
+  avatar:
+    base-url: http://localhost:8080/avatars

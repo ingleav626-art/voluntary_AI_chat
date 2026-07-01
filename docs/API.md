@@ -401,6 +401,21 @@ GET /api/friend/list
 DELETE /api/friend/{friendId}
 ```
 
+### 3.6 修改好友备注
+
+```
+PUT /api/friend/{friendId}/remark
+```
+
+**请求**：
+```json
+{
+  "remark": "四哥"
+}
+```
+
+`remark` 最长 50 字符，传空字符串可清除备注。
+
 ---
 
 ## 四、群组模块 `/api/group`
@@ -595,7 +610,7 @@ POST /api/message/read
 ```json
 {
   "sessionId": "p_1001_1002",
-  "lastMessageId": 5001
+  "messageIds": [5001, 5002]
 }
 ```
 
@@ -632,7 +647,118 @@ GET /api/conversation/list
 
 ---
 
-## 七、WebSocket 实时通信
+## 七、文件上传模块 `/api/file`
+
+### 7.1 上传用户头像
+
+```
+POST /api/file/upload/avatar
+Content-Type: multipart/form-data
+
+file: <binary>
+```
+
+**响应**：
+```json
+{
+  "code": 200,
+  "message": "上传成功",
+  "data": "http://your-server.com/avatars/abc123.jpg"
+}
+```
+
+上传后返回头像 URL，前端需再调用 `PUT /api/user/profile` 将 URL 保存到用户信息。
+图片自动裁剪为 256×256 正方形（取中心区域）。支持 JPEG/PNG/GIF/WebP，最大 10MB。
+
+### 7.2 上传群组头像
+
+```
+POST /api/file/upload/group-avatar
+Content-Type: multipart/form-data
+
+file: <binary>
+```
+
+**响应**：同 7.1，返回头像 URL。前端需再调用 `PUT /api/group/{groupId}` 将 URL 保存到群信息。
+
+---
+
+## 八、通知模块 `/api/notification`
+
+### 8.1 获取通知设置
+
+```
+GET /api/notification/settings
+```
+
+**Header**：`Authorization: Bearer <token>`
+
+**响应**：
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "messageNotification": true,
+    "messageSound": true,
+    "aiGreetingNotification": true,
+    "aiGreetingSound": true,
+    "todoReminder": true,
+    "todoSound": true,
+    "doNotDisturb": false,
+    "dndStartTime": "22:00:00",
+    "dndEndTime": "09:00:00",
+    "mergeWindowSeconds": 5
+  }
+}
+```
+
+**字段说明**：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| messageNotification | boolean | 新消息通知开关 |
+| messageSound | boolean | 新消息声音开关 |
+| aiGreetingNotification | boolean | AI 主动问候通知开关 |
+| aiGreetingSound | boolean | AI 问候声音开关 |
+| todoReminder | boolean | 待办提醒开关 |
+| todoSound | boolean | 待办声音开关 |
+| doNotDisturb | boolean | 免打扰模式开关 |
+| dndStartTime | string | 免打扰开始时间（HH:mm:ss） |
+| dndEndTime | string | 免打扰结束时间（HH:mm:ss） |
+| mergeWindowSeconds | int | 通知合并窗口（秒），范围 1-300 |
+
+> **说明**：未设置过通知的用户返回系统默认值（如上所示）。
+
+### 8.2 更新通知设置
+
+```
+PUT /api/notification/settings
+```
+
+**Header**：`Authorization: Bearer <token>`
+
+**请求体**（部分更新，只需传入要修改的字段）：
+```json
+{
+  "messageNotification": false,
+  "doNotDisturb": true,
+  "dndStartTime": "23:00:00",
+  "dndEndTime": "08:00:00",
+  "mergeWindowSeconds": 10
+}
+```
+
+**响应**：返回更新后的完整通知设置（同 GET 响应格式）。
+
+**校验规则**：
+- `mergeWindowSeconds`：范围 1-300，超出返回 400 参数校验错误
+- 其他 boolean 字段：`true` / `false`
+- 时间字段格式：`HH:mm:ss`
+
+---
+
+## 九、WebSocket 实时通信
 
 ### 连接地址
 
@@ -673,8 +799,45 @@ wss://your-cloud-server.com/ws?token=<accessToken>
 | `GROUP_MEMBER_ROLE_CHANGE` | 服务端 → 客户端 | 成员角色变更 |
 | `GROUP_INFO_CHANGE` | 服务端 → 客户端 | 群信息变更 |
 | `GROUP_DISMISSED` | 服务端 → 客户端 | 群被解散 |
+| `NOTIFICATION` | 服务端 → 客户端 | 系统通知（含新消息、AI问候、待办等子类型） |
+| `NOTIFICATION_SETTINGS_CHANGED` | 服务端 → 客户端 | 通知设置已在其他设备修改，需刷新 |
 
-### 消息 payload 格式
+### 新消息类型 payload 格式
+
+**NOTIFICATION（系统通知）**
+```json
+{
+  "type": "NOTIFICATION",
+  "id": "1719398400000",
+  "data": {
+    "notifType": "NOTIFICATION_NEW_MESSAGE",
+    "title": "张三",
+    "content": "你好，明天见",
+    "sessionId": "p_1001_1002"
+  }
+}
+```
+
+`notifType` 取值：
+
+| notifType | 场景 | 建议的客户端展示方式 |
+|-----------|------|---------------------|
+| `NOTIFICATION_NEW_MESSAGE` | 收到新消息 | 托盘气泡 / 应用内横幅 + 声音 |
+| `NOTIFICATION_AI_GREETING` | AI 主动问候 | 托盘气泡 / 应用内横幅 + 柔和声音 |
+| `NOTIFICATION_TODO_REMINDER` | 待办提醒 | 托盘气泡 + 持续提示音（不可忽略）|
+| `NOTIFICATION_SYSTEM_EVENT` | 系统事件（断线、强制下线等）| 托盘气泡 / 应用内横幅 |
+
+**NOTIFICATION_SETTINGS_CHANGED**
+```json
+{
+  "type": "NOTIFICATION_SETTINGS_CHANGED",
+  "id": "1719398400000",
+  "data": {
+    "message": "通知设置已在其他设备修改"
+  }
+}
+```
+> 客户端收到此消息后应自动调用 `GET /api/notification/settings` 刷新本地通知配置。
 
 **SEND_MESSAGE / RECEIVE_MESSAGE**
 ```json
@@ -760,7 +923,7 @@ wss://your-cloud-server.com/ws?token=<accessToken>
 
 ---
 
-## 八、本地 AI 引擎 API（客户包独有）
+## 十、本地 AI 引擎 API（客户包独有）
 
 **客户包不启动内嵌服务器**。以下 API 通过 `LocalAiEngine` POJO 方法调用实现。
 
@@ -817,6 +980,57 @@ engine.chat(request, new AiStreamCallback() {
 | GET | `/api/ai/group/{groupId}/configs` | 获取群 AI 配置 |
 | GET | `/api/ai/{aiId}/memories` | 获取 AI 记忆 |
 
+#### AI 角色字段
+
+**CreateAiProfileRequest（POST `/api/ai/create`）**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| name | String | 是 | AI 名称（最长 50 字符） |
+| avatar | String | 否 | AI 头像 URL |
+| persona | String | 否 | AI 人设/性格描述（最长 2000 字符） |
+| systemPrompt | String | 否 | 系统提示词 |
+| modelProvider | String | 是 | 模型提供商：openai/deepseek/qwen/zhipu/custom |
+| model | String | 是 | 模型名称 |
+| apiKey | String | 是 | API Key（明文传输，服务端加密存储） |
+| baseUrl | String | 否 | API 基准地址（可选，用于自定义 API endpoint） |
+| isGroup | Boolean | 否 | 是否可用于群聊（默认 false） |
+| temperature | Double | 否 | 温度参数（默认 0.7） |
+| maxTokens | Integer | 否 | 最大 Token 数（默认 2048） |
+
+**UpdateAiProfileRequest（PUT `/api/ai/{aiId}`）**
+
+所有字段均为可选，非 null 字段才会更新。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| name | String | AI 名称 |
+| avatar | String | AI 头像 URL |
+| persona | String | AI 人设 |
+| systemPrompt | String | 系统提示词 |
+| model | String | 模型名称 |
+| apiKey | String | API Key（明文，服务端加密存储） |
+| baseUrl | String | API 基准地址 |
+| isGroup | Boolean | 是否可用于群聊 |
+| temperature | Double | 温度参数 |
+| maxTokens | Integer | 最大 Token 数 |
+
+**AiProfileResponse**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| aiId | Long | AI 角色 ID |
+| name | String | AI 名称 |
+| avatar | String | AI 头像 URL |
+| persona | String | AI 人设 |
+| systemPrompt | String | 系统提示词 |
+| modelProvider | String | 模型提供商 |
+| model | String | 模型名称 |
+| baseUrl | String | API 基准地址 |
+| isGroup | Boolean | 是否可用于群聊 |
+| temperature | Double | 温度参数 |
+| maxTokens | Integer | 最大 Token 数 |
+
 ### 本地健康检查端点（ai-core 模块）
 
 嵌入式模式下的健康检查端点，由 `LocalController` 提供：
@@ -827,7 +1041,7 @@ engine.chat(request, new AiStreamCallback() {
 
 ---
 
-## 九、错误处理
+## 十一、错误处理
 
 ### 成功响应 (code=200)
 

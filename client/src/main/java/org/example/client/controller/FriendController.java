@@ -183,26 +183,7 @@ public final class FriendController implements Initializable {
 
             // 如果有头像URL，尝试加载图片
             if (item.getAvatar() != null && !item.getAvatar().isEmpty()) {
-                try {
-                    final javafx.scene.image.Image image =
-                            new javafx.scene.image.Image(item.getAvatar(), true);
-                    final javafx.scene.image.ImageView avatarImage =
-                            new javafx.scene.image.ImageView(image);
-                    avatarImage.setFitWidth(36);
-                    avatarImage.setFitHeight(36);
-                    // 圆形裁剪
-                    final javafx.scene.shape.Circle clip = new javafx.scene.shape.Circle(18);
-                    avatarImage.setClip(clip);
-                    // 图片加载失败时显示默认头像
-                    image.errorProperty().addListener((obs, oldVal, newVal) -> {
-                        if (newVal) {
-                            avatarPane.getChildren().setAll(avatarCircle, avatarText);
-                        }
-                    });
-                    avatarPane.getChildren().setAll(avatarImage);
-                } catch (final Exception e) {
-                    // 图片加载失败，保持默认头像
-                }
+                org.example.client.util.ImageUtils.loadAvatarToPane(item.getAvatar(), avatarPane, 36);
             }
 
             final VBox info = new VBox(2);

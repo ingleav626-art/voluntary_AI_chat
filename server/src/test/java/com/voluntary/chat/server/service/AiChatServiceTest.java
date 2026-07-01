@@ -59,6 +59,9 @@ class AiChatServiceTest {
     private AiMemoryService aiMemoryService;
 
     @Mock
+    private UserService userService;
+
+    @Mock
     private ChatWebSocketHandler webSocketHandler;
 
     private static final Long USER_ID = 1001L;
@@ -67,7 +70,8 @@ class AiChatServiceTest {
 
     @BeforeEach
     void setUp() {
-        aiChatService = new AiChatService(aiService, openAiClient, aiConfig, messageMapper, aiMemoryService);
+        aiChatService = new AiChatService(aiService, openAiClient, aiConfig, messageMapper, aiMemoryService,
+                userService);
         aiChatService.setAiTaskExecutor(new SyncTaskExecutor());
         aiChatService.setWebSocketHandler(webSocketHandler);
 
