@@ -39,9 +39,15 @@ class MessageTypeTest {
     }
 
     @Test
+    @DisplayName("FILE 枚举值")
+    void file() {
+        assertEquals("文件", MessageType.FILE.getDescription());
+    }
+
+    @Test
     @DisplayName("枚举数量")
     void enumCount() {
-        assertEquals(6, MessageType.values().length);
+        assertEquals(7, MessageType.values().length);
     }
 
     @Test
@@ -49,5 +55,6 @@ class MessageTypeTest {
     void valueOf() {
         assertEquals(MessageType.TEXT, MessageType.valueOf("TEXT"));
         assertEquals(MessageType.IMAGE, MessageType.valueOf("IMAGE"));
+        assertEquals(MessageType.FILE, MessageType.valueOf("FILE"));
     }
 }

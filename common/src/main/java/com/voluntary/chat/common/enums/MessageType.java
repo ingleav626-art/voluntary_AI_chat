@@ -9,6 +9,7 @@ public enum MessageType {
 
     TEXT("文本"),
     IMAGE("图片"),
+    FILE("文件"),
     AI("AI"),
     RECALL("撤回"),
     FORWARD("转发"),

@@ -79,6 +79,9 @@ class ChatWebSocketHandlerTest {
     @Mock
     private WebSocketSession session2;
 
+    @Mock
+    private WebSocketSession session3;
+
     private static final Long USER_ID_1 = 1001L;
     private static final Long USER_ID_2 = 1002L;
     private static final Long GROUP_ID = 2001L;
@@ -767,6 +770,258 @@ class ChatWebSocketHandlerTest {
         // 应查库并回填
         verify(groupMemberMapper).selectGroupMemberUserIds(GROUP_ID);
         verify(groupCacheService).setMemberIds(eq(GROUP_ID), anyList());
+    }
+
+    // ==================== IMAGE/FILE 消息 extra 字段转发 ====================
+
+    @Test
+    @DisplayName("IMAGE 消息转发携带额外字段")
+    void handleTextMessage_shouldForwardExtraFields_forImageMessage() throws Exception {
+        createSession(USER_ID_1, session1);
+        createSession(USER_ID_2, session2);
+
+        User sender = new User();
+        sender.setId(USER_ID_1);
+        sender.setUsername("张三");
+
+        SendMessageResponse sendResponse = SendMessageResponse.builder()
+                .messageId(10001L)
+                .createTime(LocalDateTime.now())
+                .build();
+
+        String payload = """
+                {
+                    "id": "img-001",
+                    "type": "SEND_MESSAGE",
+                    "data": {
+                        "sessionId": "p_1001_1002",
+                        "msgType": "IMAGE",
+                        "content": "/files/2026/07/01/test.jpg",
+                        "thumbnailUrl": "/files/2026/07/01/test_thumb.jpg",
+                        "width": 1920,
+                        "height": 1080
+                    }
+                }
+                """;
+
+        when(messageService.sendMessage(eq(USER_ID_1), any(SendMessageRequest.class)))
+                .thenReturn(sendResponse);
+        when(userService.findById(USER_ID_1)).thenReturn(sender);
+        when(onlineStatusService.isOnline(USER_ID_2)).thenReturn(true);
+
+        TextMessage textMessage = new TextMessage(payload);
+        handler.handleTextMessage(session1, textMessage);
+
+        // 验证转发的消息包含额外字段
+        ArgumentCaptor<TextMessage> captor = ArgumentCaptor.forClass(TextMessage.class);
+        verify(session2).sendMessage(captor.capture());
+
+        WebSocketMessage sent = objectMapper.readValue(captor.getValue().getPayload(), WebSocketMessage.class);
+        Map<String, Object> sentData = (Map<String, Object>) sent.getData();
+
+        assertEquals("/files/2026/07/01/test.jpg", sentData.get("content"));
+        assertEquals("IMAGE", sentData.get("msgType"));
+        assertEquals("/files/2026/07/01/test_thumb.jpg", sentData.get("thumbnailUrl"));
+        assertEquals(1920, sentData.get("width"));
+        assertEquals(1080, sentData.get("height"));
+    }
+
+    @Test
+    @DisplayName("FILE 消息转发携带文件URL和大小")
+    void handleTextMessage_shouldForwardFileFields_forFileMessage() throws Exception {
+        createSession(USER_ID_1, session1);
+        createSession(USER_ID_2, session2);
+
+        User sender = new User();
+        sender.setId(USER_ID_1);
+        sender.setUsername("张三");
+
+        SendMessageResponse sendResponse = SendMessageResponse.builder()
+                .messageId(10002L)
+                .createTime(LocalDateTime.now())
+                .build();
+
+        String payload = """
+                {
+                    "id": "file-001",
+                    "type": "SEND_MESSAGE",
+                    "data": {
+                        "sessionId": "p_1001_1002",
+                        "msgType": "FILE",
+                        "content": "report.pdf",
+                        "fileUrl": "/chat-files/2026/07/01/uuid.pdf",
+                        "fileSize": 1048576,
+                        "fileName": "report.pdf"
+                    }
+                }
+                """;
+
+        when(messageService.sendMessage(eq(USER_ID_1), any(SendMessageRequest.class)))
+                .thenReturn(sendResponse);
+        when(userService.findById(USER_ID_1)).thenReturn(sender);
+        when(onlineStatusService.isOnline(USER_ID_2)).thenReturn(true);
+
+        TextMessage textMessage = new TextMessage(payload);
+        handler.handleTextMessage(session1, textMessage);
+
+        // 验证转发的消息包含文件字段
+        ArgumentCaptor<TextMessage> captor = ArgumentCaptor.forClass(TextMessage.class);
+        verify(session2).sendMessage(captor.capture());
+
+        WebSocketMessage sent = objectMapper.readValue(captor.getValue().getPayload(), WebSocketMessage.class);
+        Map<String, Object> sentData = (Map<String, Object>) sent.getData();
+
+        assertEquals("report.pdf", sentData.get("content"));
+        assertEquals("FILE", sentData.get("msgType"));
+        assertEquals("/chat-files/2026/07/01/uuid.pdf", sentData.get("fileUrl"));
+        assertEquals(1048576, sentData.get("fileSize"));
+        assertEquals("report.pdf", sentData.get("fileName"));
+    }
+
+    @Test
+    @DisplayName("FILE 消息群聊广播携带文件字段")
+    void handleTextMessage_shouldBroadcastFileFields_forGroupFileMessage() throws Exception {
+        createSession(USER_ID_1, session1);
+
+        User sender = new User();
+        sender.setId(USER_ID_1);
+        sender.setUsername("张三");
+
+        SendMessageResponse sendResponse = SendMessageResponse.builder()
+                .messageId(10003L)
+                .createTime(LocalDateTime.now())
+                .build();
+
+        String payload = """
+                {
+                    "id": "file-grp-001",
+                    "type": "SEND_MESSAGE",
+                    "data": {
+                        "sessionId": "g_2001",
+                        "msgType": "FILE",
+                        "content": "group-doc.xlsx",
+                        "fileUrl": "/chat-files/2026/07/01/uuid.xlsx",
+                        "fileSize": 2048000,
+                        "fileName": "group-doc.xlsx"
+                    }
+                }
+                """;
+
+        when(messageService.sendMessage(eq(USER_ID_1), any(SendMessageRequest.class)))
+                .thenReturn(sendResponse);
+        when(userService.findById(USER_ID_1)).thenReturn(sender);
+        when(groupMemberMapper.selectGroupMemberUserIds(GROUP_ID))
+                .thenReturn(List.of(USER_ID_1, 2002L));
+
+        // 为群成员 2002L 创建 WebSocket 会话，接收广播
+        createSession(2002L, session3);
+
+        TextMessage textMessage = new TextMessage(payload);
+        handler.handleTextMessage(session1, textMessage);
+
+        // 验证群广播消息包含文件字段（捕获发送给其他群成员的消息）
+        ArgumentCaptor<TextMessage> captor = ArgumentCaptor.forClass(TextMessage.class);
+        verify(session3).sendMessage(captor.capture());
+
+        WebSocketMessage sent = objectMapper.readValue(captor.getValue().getPayload(), WebSocketMessage.class);
+        Map<String, Object> sentData = (Map<String, Object>) sent.getData();
+
+        assertEquals("FILE", sentData.get("msgType"));
+        assertEquals("/chat-files/2026/07/01/uuid.xlsx", sentData.get("fileUrl"));
+        assertEquals(2048000, sentData.get("fileSize"));
+        assertEquals("group-doc.xlsx", sentData.get("fileName"));
+    }
+
+    @Test
+    @DisplayName("IMAGE 消息的 extra 字段持久化到数据库")
+    void handleTextMessage_shouldPersistExtraFields_forImageMessage() throws Exception {
+        createSession(USER_ID_1, session1);
+
+        User sender = new User();
+        sender.setId(USER_ID_1);
+        sender.setUsername("张三");
+
+        SendMessageResponse sendResponse = SendMessageResponse.builder()
+                .messageId(10004L)
+                .createTime(LocalDateTime.now())
+                .build();
+
+        String payload = """
+                {
+                    "id": "img-002",
+                    "type": "SEND_MESSAGE",
+                    "data": {
+                        "sessionId": "p_1001_1002",
+                        "msgType": "IMAGE",
+                        "content": "/files/2026/07/01/photo.jpg",
+                        "thumbnailUrl": "/files/2026/07/01/photo_thumb.jpg",
+                        "width": 800,
+                        "height": 600
+                    }
+                }
+                """;
+
+        when(messageService.sendMessage(eq(USER_ID_1), any(SendMessageRequest.class)))
+                .thenReturn(sendResponse);
+        when(userService.findById(USER_ID_1)).thenReturn(sender);
+        when(onlineStatusService.isOnline(USER_ID_2)).thenReturn(false);
+
+        TextMessage textMessage = new TextMessage(payload);
+        handler.handleTextMessage(session1, textMessage);
+
+        // 验证 extra JSON 已设入请求
+        ArgumentCaptor<SendMessageRequest> captor = ArgumentCaptor.forClass(SendMessageRequest.class);
+        verify(messageService).sendMessage(eq(USER_ID_1), captor.capture());
+
+        SendMessageRequest sentRequest = captor.getValue();
+        assertNotNull(sentRequest.getExtra());
+
+        // 验证 extra JSON 包含必要字段
+        final com.fasterxml.jackson.databind.JsonNode extraJson = objectMapper.readTree(sentRequest.getExtra());
+        assertEquals("/files/2026/07/01/photo_thumb.jpg", extraJson.get("thumbnailUrl").asText());
+        assertEquals(800, extraJson.get("width").asInt());
+        assertEquals(600, extraJson.get("height").asInt());
+    }
+
+    @Test
+    @DisplayName("TEXT 消息不携带额外字段")
+    void handleTextMessage_shouldNotForwardExtraFields_forTextMessage() throws Exception {
+        createSession(USER_ID_1, session1);
+        createSession(USER_ID_2, session2);
+
+        User sender = new User();
+        sender.setId(USER_ID_1);
+        sender.setUsername("张三");
+
+        SendMessageResponse sendResponse = SendMessageResponse.builder()
+                .messageId(10005L)
+                .createTime(LocalDateTime.now())
+                .build();
+
+        String payload = """
+                {
+                    "id": "txt-001",
+                    "type": "SEND_MESSAGE",
+                    "data": {
+                        "sessionId": "p_1001_1002",
+                        "msgType": "TEXT",
+                        "content": "纯文本消息"
+                    }
+                }
+                """;
+
+        when(messageService.sendMessage(eq(USER_ID_1), any(SendMessageRequest.class)))
+                .thenReturn(sendResponse);
+        when(userService.findById(USER_ID_1)).thenReturn(sender);
+        when(onlineStatusService.isOnline(USER_ID_2)).thenReturn(true);
+
+        TextMessage textMessage = new TextMessage(payload);
+        handler.handleTextMessage(session1, textMessage);
+
+        // 验证 extra 字段为 null
+        ArgumentCaptor<SendMessageRequest> captor = ArgumentCaptor.forClass(SendMessageRequest.class);
+        verify(messageService).sendMessage(eq(USER_ID_1), captor.capture());
+        assertNull(captor.getValue().getExtra());
     }
 
     // ==================== 传输错误处理 ====================
