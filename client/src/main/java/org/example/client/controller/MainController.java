@@ -6,6 +6,7 @@ import java.util.ResourceBundle;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Alert;
@@ -15,6 +16,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.ScrollBar;
 import javafx.scene.control.TextArea;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
@@ -118,9 +120,15 @@ public final class MainController implements Initializable {
     /** 毛玻璃效果：功能栏 */
     private org.example.client.util.FrostGlassEffect functionBarFrost;
 
+    /** 消息列表变化监听器（自动滚动到底部） */
+    private ListChangeListener<MessageInfo> messageListListener;
+
     @Override
     public void initialize(final URL location, final ResourceBundle resources) {
         viewModel = new MainViewModel();
+
+        // 初始化消息列表监听器（自动滚动到底部）
+        initMessageListListener();
 
         // 绑定会话列表
         conversationList.itemsProperty().bind(viewModel.conversationsProperty());
@@ -139,12 +147,14 @@ public final class MainController implements Initializable {
                 Bindings.createStringBinding(() -> viewModel.connectedProperty().get() ? "已连接" : "连接中...",
                         viewModel.connectedProperty()));
 
-        // 绑定消息列表
-        messageList.itemsProperty().bind(
-                Bindings.createObjectBinding(() -> {
-                    final ChatViewModel chatVm = viewModel.chatViewModelProperty().get();
-                    return chatVm != null ? chatVm.messagesProperty().get() : FXCollections.observableArrayList();
-                }, viewModel.chatViewModelProperty()));
+        // 直接设置消息列表（不使用 bind，确保 ListView 能正确接收列表内部变化）
+        viewModel.chatViewModelProperty().addListener((obs, oldVm, newVm) -> {
+            if (newVm != null) {
+                messageList.setItems(newVm.getMessages());
+            } else {
+                messageList.setItems(FXCollections.observableArrayList());
+            }
+        });
 
         messageList.setCellFactory(param -> new MessageCell());
 
@@ -159,6 +169,10 @@ public final class MainController implements Initializable {
         viewModel.chatViewModelProperty().addListener((obs, oldVm, newVm) -> {
             if (oldVm != null) {
                 inputArea.textProperty().unbindBidirectional(oldVm.inputTextProperty());
+                // 解绑消息列表监听器
+                if (oldVm.messagesProperty().get() != null && messageListListener != null) {
+                    oldVm.messagesProperty().get().removeListener(messageListListener);
+                }
             }
             if (newVm != null) {
                 inputArea.textProperty().bindBidirectional(newVm.inputTextProperty());
@@ -173,6 +187,13 @@ public final class MainController implements Initializable {
                 } else {
                     groupManageButton.setVisible(false);
                     groupManageButton.setManaged(false);
+                }
+
+                // 绑定消息列表监听器，初始加载历史消息后自动滚动到底部
+                if (newVm.messagesProperty().get() != null && messageListListener != null) {
+                    newVm.messagesProperty().get().addListener(messageListListener);
+                    // 延迟滚动到底部，等待消息列表渲染完成
+                    Platform.runLater(() -> scrollToBottom());
                 }
             } else {
                 inputArea.clear();
@@ -295,7 +316,10 @@ public final class MainController implements Initializable {
             }
         }
         if (!found) {
+            // AI会话不在会话列表中，需要先添加到列表
+            viewModel.conversationsProperty().add(0, conv);
             viewModel.selectConversation(conv);
+            LOG.info("AI会话已添加到会话列表: sessionId={}, name={}", conv.getSessionId(), conv.getTargetName());
         }
         LOG.info("已选中AI会话: sessionId={}, name={}", conv.getSessionId(), conv.getTargetName());
     }
@@ -335,6 +359,42 @@ public final class MainController implements Initializable {
                 }
             }
         });
+    }
+
+    /**
+     * 初始化消息列表监听器（自动滚动到底部）
+     *
+     * <p>
+     * 监听消息列表变化，当有新消息添加时自动滚动到最底部。
+     * </p>
+     */
+    private void initMessageListListener() {
+        messageListListener = change -> {
+            while (change.next()) {
+                if (change.wasAdded() && !change.getAddedSubList().isEmpty()) {
+                    // 有新消息添加，延迟滚动到底部，等待UI渲染完成
+                    Platform.runLater(() -> scrollToBottom());
+                    break;
+                }
+            }
+        };
+    }
+
+    /**
+     * 滚动消息列表到最底部
+     *
+     * <p>
+     * 滚动到最后一条消息的位置。确保在 Platform.runLater 中调用，
+     * 避免在 UI 更新前执行滚动。
+     * </p>
+     */
+    private void scrollToBottom() {
+        if (messageList == null || messageList.getItems() == null || messageList.getItems().isEmpty()) {
+            return;
+        }
+        final int lastIndex = messageList.getItems().size() - 1;
+        messageList.scrollTo(lastIndex);
+        LOG.debug("消息列表已滚动到底部: lastIndex={}", lastIndex);
     }
 
     /**
@@ -784,13 +844,22 @@ public final class MainController implements Initializable {
             setText(null);
 
             // 右键菜单
-            if (item.isSentByMe() && item.getMessageId() != null) {
+            if (item.isSentByMe()) {
                 final ContextMenu contextMenu = new ContextMenu();
-                if (isRecallable(item)) {
+                final Long msgId = item.getMessageId();
+                final boolean isPending = msgId == null || msgId <= 0;
+
+                if (!isPending && isRecallable(item)) {
                     final MenuItem recallItem = new MenuItem("撤回");
                     recallItem.setOnAction(e -> handleRecallMessage(item));
                     contextMenu.getItems().add(recallItem);
+                } else if (isPending) {
+                    // 待发送消息不显示撤回选项
+                    final MenuItem sendingItem = new MenuItem("发送中...");
+                    sendingItem.setDisable(true);
+                    contextMenu.getItems().add(sendingItem);
                 }
+
                 if (!contextMenu.getItems().isEmpty()) {
                     setContextMenu(contextMenu);
                 } else {

@@ -222,8 +222,8 @@
 }
 
 .btn-action-sm {
-    -fx-background-color: rgba(255, 240, 244, 0.85);
-    -fx-border-color: rgba(255, 224, 236, 0.7);
+    -fx-background-color: #FFC0CB;
+    -fx-border-color: #FF9AAC;
     -fx-border-radius: 3px;
     -fx-background-radius: 3px;
     -fx-padding: 2px 8px;
@@ -232,7 +232,7 @@
 }
 
 .btn-action-sm:hover {
-    -fx-background-color: #FFE0EC;
+    -fx-background-color: #FFA0B0;
     -fx-border-color: #FF6B9D;
 }
 

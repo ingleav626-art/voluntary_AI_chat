@@ -310,10 +310,10 @@ public final class WebSocketClient {
      * @param type 消息类型
      * @param data 消息数据
      */
-    public void send(final String type, final Map<String, Object> data) {
+    public String send(final String type, final Map<String, Object> data) {
         if (!connected || webSocket == null) {
             LOG.warn("[WS-SEND] 失败：未连接 type={}, data={}", type, data);
-            return;
+            return null;
         }
 
         final WebSocketMessage message = WebSocketMessage.builder()
@@ -325,15 +325,17 @@ public final class WebSocketClient {
         final String json = JsonUtils.toJson(message);
         if (json == null) {
             LOG.error("[WS-SEND] 失败：消息序列化失败 type={}", type);
-            return;
+            return null;
         }
 
         try {
             webSocket.sendText(json, true);
             LOG.info("[WS-SEND] type={}, messageId={}, dataKeys={}",
                     type, message.getId(), data != null ? data.keySet() : "null");
+            return message.getId();
         } catch (final Exception e) {
             LOG.error("[WS-SEND] 失败 type={}, messageId={}", type, message.getId(), e);
+            return null;
         }
     }
 

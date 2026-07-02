@@ -92,6 +92,30 @@ public class GroupAiConfigController {
     @FXML
     public void initialize() {
         configListView.setCellFactory(list -> new AiGroupConfigCell());
+
+        // 设置 AI 选择下拉框的显示格式
+        aiSelectCombo.setCellFactory(list -> new ListCell<AiProfile>() {
+            @Override
+            protected void updateItem(final AiProfile item, final boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(item.getName() != null ? item.getName() : "AI #" + item.getAiId());
+                }
+            }
+        });
+        aiSelectCombo.setButtonCell(new ListCell<AiProfile>() {
+            @Override
+            protected void updateItem(final AiProfile item, final boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText("请选择 AI");
+                } else {
+                    setText(item.getName() != null ? item.getName() : "AI #" + item.getAiId());
+                }
+            }
+        });
     }
 
     /**
@@ -106,10 +130,37 @@ public class GroupAiConfigController {
                 .thenAccept(response -> {
                     Platform.runLater(() -> {
                         if (response != null && response.isSuccess() && response.getData() != null) {
-                            configListView.setItems(
-                                    FXCollections.observableArrayList(response.getData()));
+                            final List<AiGroupConfig> configs = response.getData();
+
+                            // 本地模式：补充真实AI名称（服务端返回占位符）
+                            try {
+                                final org.example.client.model.LoginResponse login =
+                                        org.example.client.util.TokenStorage.load();
+                                final Long userId = login != null && login.getUser() != null
+                                        ? login.getUser().getUserId() : 0L;
+
+                                final List<com.voluntary.chat.server.entity.AiProfile> localProfiles =
+                                        org.example.client.engine.LocalAiEngine.getInstance().listAiProfiles(userId);
+
+                                // 构建AI ID -> 名称映射
+                                final java.util.Map<Long, String> aiNameMap = new java.util.HashMap<>();
+                                for (final com.voluntary.chat.server.entity.AiProfile p : localProfiles) {
+                                    aiNameMap.put(p.getId(), p.getName());
+                                }
+
+                                // 补充真实名称
+                                for (final AiGroupConfig config : configs) {
+                                    if (config.getAiId() != null && aiNameMap.containsKey(config.getAiId())) {
+                                        config.setAiName(aiNameMap.get(config.getAiId()));
+                                    }
+                                }
+                            } catch (final Exception e) {
+                                LOG.warn("补充AI名称失败，使用服务端返回的名称", e);
+                            }
+
+                            configListView.setItems(FXCollections.observableArrayList(configs));
                             LOG.info("群AI配置加载成功: groupId={}, count={}",
-                                    groupId, response.getData().size());
+                                    groupId, configs.size());
                         } else {
                             final String msg = response != null ? response.getMessage() : "加载配置失败";
                             errorLabel.setText(msg);
@@ -125,23 +176,69 @@ public class GroupAiConfigController {
     }
 
     /**
-     * 加载 AI 角色列表供选择
+     * 加载 AI 角色列表供选择（从本地引擎获取，确保与会话列表数据一致）
      */
     private void loadAiProfiles() {
-        AiService.getInstance().getAiList(1, 100)
-                .thenAccept(response -> {
-                    Platform.runLater(() -> {
-                        if (response != null && response.isSuccess() && response.getData() != null) {
-                            final PageResult<AiProfile> result = response.getData();
-                            aiProfiles = result.getList() != null ? result.getList() : new ArrayList<>();
-                            aiSelectCombo.setItems(FXCollections.observableArrayList(aiProfiles));
-                        }
+        try {
+            // 从本地引擎获取AI列表（与会话列表数据源一致）
+            final org.example.client.model.LoginResponse login =
+                    org.example.client.util.TokenStorage.load();
+            final Long userId = login != null && login.getUser() != null
+                    ? login.getUser().getUserId() : 0L;
+
+            final List<com.voluntary.chat.server.entity.AiProfile> localProfiles =
+                    org.example.client.engine.LocalAiEngine.getInstance().listAiProfiles(userId);
+
+            // 转换为客户端 AiProfile 模型，只保留可用于群聊的AI（isGroup=true或null）
+            aiProfiles = new ArrayList<>();
+            for (final com.voluntary.chat.server.entity.AiProfile profile : localProfiles) {
+                // 过滤：只显示可用于群聊的AI
+                if (profile.getIsGroup() == null || profile.getIsGroup()) {
+                    final AiProfile clientProfile = new AiProfile();
+                    clientProfile.setAiId(profile.getId());
+                    clientProfile.setName(profile.getName());
+                    clientProfile.setAvatar(profile.getAvatar());
+                    clientProfile.setPersona(profile.getPersona());
+                    clientProfile.setSystemPrompt(profile.getSystemPrompt());
+                    clientProfile.setModelProvider(profile.getModelProvider());
+                    clientProfile.setModel(profile.getModel());
+                    clientProfile.setIsGroup(profile.getIsGroup());
+                    clientProfile.setTemperature(profile.getTemperature());
+                    clientProfile.setMaxTokens(profile.getMaxTokens());
+                    aiProfiles.add(clientProfile);
+                }
+            }
+
+            Platform.runLater(() -> {
+                aiSelectCombo.setItems(FXCollections.observableArrayList(aiProfiles));
+                LOG.info("AI角色列表加载成功（本地引擎）: count={}, 可群聊数={}", localProfiles.size(), aiProfiles.size());
+            });
+        } catch (final Exception e) {
+            LOG.error("从本地引擎加载AI角色列表失败", e);
+            // 降级：尝试从服务端获取
+            AiService.getInstance().getAiList(1, 100)
+                    .thenAccept(response -> {
+                        Platform.runLater(() -> {
+                            if (response != null && response.isSuccess() && response.getData() != null) {
+                                final PageResult<AiProfile> result = response.getData();
+                                final List<AiProfile> allProfiles = result.getList() != null ? result.getList() : new ArrayList<>();
+                                // 过滤可用于群聊的AI
+                                aiProfiles = new ArrayList<>();
+                                for (final AiProfile p : allProfiles) {
+                                    if (p.getIsGroup() == null || p.getIsGroup()) {
+                                        aiProfiles.add(p);
+                                    }
+                                }
+                                aiSelectCombo.setItems(FXCollections.observableArrayList(aiProfiles));
+                                LOG.info("AI角色列表加载成功（服务端降级）: count={}", aiProfiles.size());
+                            }
+                        });
+                    })
+                    .exceptionally(ex -> {
+                        LOG.error("加载AI角色列表异常", ex);
+                        return null;
                     });
-                })
-                .exceptionally(ex -> {
-                    LOG.error("加载AI角色列表异常", ex);
-                    return null;
-                });
+        }
     }
 
     /**
@@ -165,7 +262,12 @@ public class GroupAiConfigController {
         final String probText = triggerProbabilityField.getText().trim();
         if (!probText.isEmpty()) {
             try {
-                config.setTriggerProbability(Double.parseDouble(probText));
+                final double prob = Double.parseDouble(probText);
+                if (prob < 0.0 || prob > 1.0) {
+                    errorLabel.setText("触发概率必须在 0.0 到 1.0 之间");
+                    return;
+                }
+                config.setTriggerProbability(prob);
             } catch (final NumberFormatException e) {
                 errorLabel.setText("触发概率必须是数字");
                 return;

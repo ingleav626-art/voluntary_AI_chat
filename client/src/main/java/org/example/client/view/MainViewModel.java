@@ -140,7 +140,7 @@ public final class MainViewModel {
     }
 
     /**
-     * 加载会话列表（从服务端获取全部数据）
+     * 加载会话列表（从服务端获取全部数据 + 本地AI会话）
      */
     private void fetchConversationsFromServer() {
         loading.set(true);
@@ -155,15 +155,48 @@ public final class MainViewModel {
                             final List<ConversationInfo> list = response.getData() != null
                                     ? response.getData().getList()
                                     : new ArrayList<>();
+
+                            // 从 LocalAiEngine 获取所有 AI 角色，构建 AI 会话信息
+                            final List<ConversationInfo> aiConversations = new ArrayList<>();
+                            try {
+                                final UserInfo user = currentUser.get();
+                                if (user != null && user.getUserId() != null) {
+                                    final List<com.voluntary.chat.server.entity.AiProfile> aiProfiles =
+                                            org.example.client.engine.LocalAiEngine.getInstance()
+                                                    .listAiProfiles(user.getUserId());
+
+                                    for (final com.voluntary.chat.server.entity.AiProfile profile : aiProfiles) {
+                                        final ConversationInfo aiConv = new ConversationInfo();
+                                        aiConv.setSessionId("a_" + profile.getId()); // AI会话ID格式
+                                        aiConv.setTargetId(profile.getId());
+                                        aiConv.setTargetType("AI");
+                                        aiConv.setTargetName(profile.getName());
+                                        aiConv.setTargetAvatar(profile.getAvatar());
+                                        aiConv.setUnreadCount(0); // AI会话默认无未读
+                                        aiConv.setLastMessage(null); // 最后消息从历史加载
+                                        aiConv.setLastMessageTime(null);
+                                        aiConversations.add(aiConv);
+                                    }
+                                    LOG.info("从本地引擎加载AI会话: count={}", aiConversations.size());
+                                }
+                            } catch (final Exception e) {
+                                LOG.warn("加载AI角色列表失败，跳过AI会话", e);
+                            }
+
                             allConversations.setAll(list);
+
+                            // 合并服务端列表和AI会话
+                            final List<ConversationInfo> mergedList = new ArrayList<>(list);
+                            mergedList.addAll(0, aiConversations); // AI会话放在顶部
+
                             // 如果有搜索关键词，应用过滤；否则显示全部
                             final String kw = searchKeyword.get();
                             if (kw != null && !kw.trim().isEmpty()) {
                                 filterConversations(kw);
                             } else {
-                                conversations.setAll(list);
+                                conversations.setAll(mergedList);
                             }
-                            LOG.info("会话列表加载成功: count={}", list.size());
+                            LOG.info("会话列表加载成功: count={}, AI会话数={}", list.size(), aiConversations.size());
                         } else {
                             final String msg = response != null ? response.getMessage() : "加载会话列表失败";
                             errorMessage.set(msg);
@@ -625,12 +658,17 @@ public final class MainViewModel {
         }
 
         final String messageId = String.valueOf(data.get("messageId"));
+        final String sessionId = (String) data.get("sessionId");
         final String content = (String) data.get("content");
         final boolean done = Boolean.TRUE.equals(data.get("done"));
         final Object aiMessageIdObj = data.get("aiMessageId");
+        final String senderType = (String) data.get("senderType");
+        final String senderName = (String) data.get("senderName");
+        final String senderAvatar = (String) data.get("senderAvatar");
+        final Object senderIdObj = data.get("senderId");
 
-        LOG.debug("[AI-STREAM] 收到AI流式消息: messageId={}, done={}, contentLen={}",
-                messageId, done, content != null ? content.length() : 0);
+        LOG.debug("[AI-STREAM] 收到AI流式消息: messageId={}, sessionId={}, done={}, contentLen={}",
+                messageId, sessionId, done, content != null ? content.length() : 0);
 
         final ChatViewModel chatVm = chatViewModel.get();
         if (chatVm == null) {
@@ -638,7 +676,42 @@ public final class MainViewModel {
             return;
         }
 
-        chatVm.handleAiStream(messageId, content, done, aiMessageIdObj != null ? toLong(aiMessageIdObj) : null);
+        final String currentSessionId = chatVm.getSessionId();
+        if (currentSessionId == null) {
+            return;
+        }
+
+        final boolean isGroupAi = sessionId != null && sessionId.contains("_a_");
+        final String matchedSessionId = isGroupAi
+                ? extractGroupSessionId(sessionId)
+                : sessionId;
+
+        if (!currentSessionId.equals(matchedSessionId)) {
+            LOG.debug("[AI-STREAM] 会话不匹配，忽略: current={}, target={}",
+                    currentSessionId, matchedSessionId);
+            return;
+        }
+
+        final Long senderId = senderIdObj != null ? toLong(senderIdObj) : null;
+        chatVm.handleGroupAiStream(messageId, content, done,
+                aiMessageIdObj != null ? toLong(aiMessageIdObj) : null,
+                senderId, senderName, senderAvatar, senderType);
+    }
+
+    /**
+     * 从群AI会话ID中提取群会话ID
+     * 输入: g_{groupId}_a_{aiId}
+     * 输出: g_{groupId}
+     */
+    private String extractGroupSessionId(final String sessionId) {
+        if (sessionId == null) {
+            return null;
+        }
+        final int aIdx = sessionId.indexOf("_a_");
+        if (aIdx > 0) {
+            return sessionId.substring(0, aIdx);
+        }
+        return sessionId;
     }
 
     /**
@@ -872,12 +945,9 @@ public final class MainViewModel {
         if (chatVm != null) {
             try {
                 chatVm.updateMessageAck(clientId, messageId, parseDateTime(createTimeStr));
-                LOG.debug("消息确认: clientId={}, messageId={}", clientId, messageId);
             } catch (final Exception e) {
                 LOG.error("处理消息确认时异常: clientId={}, messageId={}", clientId, messageId, e);
             }
-        } else {
-            LOG.debug("消息确认时 ChatViewModel 为 null: clientId={}, messageId={}", clientId, messageId);
         }
     }
 

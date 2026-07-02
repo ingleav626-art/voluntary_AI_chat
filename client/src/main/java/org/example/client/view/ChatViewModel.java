@@ -116,6 +116,12 @@ public final class ChatViewModel {
         hasMoreHistory = true;
         LOG.info("开始加载历史消息: sessionId={}", sessionId);
 
+        // AI 会话从本地引擎加载，真人会话从服务端加载
+        if (sessionId != null && sessionId.startsWith("a_")) {
+            loadAiConversationHistory(sessionId);
+            return;
+        }
+
         ChatService.getInstance().getHistory(sessionId, currentPage, DEFAULT_PAGE_SIZE)
                 .thenAccept(response -> {
                     // 异步回调在 HTTP 线程执行，UI 更新必须切回 JavaFX 线程
@@ -155,6 +161,11 @@ public final class ChatViewModel {
                                             java.util.Comparator.nullsFirst(java.time.LocalDateTime::compareTo)));
                                     messages.setAll(list);
                                     LOG.info("历史消息加载成功: sessionId={}, count={}", sessionId, list.size());
+
+                                    // 群聊：补充本地AI消息
+                                    if (sessionId != null && sessionId.startsWith("g_")) {
+                                        loadGroupAiMessages(sessionId);
+                                    }
 
                                     // 检查是否有待撤回的乐观消息（刷新后需要补执行撤回）
                                     checkAndExecutePendingRecalls(list);
@@ -199,137 +210,12 @@ public final class ChatViewModel {
             return;
         }
 
-        // 生成客户端消息ID用于 ACK 匹配
-        final String clientId = UUID.randomUUID().toString();
-
-        // 创建乐观消息（先显示在界面上）
-        final MessageInfo optimisticMsg = new MessageInfo();
-        optimisticMsg.setMessageId(-1L);
-        optimisticMsg.setSessionId(conversation.getSessionId());
-        optimisticMsg.setSenderId(currentUser != null ? currentUser.getUserId() : null);
-        optimisticMsg.setSenderName(currentUser != null ? currentUser.getUsername() : "");
-        optimisticMsg.setSenderType("USER");
-        optimisticMsg.setType(MSG_TYPE_TEXT);
-        optimisticMsg.setContent(text.trim());
-        optimisticMsg.setCreateTime(java.time.LocalDateTime.now());
-        optimisticMsg.setSentByMe(true);
-
-        messages.add(optimisticMsg);
-        pendingMessages.put(clientId, optimisticMsg);
-
-        // 通过 WebSocket 发送
-        final Map<String, Object> data = new HashMap<>();
-        data.put("sessionId", conversation.getSessionId());
-        data.put("msgType", MSG_TYPE_TEXT);
-        data.put("content", text.trim());
-
-        if ("AI".equals(conversation.getTargetType())) {
-            // AI 对话始终使用本地引擎（API.md 架构：客户包不走 HTTP/WS 回环）
-            final Long aiId = conversation.getTargetId();
-            final Long userId = currentUser != null ? currentUser.getUserId() : 0L;
-            final String sessionId = conversation.getSessionId();
-            final String content = text.trim();
-
-            // 创建 AI 占位消息（用于流式更新）
-            final MessageInfo aiPlaceholder = new MessageInfo();
-            aiPlaceholder.setMessageId(-2L);
-            aiPlaceholder.setSessionId(sessionId);
-            aiPlaceholder.setSenderId(aiId);
-            aiPlaceholder.setSenderName(conversation.getTargetName());
-            aiPlaceholder.setSenderType("AI");
-            aiPlaceholder.setType(MSG_TYPE_TEXT);
-            aiPlaceholder.setContent("");
-            aiPlaceholder.setCreateTime(java.time.LocalDateTime.now());
-            aiPlaceholder.setSentByMe(false);
-            messages.add(aiPlaceholder);
-
-            LocalAiEngine.getInstance().chat(aiId, userId, content, new AiStreamCallback() {
-                private final StringBuilder fullContent = new StringBuilder();
-
-                    @Override
-                    public void onChunk(String chunk) {
-                        fullContent.append(chunk);
-                        // 流式更新最后一条 AI 消息
-                        Platform.runLater(() -> {
-                            // 查找是否已有 AI 回复消息
-                            MessageInfo lastAiMsg = null;
-                            for (MessageInfo msg : messages) {
-                                if (msg.getMessageId() != null && msg.getMessageId() < 0
-                                        && msg.getSenderType() != null && "AI".equals(msg.getSenderType())) {
-                                    lastAiMsg = msg;
-                                    break;
-                                }
-                            }
-                            if (lastAiMsg != null) {
-                                lastAiMsg.setContent(fullContent.toString());
-                                final int idx = messages.indexOf(lastAiMsg);
-                                if (idx >= 0) {
-                                    messages.set(idx, lastAiMsg);
-                                }
-                            }
-                        });
-                    }
-
-                    @Override
-                    public void onComplete(String fullResponse, Long messageId) {
-                        Platform.runLater(() -> {
-                            // 创建完整的 AI 回复消息
-                            final MessageInfo aiMsg = new MessageInfo();
-                            aiMsg.setMessageId(messageId != null ? messageId : -1L);
-                            aiMsg.setSessionId(sessionId);
-                            aiMsg.setSenderId(aiId);
-                            aiMsg.setSenderName(conversation.getTargetName());
-                            aiMsg.setSenderType("AI");
-                            aiMsg.setType(MSG_TYPE_TEXT);
-                            aiMsg.setContent(fullResponse);
-                            aiMsg.setCreateTime(LocalDateTime.now());
-                            aiMsg.setSentByMe(false);
-
-                            // 移除占位消息
-                            messages.removeIf(msg -> msg.getMessageId() != null
-                                    && msg.getMessageId() < 0 && "AI".equals(msg.getSenderType()));
-
-                            messages.add(aiMsg);
-                            LOG.info("AI 回复完成（本地）: aiId={}, sessionId={}", aiId, sessionId);
-                        });
-                    }
-
-                    @Override
-                    public void onError(String error) {
-                        Platform.runLater(() -> {
-                            LOG.warn("AI 回复失败（本地）: error={}", error);
-                            // 生成更友好的错误提示
-                            String userMsg;
-                            if (error != null && error.contains("authentication_error")) {
-                                userMsg = "API Key 无效，请在 AI 设置中更新有效的 API Key";
-                            } else if (error != null && error.contains("invalid_request_error")) {
-                                userMsg = "API 请求失败，请检查 AI 角色的模型配置是否正确";
-                            } else {
-                                userMsg = "AI 回复失败: " + error;
-                            }
-                            // 更新占位消息为错误提示
-                            for (MessageInfo msg : messages) {
-                                if (msg.getMessageId() != null && msg.getMessageId() < 0
-                                        && "AI".equals(msg.getSenderType())) {
-                                    msg.setContent(userMsg);
-                                    final int idx = messages.indexOf(msg);
-                                    if (idx >= 0) {
-                                        messages.set(idx, msg);
-                                    }
-                                    break;
-                                }
-                            }
-                        });
-                    }
-                });
-        } else {
-            WebSocketClient.getInstance().send(MessageTypes.SEND_MESSAGE, data);
-        }
+        // 使用 MessageSender 发送消息（拆分逻辑，避免文件超限）
+        org.example.client.service.MessageSender.getInstance().sendMessage(
+                currentUser, conversation, text, messages, pendingMessages);
 
         // 清空输入框
         inputText.set("");
-
-        LOG.info("消息已发送: sessionId={}", conversation.getSessionId());
     }
 
     /**
@@ -364,19 +250,47 @@ public final class ChatViewModel {
             final java.time.LocalDateTime createTime) {
         final MessageInfo pending = pendingMessages.remove(clientId);
         if (pending != null) {
+            // 在修改 messageId 前获取 index，因为 Lombok @Data 的 equals()
+            // 依赖 messageId 字段，修改后 indexOf 会返回 -1
+            final int index = messages.indexOf(pending);
+
             pending.setMessageId(messageId);
             pending.setCreateTime(createTime);
 
-            // 触发列表更新
-            final int index = messages.indexOf(pending);
+            // currentMsg：messages 列表中当前实际使用的引用（可能是新对象以触发重绘）
+            final MessageInfo currentMsg;
             if (index >= 0) {
-                messages.set(index, pending);
+                // 创建新 MessageInfo 对象（不同引用），用 remove+add 替代 set，
+                // 强制 JavaFX ListView 调用 updateItem 重绘单元格，使右键菜单
+                // 能立即从"发送中..."更新为"撤回"
+                final MessageInfo confirmed = new MessageInfo();
+                confirmed.setMessageId(messageId);
+                confirmed.setCreateTime(createTime);
+                confirmed.setSessionId(pending.getSessionId());
+                confirmed.setSenderId(pending.getSenderId());
+                confirmed.setSenderName(pending.getSenderName());
+                confirmed.setSenderAvatar(pending.getSenderAvatar());
+                confirmed.setSenderType(pending.getSenderType());
+                confirmed.setType(pending.getType());
+                confirmed.setContent(pending.getContent());
+                confirmed.setThumbnailUrl(pending.getThumbnailUrl());
+                confirmed.setWidth(pending.getWidth());
+                confirmed.setHeight(pending.getHeight());
+                confirmed.setRecalled(pending.isRecalled());
+                confirmed.setExtra(pending.getExtra());
+                confirmed.setRead(pending.isRead());
+                confirmed.setSentByMe(pending.isSentByMe());
+                messages.remove(index);
+                messages.add(index, confirmed);
+                currentMsg = confirmed;
+            } else {
+                currentMsg = pending;
             }
 
             // 如果该消息注册了延迟撤回，ACK 到达后异步执行 REST 撤回
             if (pendingRecallClientIds.remove(clientId)) {
                 LOG.info("ACK 到达，执行异步 REST 撤回: clientId={}, messageId={}", clientId, messageId);
-                final String recallContent = pending.getContent();
+                final String recallContent = currentMsg.getContent();
                 ChatService.getInstance().recallMessage(messageId)
                         .thenAccept(response -> {
                             Platform.runLater(() -> {
@@ -388,10 +302,10 @@ public final class ChatViewModel {
                                     LOG.info("延迟 REST 撤回成功: messageId={}", messageId);
                                 } else {
                                     // 撤回失败：不清理 pendingRecallContents，由 checkAndExecutePendingRecalls 重试
-                                    pending.setRecalled(false);
-                                    final int idx = messages.indexOf(pending);
+                                    currentMsg.setRecalled(false);
+                                    final int idx = messages.indexOf(currentMsg);
                                     if (idx >= 0) {
-                                        messages.set(idx, pending);
+                                        messages.set(idx, currentMsg);
                                     }
                                     final String msg = response != null ? response.getMessage() : "撤回失败";
                                     errorMessage.set(msg);
@@ -403,10 +317,10 @@ public final class ChatViewModel {
                         .exceptionally(ex -> {
                             LOG.error("延迟 REST 撤回异常（保留在待撤回列表以便重试）: messageId={}", messageId, ex);
                             Platform.runLater(() -> {
-                                pending.setRecalled(false);
-                                final int idx = messages.indexOf(pending);
+                                currentMsg.setRecalled(false);
+                                final int idx = messages.indexOf(currentMsg);
                                 if (idx >= 0) {
-                                    messages.set(idx, pending);
+                                    messages.set(idx, currentMsg);
                                 }
                                 errorMessage.set("撤回失败，请重试");
                             });
@@ -414,7 +328,10 @@ public final class ChatViewModel {
                         });
             }
 
-            LOG.debug("消息确认更新: clientId={}, messageId={}", clientId, messageId);
+            // ACK 到达后自动刷新消息列表，使右键菜单从"发送中..."更新为"撤回"
+            Platform.runLater(() -> {
+                messages.setAll(new ArrayList<>(messages));
+            });
         }
     }
 
@@ -482,7 +399,7 @@ public final class ChatViewModel {
             return;
         }
 
-        final Long messageId = message.getMessageId();
+        Long messageId = message.getMessageId();
 
         // 乐观消息：立即标记撤回，等 ACK 到达后自动执行 REST 撤回
         if (messageId == null || messageId < 0) {
@@ -508,12 +425,21 @@ public final class ChatViewModel {
                         clientId, message.getContent());
                 return;
             }
-            LOG.warn("乐观消息未找到对应 clientId，忽略: messageId={}", messageId);
-            return;
+
+            // 未找到 clientId：ACK 可能已并发到达并更新了 messageId
+            // 重新读取 messageId（ACK 线程可能已经将其更新为正数）
+            messageId = message.getMessageId();
+            if (messageId == null || messageId < 0) {
+                LOG.warn("乐观消息未找到对应 clientId，忽略: messageId={}", messageId);
+                return;
+            }
+            // ACK 已到达，messageId 已被更新，继续执行已确认路径的 REST 撤回
+            LOG.info("乐观消息已由 ACK 并发确认，直接执行 REST 撤回: messageId={}", messageId);
         }
 
         // 已确认消息，直接调 REST 撤回
-        ChatService.getInstance().recallMessage(messageId)
+        final Long finalMessageId = messageId;
+        ChatService.getInstance().recallMessage(finalMessageId)
                 .thenAccept(response -> {
                     Platform.runLater(() -> {
                         if (response != null && response.isSuccess()) {
@@ -522,7 +448,7 @@ public final class ChatViewModel {
                             if (index >= 0) {
                                 messages.set(index, message);
                             }
-                            LOG.info("消息撤回成功: messageId={}", messageId);
+                            LOG.info("消息撤回成功: messageId={}", finalMessageId);
                         } else {
                             final String msg = response != null ? response.getMessage() : "撤回失败";
                             errorMessage.set(msg);
@@ -531,15 +457,22 @@ public final class ChatViewModel {
                     });
                 })
                 .exceptionally(ex -> {
-                    LOG.error("消息撤回异常: messageId={}", messageId, ex);
+                    LOG.error("消息撤回异常: messageId={}", finalMessageId, ex);
                     Platform.runLater(() -> errorMessage.set("网络异常，撤回失败"));
                     return null;
                 });
     }
 
+    /** 撤回超时错误码（code=4001），此错误不可恢复 */
+    private static final int RECALL_TIMEOUT_CODE = 4001;
+
     /**
      * 检查并执行待撤回的乐观消息
      * 刷新历史消息后，如果发现有待撤回的消息（内容匹配），立即执行 REST 撤回
+     * <p>
+     * <b>注意</b>：仅匹配"自己发送 + 内容相同 + 未撤回 + 2分钟内"的消息，
+     * 避免因内容重复（如"1"）误匹配到其他消息。
+     * </p>
      *
      * @param loadedMessages 加载的消息列表
      */
@@ -551,15 +484,38 @@ public final class ChatViewModel {
         LOG.debug("检查待撤回消息: pendingCount={}, loadedCount={}",
                 pendingRecallContents.size(), loadedMessages.size());
 
+        final java.time.LocalDateTime cutoff = java.time.LocalDateTime.now().minusMinutes(2);
+
         for (final MessageInfo msg : loadedMessages) {
             // 只检查自己发送的消息，且内容匹配待撤回列表
             if (msg.isSentByMe() && msg.getContent() != null
                     && pendingRecallContents.contains(msg.getContent())
                     && msg.getMessageId() != null && msg.getMessageId() > 0) {
+
+                // 关键修复：先检查服务器是否已经撤回了该消息
+                if (msg.isRecalled()) {
+                    // 服务器已经撤回，跳过但不移除 pendingRecallContents
+                    // （可能有其他同内容消息仍需撤回，如多个"1"）
+                    LOG.info("服务器已撤回该消息，跳过: messageId={}, content={}",
+                            msg.getMessageId(), msg.getContent());
+                    continue; // 跳过，继续检查其他同内容消息
+                }
+
+                // 检查消息是否超过2分钟撤回窗口
+                if (msg.getCreateTime() != null && msg.getCreateTime().isBefore(cutoff)) {
+                    // 超过2分钟，永久不可撤回，跳过但不移除 pendingRecallContents
+                    // （可能有其他同内容消息仍在2分钟窗口内）
+                    LOG.info("消息已超过2分钟撤回窗口，跳过: messageId={}, content={}",
+                            msg.getMessageId(), msg.getContent());
+                    continue; // 跳过，继续检查其他同内容消息
+                }
+
+                // 消息尚未撤回且未超过2分钟，执行 REST 撤回
                 LOG.info("发现待撤回消息，立即执行 REST 撤回: messageId={}, content={}",
                         msg.getMessageId(), msg.getContent());
                 // 从待撤回列表中移除（先移除，避免重试风暴）
-                pendingRecallContents.remove(msg.getContent());
+                final String recallContent = msg.getContent();
+                pendingRecallContents.remove(recallContent);
                 // 执行 REST 撤回
                 ChatService.getInstance().recallMessage(msg.getMessageId())
                         .thenAccept(response -> {
@@ -576,11 +532,14 @@ public final class ChatViewModel {
                                     } else {
                                         final String errorMsg = response != null ? response.getMessage()
                                                 : "撤回失败";
-                                        LOG.warn("延迟 REST 撤回失败: messageId={}, error={}",
-                                                msg.getMessageId(), errorMsg);
-                                        // 撤回失败，重新加入待撤回列表以便用户重试
-                                        if (msg.getContent() != null) {
-                                            pendingRecallContents.add(msg.getContent());
+                                        final int code = response != null ? response.getCode() : 0;
+                                        LOG.warn("延迟 REST 撤回失败: messageId={}, code={}, error={}",
+                                                msg.getMessageId(), code, errorMsg);
+                                        // 仅临时性错误才重新加入待撤回列表
+                                        // 永久性错误（如超时code=4001）不再重试
+                                        if (code != RECALL_TIMEOUT_CODE && recallContent != null) {
+                                            pendingRecallContents.add(recallContent);
+                                            LOG.info("临时性撤回失败，重新加入待撤回列表以便重试: content={}", recallContent);
                                         }
                                     }
                                 } catch (final Exception e) {
@@ -854,8 +813,151 @@ public final class ChatViewModel {
         }
     }
 
+    /**
+     * 加载 AI 会话的历史消息（从本地引擎）
+     *
+     * @param sessionId AI会话ID（格式: a_{aiId}）
+     */
+    private void loadAiConversationHistory(final String sessionId) {
+        try {
+            // 构建正确的sessionId格式：a_{aiId}_{userId}
+            final Long userId = currentUser.getUserId();
+            final String fullSessionId = sessionId + "_" + userId;
+            LOG.info("构建完整AI会话ID: original={}, full={}", sessionId, fullSessionId);
+
+            final List<com.voluntary.chat.server.entity.Message> aiMessages =
+                    org.example.client.engine.LocalAiEngine.getInstance()
+                            .getAiConversationHistory(fullSessionId, DEFAULT_PAGE_SIZE * 5);
+
+            Platform.runLater(() -> {
+                loading.set(false);
+
+                final List<MessageInfo> list = new java.util.ArrayList<>();
+                for (final com.voluntary.chat.server.entity.Message msg : aiMessages) {
+                    final MessageInfo info = new MessageInfo();
+                    info.setMessageId(msg.getId());
+                    info.setSessionId(msg.getSessionId());
+                    info.setSenderId(msg.getSenderId());
+                    info.setSenderType(msg.getSenderType() == 1 ? "AI" : "USER");
+                    info.setType(msg.getType() == 0 ? "TEXT" : "IMAGE");
+                    info.setContent(msg.getContent());
+                    info.setCreateTime(msg.getCreateTime());
+                    info.setRecalled(msg.getRecallTime() != null);
+                    info.setSentByMe(currentUser != null
+                            && currentUser.getUserId() != null
+                            && currentUser.getUserId().equals(msg.getSenderId()));
+                    info.setRead(true); // AI消息默认已读
+                    list.add(info);
+                }
+
+                // 按时间升序排序
+                list.sort(java.util.Comparator.comparing(
+                        MessageInfo::getCreateTime,
+                        java.util.Comparator.nullsFirst(java.time.LocalDateTime::compareTo)));
+
+                messages.setAll(list);
+                LOG.info("AI会话历史消息加载成功: sessionId={}, count={}", sessionId, list.size());
+            });
+        } catch (final Exception e) {
+            LOG.error("加载AI会话历史消息失败: sessionId={}", sessionId, e);
+            Platform.runLater(() -> {
+                loading.set(false);
+                errorMessage.set("加载AI聊天记录失败: " + e.getMessage());
+            });
+        }
+    }
+
     /** AI 流式输出缓存：streamMessageId -> MessageInfo（用于增量追加），实例变量避免跨会话污染 */
     private final Map<String, MessageInfo> aiStreamCache = new ConcurrentHashMap<>();
+
+    /**
+     * 加载群聊中的本地AI消息并合并到消息列表
+     *
+     * @param sessionId 群聊会话ID（格式: g_{groupId}）
+     */
+    private void loadGroupAiMessages(final String sessionId) {
+        try {
+            LOG.info("开始加载群聊本地AI消息: sessionId={}", sessionId);
+            final String[] parts = sessionId.split("_");
+            final Long groupId = Long.parseLong(parts[1]);
+
+            final List<com.voluntary.chat.server.entity.Message> aiMessages =
+                    org.example.client.engine.LocalAiEngine.getInstance()
+                            .getGroupAiMessages(groupId, DEFAULT_PAGE_SIZE * 10);
+
+            LOG.info("群聊本地AI消息查询结果: sessionId={}, 查得数量={}", sessionId,
+                    aiMessages != null ? aiMessages.size() : 0);
+
+            if (aiMessages == null || aiMessages.isEmpty()) {
+                LOG.info("群聊本地AI消息为空，无需补充: sessionId={}", sessionId);
+                return;
+            }
+
+            // 去重合并：按messageId检查，不重复的添加到messages列表
+            final java.util.Set<Long> existingIds = new java.util.HashSet<>();
+            for (final MessageInfo msg : messages) {
+                if (msg.getMessageId() != null) {
+                    existingIds.add(msg.getMessageId());
+                }
+            }
+            LOG.info("群聊本地AI消息去重: sessionId={}, 已有消息数={}", sessionId, existingIds.size());
+
+            int addedCount = 0;
+            for (final com.voluntary.chat.server.entity.Message msg : aiMessages) {
+                if (existingIds.contains(msg.getId())) {
+                    LOG.debug("跳过重复消息: messageId={}", msg.getId());
+                    continue;
+                }
+
+                final MessageInfo info = new MessageInfo();
+                info.setMessageId(msg.getId());
+                info.setSessionId(msg.getSessionId());
+                info.setSenderId(msg.getSenderId());
+                info.setSenderType(msg.getSenderType() == 1 ? "AI" : "USER");
+                info.setContent(msg.getContent());
+                info.setCreateTime(msg.getCreateTime());
+                info.setType(msg.getType() == 0 ? "TEXT" : "IMAGE");
+                info.setRecalled(msg.getRecallTime() != null);
+                info.setSentByMe(currentUser != null
+                        && currentUser.getUserId() != null
+                        && currentUser.getUserId().equals(msg.getSenderId()));
+                info.setRead(true);
+                // 根据发送者类型设置发送者名称
+                if (msg.getSenderType() == 1) {
+                    // AI 消息 - 从本地引擎获取AI名称
+                    final com.voluntary.chat.server.entity.AiProfile aiProfile =
+                            org.example.client.engine.LocalAiEngine.getInstance().getAiProfile(msg.getSenderId());
+                    info.setSenderName(aiProfile != null ? aiProfile.getName() : "AI");
+                } else {
+                    // 用户消息 - 如果是当前用户则显示当前用户名，否则显示"用户"
+                    if (currentUser != null && currentUser.getUserId() != null
+                            && currentUser.getUserId().equals(msg.getSenderId())) {
+                        info.setSenderName(currentUser.getUsername());
+                    } else {
+                        info.setSenderName("用户" + msg.getSenderId());
+                    }
+                }
+                messages.add(info);
+                existingIds.add(msg.getId());
+                addedCount++;
+                LOG.debug("添加群聊本地消息: messageId={}, senderType={}, content={}",
+                        msg.getId(), msg.getSenderType(),
+                        msg.getContent() != null ? msg.getContent().substring(0, Math.min(50, msg.getContent().length())) : "");
+            }
+
+            if (addedCount > 0) {
+                messages.sort(java.util.Comparator.comparing(
+                        MessageInfo::getCreateTime,
+                        java.util.Comparator.nullsFirst(java.time.LocalDateTime::compareTo)));
+                LOG.info("群聊本地AI消息补充完成: sessionId={}, 补充数量={}, 总消息数={}",
+                        sessionId, addedCount, messages.size());
+            } else {
+                LOG.info("群聊本地AI消息无需补充: sessionId={}, 所有消息已存在", sessionId);
+            }
+        } catch (final Exception e) {
+            LOG.error("加载群聊本地AI消息失败: sessionId={}", sessionId, e);
+        }
+    }
 
     /**
      * 处理 AI 流式输出
@@ -916,6 +1018,74 @@ public final class ChatViewModel {
                 messages.set(index, aiMsg);
             }
             LOG.info("[AI-STREAM] AI流式输出完成: streamId={}, aiMessageId={}", streamMessageId, aiMessageId);
+        }
+    }
+
+    /**
+     * 处理群聊 AI 流式输出
+     *
+     * @param streamMessageId 流式消息ID
+     * @param content         内容
+     * @param done            是否完成
+     * @param aiMessageId     AI消息ID
+     * @param senderId        发送者ID
+     * @param senderName      发送者名称
+     * @param senderAvatar    发送者头像
+     * @param senderType      发送者类型
+     */
+    public void handleGroupAiStream(final String streamMessageId, final String content,
+            final boolean done, final Long aiMessageId,
+            final Long senderId, final String senderName,
+            final String senderAvatar, final String senderType) {
+        if (content == null) {
+            return;
+        }
+
+        MessageInfo aiMsg = aiStreamCache.get(streamMessageId);
+
+        if (aiMsg == null) {
+            if (done) {
+                LOG.warn("[AI-STREAM] 群聊收到完成消息但无占位缓存: streamId={}", streamMessageId);
+                return;
+            }
+            // 首次收到流式消息，创建 AI 消息占位
+            aiMsg = new MessageInfo();
+            aiMsg.setMessageId(-System.currentTimeMillis());
+            aiMsg.setSessionId(conversation.getSessionId());
+            aiMsg.setSenderId(senderId);
+            aiMsg.setSenderName(senderName != null ? senderName : "AI");
+            aiMsg.setSenderAvatar(senderAvatar);
+            aiMsg.setSenderType(senderType != null ? senderType : "AI");
+            aiMsg.setType("TEXT");
+            aiMsg.setContent(content);
+            aiMsg.setCreateTime(java.time.LocalDateTime.now());
+            aiMsg.setSentByMe(false);
+
+            messages.add(aiMsg);
+            aiStreamCache.put(streamMessageId, aiMsg);
+            LOG.debug("[AI-STREAM] 群聊创建AI消息占位: streamId={}, sender={}", streamMessageId, senderName);
+        } else {
+            // 增量追加内容
+            aiMsg.setContent(aiMsg.getContent() + content);
+            // 触发列表更新
+            final int index = messages.indexOf(aiMsg);
+            if (index >= 0) {
+                messages.set(index, aiMsg);
+            }
+        }
+
+        if (done) {
+            // 流式输出完成
+            if (aiMessageId != null) {
+                aiMsg.setMessageId(aiMessageId);
+            }
+            aiStreamCache.remove(streamMessageId);
+            // 最终刷新一次列表
+            final int index = messages.indexOf(aiMsg);
+            if (index >= 0) {
+                messages.set(index, aiMsg);
+            }
+            LOG.info("[AI-STREAM] 群聊AI流式输出完成: streamId={}, aiMessageId={}", streamMessageId, aiMessageId);
         }
     }
 }

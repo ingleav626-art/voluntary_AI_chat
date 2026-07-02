@@ -210,6 +210,14 @@ public final class AiController implements Initializable {
         alert.setHeaderText("删除 AI 角色");
         alert.setContentText("确定要删除 \"" + selected.getName() + "\" 吗？此操作不可恢复。");
 
+        // 应用粉色风格（添加默认CSS防止modena覆盖，再添加AI CSS）
+        alert.getDialogPane().getStylesheets().addAll(
+                getClass().getResource("/css/default.css").toExternalForm(),
+                getClass().getResource("/css/ai.css").toExternalForm());
+        alert.getDialogPane().getStyleClass().add("ai-delete-dialog");
+        // 使用内联样式确保优先级最高（不会被modena覆盖）
+        alert.getDialogPane().setStyle("-fx-background-color: linear-gradient(from 0% 0% to 0% 100%, #FFF5F8 0%, #FFE0EC 55%, #FFC1D6 100%); -fx-border-color: #FFB6C1; -fx-border-width: 2;");
+
         alert.showAndWait().ifPresent(response -> {
             if (response == javafx.scene.control.ButtonType.OK) {
                 LOG.info("确认删除AI角色: aiId={}", selected.getAiId());

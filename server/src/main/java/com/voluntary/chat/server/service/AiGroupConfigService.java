@@ -11,6 +11,7 @@ import com.voluntary.chat.server.mapper.AiGroupConfigMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +32,10 @@ public class AiGroupConfigService {
     @Autowired(required = false)
     private StringRedisTemplate redisTemplate;
 
+    /** 云端模式是否启用（本地模式下AI存储在客户端，服务端不验证AI存在） */
+    @Value("${cloud.mode.enabled:false}")
+    private boolean cloudModeEnabled;
+
     private static final String COOLDOWN_KEY_PREFIX = "ai:cooldown:";
     /** 默认冷却时间（秒） */
     private static final int DEFAULT_COOLDOWN_SECONDS = 30;
@@ -44,15 +49,30 @@ public class AiGroupConfigService {
      */
     @Transactional
     public Long createGroupConfig(final Long groupId, final Long userId, final AiGroupConfigRequest request) {
-        // 检查 AI 是否存在且可用
-        final AiProfile profile = aiService.getAiProfileById(request.getAiId());
+        // 云端模式下检查 AI 是否存在且可用（本地模式下AI存储在客户端，跳过验证）
+        if (cloudModeEnabled) {
+            final AiProfile profile = aiService.getAiProfileById(request.getAiId());
+            log.debug("云端模式验证AI存在: aiId={}, name={}", request.getAiId(), profile.getName());
+        } else {
+            log.debug("本地模式跳过AI验证: aiId={}", request.getAiId());
+        }
 
-        // 检查是否已存在配置
-        final LambdaQueryWrapper<AiGroupConfig> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(AiGroupConfig::getGroupId, groupId)
-                .eq(AiGroupConfig::getAiId, request.getAiId());
-        final AiGroupConfig existing = aiGroupConfigMapper.selectOne(wrapper);
+        // 检查是否已存在配置（包括已删除的，使用原生SQL绕过逻辑删除）
+        final AiGroupConfig existing = aiGroupConfigMapper.selectByGroupAndAiIgnoreDeleted(groupId, request.getAiId());
+
         if (existing != null) {
+            // 如果已存在但已删除，恢复它
+            if (existing.getIsDeleted() != null && existing.getIsDeleted() == 1) {
+                existing.setIsDeleted(0);
+                existing.setIsEnabled(request.getIsEnabled() != null ? request.getIsEnabled() : true);
+                existing.setTriggerKeywords(request.getTriggerKeywords());
+                existing.setTriggerProbability(request.getTriggerProbability() != null ? request.getTriggerProbability() : 0.0);
+                existing.setCooldownSeconds(request.getCooldownSeconds() != null ? request.getCooldownSeconds() : DEFAULT_COOLDOWN_SECONDS);
+                aiGroupConfigMapper.updateById(existing);
+                log.info("群 AI 配置恢复成功: groupId={}, aiId={}, userId={}, configId={}",
+                        groupId, request.getAiId(), userId, existing.getId());
+                return existing.getId();
+            }
             throw new BusinessException(ErrorCode.BAD_REQUEST, "该 AI 已配置在此群中");
         }
 
@@ -84,11 +104,18 @@ public class AiGroupConfigService {
 
         return configs.stream()
                 .map(config -> {
-                    final AiProfile profile = aiService.getAiProfileById(config.getAiId());
+                    // 云端模式从服务端数据库获取AI名称，本地模式返回占位符（客户端自行补充）
+                    String aiName;
+                    if (cloudModeEnabled) {
+                        final AiProfile profile = aiService.getAiProfileById(config.getAiId());
+                        aiName = profile.getName();
+                    } else {
+                        aiName = "AI #" + config.getAiId(); // 占位符，客户端本地引擎补充真实名称
+                    }
                     return AiGroupConfigResponse.builder()
                             .configId(config.getId())
                             .aiId(config.getAiId())
-                            .aiName(profile.getName())
+                            .aiName(aiName)
                             .triggerKeywords(config.getTriggerKeywords())
                             .triggerProbability(config.getTriggerProbability())
                             .isEnabled(config.getIsEnabled())
@@ -160,11 +187,16 @@ public class AiGroupConfigService {
             return false;
         }
 
-        // 1. @触发（优先级最高）
-        final AiProfile profile = aiService.getAiProfileById(aiId);
-        if (content.contains("@") && content.contains(profile.getName())) {
-            setCooldown(groupId, aiId, config.getCooldownSeconds());
-            return true;
+        // 1. @触发（优先级最高）- 云端模式下检查，本地模式跳过（无AI名称数据）
+        if (cloudModeEnabled) {
+            final AiProfile profile = aiService.getAiProfileById(aiId);
+            if (content.contains("@") && content.contains(profile.getName())) {
+                setCooldown(groupId, aiId, config.getCooldownSeconds());
+                return true;
+            }
+        } else {
+            // 本地模式：客户端自行处理@触发，服务端只检查关键词和概率
+            log.debug("本地模式跳过@触发检查: groupId={}, aiId={}", groupId, aiId);
         }
 
         // 2. 关键词触发

@@ -194,6 +194,8 @@ public class AiChatService {
             final String apiKey = aiService.decryptApiKey(profile);
             final String baseUrl = openAiClient.getBaseUrl(profile.getModelProvider());
 
+            final boolean isGroupChat = sessionId != null && sessionId.contains("_a_");
+
             saveUserMessage(userId, sessionId, content, aiId);
 
             final List<Map<String, String>> messages = buildContext(profile, userId, sessionId, content);
@@ -207,12 +209,27 @@ public class AiChatService {
                     messages,
                     profile.getTemperature(),
                     profile.getMaxTokens(),
-                    chunk -> webSocketHandler.sendAiStream(userId, messageId, chunk, false),
+                    chunk -> {
+                        if (isGroupChat) {
+                            webSocketHandler.sendGroupAiStream(sessionId, messageId, aiId,
+                                    profile.getName(), profile.getAvatar(), chunk, false);
+                        } else {
+                            webSocketHandler.sendAiStream(userId, messageId, chunk, false);
+                        }
+                    },
                     completeContent -> {
                         fullResponse.append(completeContent);
                         final Long aiMessageId = saveAiMessage(profile.getId(), sessionId, completeContent, userId);
-                        webSocketHandler.sendAiStream(userId, messageId, completeContent, true, aiMessageId);
-                        log.info("AI 对话完成: aiId={}, userId={}, messageId={}", aiId, userId, aiMessageId);
+
+                        if (isGroupChat) {
+                            webSocketHandler.sendGroupAiStream(sessionId, messageId, aiId,
+                                    profile.getName(), profile.getAvatar(), completeContent, true, aiMessageId);
+                        } else {
+                            webSocketHandler.sendAiStream(userId, messageId, completeContent, true, aiMessageId);
+                        }
+
+                        log.info("AI 对话完成: aiId={}, userId={}, messageId={}, group={}",
+                                aiId, userId, aiMessageId, isGroupChat);
 
                         aiTaskExecutor.execute(() -> {
                             try {
@@ -226,7 +243,13 @@ public class AiChatService {
             openAiClient.streamChatCompletion(streamConfig);
         } catch (final RuntimeException e) {
             log.error("AI 对话处理失败: aiId={}, userId={}, messageId={}", aiId, userId, messageId, e);
-            webSocketHandler.sendAiStream(userId, messageId, "AI 回复失败，请稍后重试", true, null);
+            if (sessionId != null && sessionId.contains("_a_")) {
+                final AiProfile profile = aiService.getAiProfileById(aiId);
+                webSocketHandler.sendGroupAiStream(sessionId, messageId, aiId,
+                        profile.getName(), profile.getAvatar(), "AI 回复失败，请稍后重试", true, null);
+            } else {
+                webSocketHandler.sendAiStream(userId, messageId, "AI 回复失败，请稍后重试", true, null);
+            }
         }
     }
 

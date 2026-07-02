@@ -27,6 +27,9 @@ public class MessageTypes {
     public static final String GROUP_INFO_CHANGE = "GROUP_INFO_CHANGE";
     public static final String GROUP_DISMISSED = "GROUP_DISMISSED";
 
+    // 本地模式下客户端广播群AI回复
+    public static final String GROUP_AI_STREAM = "GROUP_AI_STREAM";
+
     // 通知消息（服务端 → 客户端）
     public static final String NOTIFICATION = "NOTIFICATION";
     public static final String NOTIFICATION_NEW_MESSAGE = "NOTIFICATION_NEW_MESSAGE";
