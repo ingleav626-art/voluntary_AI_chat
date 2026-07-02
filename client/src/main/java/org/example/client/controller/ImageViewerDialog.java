@@ -54,7 +54,8 @@ public class ImageViewerDialog {
     private double imageTranslateY;
 
     public ImageViewerDialog(final String imageUrl) {
-        this.imageUrl = imageUrl;
+        // 将相对路径解析为完整 URL（支持热点/远程模式）
+        this.imageUrl = org.example.client.util.ImageUtils.resolveImageUrl(imageUrl);
         this.stage = new Stage();
         this.imageView = new ImageView();
         initDialog();

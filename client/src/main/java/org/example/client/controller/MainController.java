@@ -643,7 +643,8 @@ public final class MainController implements Initializable {
             if ("IMAGE".equals(item.getType())) {
                 final String thumbnailUrl = item.getThumbnailUrl();
                 final String originalUrl = item.getContent();
-                final String imageUrl = thumbnailUrl != null && !thumbnailUrl.isEmpty() ? thumbnailUrl : originalUrl;
+                final String displayUrl = org.example.client.util.ImageUtils.resolveImageUrl(
+                        thumbnailUrl != null && !thumbnailUrl.isEmpty() ? thumbnailUrl : originalUrl);
 
                 final javafx.scene.image.ImageView imageView = new javafx.scene.image.ImageView();
                 imageView.setPreserveRatio(true);
@@ -651,6 +652,21 @@ public final class MainController implements Initializable {
                 imageView.setFitHeight(150);
                 imageView.getStyleClass().add("message-image");
                 imageView.setCursor(javafx.scene.Cursor.HAND);
+
+                // 异步加载图片（带认证）
+                org.example.client.service.ChatService.getInstance()
+                        .loadImageBytes(displayUrl)
+                        .thenAccept(bytes -> javafx.application.Platform.runLater(() -> {
+                            if (bytes != null && bytes.length > 0) {
+                                final javafx.scene.image.Image img = new javafx.scene.image.Image(
+                                        new java.io.ByteArrayInputStream(bytes));
+                                imageView.setImage(img);
+                            }
+                        }))
+                        .exceptionally(ex -> {
+                            LOG.warn("聊天图片加载失败: {}", displayUrl, ex);
+                            return null;
+                        });
 
                 imageView.setOnMouseClicked(e -> new ImageViewerDialog(originalUrl).show());
 
@@ -679,26 +695,6 @@ public final class MainController implements Initializable {
                     }
                 }
 
-                if (imageUrl != null && !imageUrl.isEmpty()) {
-                    final MessageInfo currentItem = item;
-                    org.example.client.service.ChatService.getInstance()
-                            .loadImageBytes(imageUrl)
-                            .thenAccept(bytes -> Platform.runLater(() -> {
-                                if (getItem() == currentItem && bytes != null && bytes.length > 0) {
-                                    try {
-                                        final javafx.scene.image.Image image = new javafx.scene.image.Image(
-                                                new java.io.ByteArrayInputStream(bytes));
-                                        imageView.setImage(image);
-                                    } catch (final Exception e) {
-                                        LOG.warn("图片解码失败: {}", imageUrl, e);
-                                    }
-                                }
-                            }))
-                            .exceptionally(ex -> {
-                                LOG.warn("图片加载失败: {} - {}", imageUrl, ex.getMessage());
-                                return null;
-                            });
-                }
                 return;
             } else if ("FILE".equals(item.getType())) {
                 final String fileName = item.getContent();
@@ -714,7 +710,9 @@ public final class MainController implements Initializable {
                 nameLabel.setWrapText(true);
                 nameLabel.setMaxWidth(250);
 
+                // 从 extra 中解析文件URL和大小
                 String sizeText = "";
+                String fileUrl = null;
                 if (item.getExtra() != null) {
                     try {
                         final com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
@@ -729,16 +727,33 @@ public final class MainController implements Initializable {
                                 sizeText = fileSize + " B";
                             }
                         }
+                        if (extra.has("fileUrl")) {
+                            fileUrl = extra.get("fileUrl").asText();
+                        }
                     } catch (final Exception e) {
-                        // 解析 extra 失败，记录日志不影响 UI 显示
                         LOG.debug("解析消息 extra 字段失败: messageId={}, extra={}",
                                 item.getMessageId(), item.getExtra(), e);
                     }
                 }
+
                 final Label sizeLabel = new Label(sizeText);
                 sizeLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #888;");
-                fileInfo.getChildren().addAll(nameLabel, sizeLabel);
-                fileBox.getChildren().addAll(fileIcon, fileInfo);
+
+                // 下载按钮
+                final Button downloadBtn = new Button("下载");
+                downloadBtn.setStyle(
+                        "-fx-font-size: 11px; -fx-padding: 2 8; -fx-background-color: #4a9eff; -fx-text-fill: white; -fx-background-radius: 4; -fx-cursor: hand;");
+                final String finalFileUrl = fileUrl;
+                final String finalFileName = fileName;
+                downloadBtn.setOnAction(e -> downloadFile(finalFileUrl, finalFileName));
+
+                if (finalFileUrl != null) {
+                    fileInfo.getChildren().addAll(nameLabel, sizeLabel);
+                    fileBox.getChildren().addAll(fileIcon, fileInfo, downloadBtn);
+                } else {
+                    fileInfo.getChildren().addAll(nameLabel, sizeLabel);
+                    fileBox.getChildren().addAll(fileIcon, fileInfo);
+                }
                 bubble.getChildren().add(fileBox);
             } else {
                 final Label content = new Label(item.getContent() != null ? item.getContent() : "");
@@ -924,6 +939,44 @@ public final class MainController implements Initializable {
             } else {
                 return time.format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm"));
             }
+        }
+
+        /**
+         * 下载文件到本地
+         *
+         * @param fileUrl  文件URL（相对路径或完整URL）
+         * @param fileName 保存的文件名
+         */
+        private void downloadFile(final String fileUrl, final String fileName) {
+            if (fileUrl == null || fileUrl.isEmpty()) {
+                LOG.warn("文件URL为空，无法下载");
+                return;
+            }
+
+            // 弹出文件保存对话框
+            final javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
+            fileChooser.setTitle("保存文件");
+            fileChooser.setInitialFileName(fileName != null ? fileName : "download");
+            final java.io.File saveFile = fileChooser.showSaveDialog(
+                    getListView().getScene().getWindow());
+            if (saveFile == null) {
+                return;
+            }
+
+            // 异步下载文件
+            org.example.client.service.ChatService.getInstance().loadFileBytes(fileUrl)
+                    .thenAccept(bytes -> javafx.application.Platform.runLater(() -> {
+                        try {
+                            java.nio.file.Files.write(saveFile.toPath(), bytes);
+                            LOG.info("文件下载成功: fileName={}, size={}", fileName, bytes.length);
+                        } catch (final java.io.IOException e) {
+                            LOG.error("保存文件失败: {}", saveFile, e);
+                        }
+                    }))
+                    .exceptionally(ex -> {
+                        LOG.error("文件下载失败: url={}", fileUrl, ex);
+                        return null;
+                    });
         }
 
         /**

@@ -77,6 +77,7 @@ public class MessageService {
         message.setTargetType(sessionInfo.targetType.ordinal());
         message.setType(msgType.ordinal());
         message.setContent(request.getContent());
+        message.setExtra(request.getExtra());
         return message;
     }
 

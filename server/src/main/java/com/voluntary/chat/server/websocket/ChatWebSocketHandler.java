@@ -126,6 +126,23 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
                 senderId, request.getSessionId(), request.getType(),
                 request.getContent() != null ? request.getContent().length() : 0);
 
+        // 提取额外字段（图片和文件消息的元信息），转发时携带
+        final Map<String, Object> extraFields = new LinkedHashMap<>();
+        for (final String key : List.of("thumbnailUrl", "width", "height", "fileUrl", "fileSize", "fileName")) {
+            if (data.containsKey(key) && data.get(key) != null) {
+                extraFields.put(key, data.get(key));
+            }
+        }
+
+        // 将额外字段构建为 JSON 存入 request.extra，持久化到数据库
+        if (!extraFields.isEmpty()) {
+            try {
+                request.setExtra(objectMapper.writeValueAsString(extraFields));
+            } catch (final Exception e) {
+                log.warn("序列化extra字段失败: {}", e.getMessage());
+            }
+        }
+
         final SendMessageResponse response = messageService.sendMessage(senderId, request);
 
         // 更新会话缓存：最后一条消息 + 会话列表排序
@@ -167,9 +184,9 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
         }
 
         if (request.getSessionId().startsWith("g_")) {
-            broadcastGroupMessage(senderId, sender, request, response);
+            broadcastGroupMessage(senderId, sender, request, response, extraFields);
         } else {
-            forwardPrivateMessage(senderId, sender, request, response);
+            forwardPrivateMessage(senderId, sender, request, response, extraFields);
         }
     }
 
@@ -194,26 +211,30 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
     }
 
     private void broadcastGroupMessage(final Long senderId, final User sender,
-            final SendMessageRequest request, final SendMessageResponse response) {
+            final SendMessageRequest request, final SendMessageResponse response,
+            final Map<String, Object> extraFields) {
         final String[] parts = request.getSessionId().split("_");
         final Long groupId = Long.parseLong(parts[1]);
 
         final List<Long> groupMembers = getGroupMemberIds(groupId);
 
+        final Map<String, Object> msgData = new LinkedHashMap<>();
+        msgData.put("messageId", response.getMessageId());
+        msgData.put("sessionId", request.getSessionId());
+        msgData.put("groupId", groupId);
+        msgData.put("senderId", senderId);
+        msgData.put("senderName", sender.getUsername());
+        msgData.put("senderAvatar", sender.getAvatar() != null ? sender.getAvatar() : "");
+        msgData.put("senderType", SenderType.USER.name());
+        msgData.put("msgType", request.getType());
+        msgData.put("content", request.getContent());
+        msgData.put("createTime", response.getCreateTime().toString());
+        msgData.putAll(extraFields);
+
         final WebSocketMessage groupMsg = WebSocketMessage.builder()
                 .id(String.valueOf(response.getMessageId()))
                 .type(MessageTypes.GROUP_MESSAGE)
-                .data(Map.of(
-                        "messageId", response.getMessageId(),
-                        "sessionId", request.getSessionId(),
-                        "groupId", groupId,
-                        "senderId", senderId,
-                        "senderName", sender.getUsername(),
-                        "senderAvatar", sender.getAvatar() != null ? sender.getAvatar() : "",
-                        "senderType", SenderType.USER.name(),
-                        "msgType", request.getType(),
-                        "content", request.getContent(),
-                        "createTime", response.getCreateTime().toString()))
+                .data(msgData)
                 .build();
 
         for (final Long memberId : groupMembers) {
@@ -229,7 +250,8 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
     }
 
     private void forwardPrivateMessage(final Long senderId, final User sender,
-            final SendMessageRequest request, final SendMessageResponse response) {
+            final SendMessageRequest request, final SendMessageResponse response,
+            final Map<String, Object> extraFields) {
         final Map<String, Object> msgData = new LinkedHashMap<>();
         msgData.put("messageId", response.getMessageId());
         msgData.put("sessionId", request.getSessionId());
@@ -240,6 +262,7 @@ public class ChatWebSocketHandler extends AiWebSocketHandler {
         msgData.put("msgType", request.getType());
         msgData.put("content", request.getContent());
         msgData.put("createTime", response.getCreateTime().toString());
+        msgData.putAll(extraFields);
 
         final WebSocketMessage receiveMsg = WebSocketMessage.builder()
                 .id(String.valueOf(response.getMessageId()))

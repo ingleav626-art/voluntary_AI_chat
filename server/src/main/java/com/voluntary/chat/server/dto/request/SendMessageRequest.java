@@ -16,4 +16,7 @@ public class SendMessageRequest {
     @NotBlank(message = "消息内容不能为空")
     @Size(max = 5000, message = "消息内容不能超过5000字符")
     private String content;
+
+    /** 额外信息（JSON格式，用于图片/文件消息的元信息） */
+    private String extra;
 }

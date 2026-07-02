@@ -98,7 +98,10 @@ upload:
     dir: /opt/app/uploads/chat/images
     base-url: https://your-domain.com/files
   avatar:
+    dir: /opt/app/uploads/avatars
     base-url: https://your-domain.com/avatars
+  file:
+    dir: /opt/app/uploads/chat/files
     # 或使用OSS配置
     oss:
       enabled: false

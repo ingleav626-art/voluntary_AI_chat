@@ -8,6 +8,7 @@ import java.util.concurrent.CompletableFuture;
 import org.example.client.config.ClientConfig;
 import org.example.client.model.ApiResponse;
 import org.example.client.model.ConversationInfo;
+import org.example.client.model.FileUploadResponse;
 import org.example.client.model.ImageUploadResponse;
 import org.example.client.model.MarkReadRequest;
 import org.example.client.model.MessageInfo;
@@ -51,6 +52,9 @@ public final class ChatService extends BaseHttpService {
 
         /** 图片上传接口路径 */
         private static final String MESSAGE_UPLOAD_IMAGE_PATH = "/message/upload/image";
+
+        /** 文件上传接口路径 */
+        private static final String FILE_UPLOAD_PATH = "/file/upload/file";
 
         /** 默认每页数量 */
         private static final int DEFAULT_PAGE_SIZE = 20;
@@ -275,39 +279,159 @@ public final class ChatService extends BaseHttpService {
          * @return 异步结果，包含图片字节数据
          */
         public CompletableFuture<byte[]> loadImageBytes(final String imageUrl) {
+                // 将相对路径解析为完整 URL（支持热点/远程模式）
+                final String fullUrl = org.example.client.util.ImageUtils.resolveImageUrl(imageUrl);
                 final CompletableFuture<byte[]> future = new CompletableFuture<>();
                 try {
-                        final org.example.client.model.LoginResponse token =
-                                org.example.client.util.TokenStorage.load();
+                        final org.example.client.model.LoginResponse token = org.example.client.util.TokenStorage
+                                        .load();
                         final HttpRequest.Builder builder = HttpRequest.newBuilder()
-                                .uri(java.net.URI.create(imageUrl))
-                                .timeout(java.time.Duration.ofSeconds(
-                                        ClientConfig.getInstance().getReadTimeout()))
-                                .GET();
+                                        .uri(java.net.URI.create(fullUrl))
+                                        .timeout(java.time.Duration.ofSeconds(
+                                                        ClientConfig.getInstance().getReadTimeout()))
+                                        .GET();
                         if (token != null && token.getAccessToken() != null) {
                                 builder.header("Authorization", "Bearer " + token.getAccessToken());
                         }
                         final HttpRequest request = builder.build();
 
                         getHttpClient().sendAsync(request, java.net.http.HttpResponse.BodyHandlers.ofByteArray())
-                                .thenAccept(response -> {
-                                        if (response.statusCode() == 200) {
-                                                future.complete(response.body());
-                                        } else {
-                                                LOG.warn("下载图片失败: url={}, status={}",
-                                                        imageUrl, response.statusCode());
-                                                future.completeExceptionally(
-                                                        new java.io.IOException(
-                                                                "HTTP " + response.statusCode()));
-                                        }
-                                })
-                                .exceptionally(ex -> {
-                                        LOG.warn("下载图片异常: url={}", imageUrl, ex);
-                                        future.completeExceptionally(ex);
-                                        return null;
-                                });
+                                        .thenAccept(response -> {
+                                                if (response.statusCode() == 200) {
+                                                        future.complete(response.body());
+                                                } else {
+                                                        LOG.warn("下载图片失败: url={}, status={}",
+                                                                        fullUrl, response.statusCode());
+                                                        future.completeExceptionally(
+                                                                        new java.io.IOException(
+                                                                                        "HTTP " + response
+                                                                                                        .statusCode()));
+                                                }
+                                        })
+                                        .exceptionally(ex -> {
+                                                LOG.warn("下载图片异常: url={}", fullUrl, ex);
+                                                future.completeExceptionally(ex);
+                                                return null;
+                                        });
                 } catch (final Exception e) {
-                        LOG.warn("创建图片下载请求失败: url={}", imageUrl, e);
+                        LOG.warn("创建图片下载请求失败: url={}", fullUrl, e);
+                        future.completeExceptionally(e);
+                }
+                return future;
+        }
+
+        /**
+         * 上传聊天文件
+         * 使用 multipart/form-data 格式上传，服务端返回文件URL等信息
+         *
+         * @param filePath 文件路径
+         * @return 异步结果，包含文件URL、文件名、大小等信息
+         */
+        public CompletableFuture<ApiResponse<FileUploadResponse>> uploadFile(final Path filePath) {
+                try {
+                        final byte[] fileBytes = Files.readAllBytes(filePath);
+                        final String boundary = "----Boundary" + System.currentTimeMillis();
+                        final String url = ClientConfig.getInstance().getBaseUrl() + FILE_UPLOAD_PATH;
+
+                        // 探测文件 MIME 类型
+                        String contentType = Files.probeContentType(filePath);
+                        if (contentType == null || contentType.isEmpty()) {
+                                contentType = "application/octet-stream";
+                        }
+
+                        // 对文件名进行 URL 编码
+                        final String encodedFileName = java.net.URLEncoder.encode(
+                                        filePath.getFileName().toString(), java.nio.charset.StandardCharsets.UTF_8);
+
+                        // 构建 multipart/form-data 请求体
+                        final StringBuilder sb = new StringBuilder();
+                        sb.append("--").append(boundary).append("\r\n");
+                        sb.append("Content-Disposition: form-data; name=\"file\"; filename=\"")
+                                        .append(encodedFileName).append("\"\r\n");
+                        sb.append("Content-Type: ").append(contentType).append("\r\n\r\n");
+
+                        final byte[] header = sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                        final byte[] footer = ("\r\n--" + boundary + "--\r\n")
+                                        .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+                        final java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+                        bos.write(header);
+                        bos.write(fileBytes);
+                        bos.write(footer);
+                        final byte[] body = bos.toByteArray();
+
+                        final HttpRequest.Builder builder = HttpRequest.newBuilder()
+                                        .uri(java.net.URI.create(url))
+                                        .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                                        .timeout(java.time.Duration
+                                                        .ofSeconds(ClientConfig.getInstance().getReadTimeout()))
+                                        .POST(HttpRequest.BodyPublishers.ofByteArray(body));
+
+                        // 添加认证头
+                        final org.example.client.model.LoginResponse loginResponse = org.example.client.util.TokenStorage
+                                        .load();
+                        if (loginResponse != null && loginResponse.getAccessToken() != null
+                                        && !loginResponse.getAccessToken().isEmpty()) {
+                                builder.header("Authorization", "Bearer " + loginResponse.getAccessToken());
+                        }
+
+                        final HttpRequest request = builder.build();
+                        LOG.info("上传文件: fileName={}, contentType={}, size={}", filePath.getFileName(),
+                                        contentType, fileBytes.length);
+
+                        return sendRequest(request, getTypeFactory().constructParametricType(
+                                        ApiResponse.class, FileUploadResponse.class));
+                } catch (final java.io.IOException e) {
+                        LOG.error("读取文件失败: {}", filePath, e);
+                        final CompletableFuture<ApiResponse<FileUploadResponse>> failed = new CompletableFuture<>();
+                        failed.completeExceptionally(e);
+                        return failed;
+                }
+        }
+
+        /**
+         * 下载文件字节（带认证）
+         *
+         * @param fileUrl 文件URL（相对路径或完整URL均可）
+         * @return 异步结果，包含文件字节数据
+         */
+        public CompletableFuture<byte[]> loadFileBytes(final String fileUrl) {
+                // 解析为完整 URL
+                final String fullUrl = org.example.client.util.ImageUtils.resolveImageUrl(fileUrl);
+                final CompletableFuture<byte[]> future = new CompletableFuture<>();
+                try {
+                        final org.example.client.model.LoginResponse token = org.example.client.util.TokenStorage
+                                        .load();
+                        final HttpRequest.Builder builder = HttpRequest.newBuilder()
+                                        .uri(java.net.URI.create(fullUrl))
+                                        .timeout(java.time.Duration.ofSeconds(
+                                                        ClientConfig.getInstance().getReadTimeout()))
+                                        .GET();
+                        if (token != null && token.getAccessToken() != null) {
+                                builder.header("Authorization", "Bearer " + token.getAccessToken());
+                        }
+                        final HttpRequest request = builder.build();
+
+                        getHttpClient().sendAsync(request, java.net.http.HttpResponse.BodyHandlers.ofByteArray())
+                                        .thenAccept(response -> {
+                                                if (response.statusCode() == 200) {
+                                                        future.complete(response.body());
+                                                } else {
+                                                        LOG.warn("下载文件失败: url={}, status={}",
+                                                                        fullUrl, response.statusCode());
+                                                        future.completeExceptionally(
+                                                                        new java.io.IOException(
+                                                                                        "HTTP " + response
+                                                                                                        .statusCode()));
+                                                }
+                                        })
+                                        .exceptionally(ex -> {
+                                                LOG.warn("下载文件异常: url={}", fullUrl, ex);
+                                                future.completeExceptionally(ex);
+                                                return null;
+                                        });
+                } catch (final Exception e) {
+                        LOG.warn("创建文件下载请求失败: url={}", fullUrl, e);
                         future.completeExceptionally(e);
                 }
                 return future;

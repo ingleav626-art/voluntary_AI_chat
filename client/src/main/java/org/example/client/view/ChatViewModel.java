@@ -700,7 +700,7 @@ public final class ChatViewModel {
 
     /**
      * 发送文件消息
-     * 通过 WebSocket 发送 FILE 类型消息（包含文件名和大小等元信息）
+     * 先上传文件到服务器获取URL，再通过 WebSocket 发送 FILE 类型消息（包含文件URL和元信息）
      *
      * @param filePath 文件路径
      */
@@ -718,35 +718,65 @@ public final class ChatViewModel {
 
         final String fileName = file.getName();
         final long fileSize = file.length();
-        final String clientId = UUID.randomUUID().toString();
 
-        // 创建乐观消息
-        final MessageInfo optimisticMsg = new MessageInfo();
-        optimisticMsg.setMessageId(-1L);
-        optimisticMsg.setSessionId(conversation.getSessionId());
-        optimisticMsg.setSenderId(currentUser != null ? currentUser.getUserId() : null);
-        optimisticMsg.setSenderName(currentUser != null ? currentUser.getUsername() : "");
-        optimisticMsg.setSenderType("USER");
-        optimisticMsg.setType(MSG_TYPE_FILE);
-        optimisticMsg.setContent(fileName);
-        optimisticMsg.setExtra(String.format("{\"fileSize\": %d, \"filePath\": \"%s\"}",
-                fileSize, filePath.toString().replace("\\", "\\\\")));
-        optimisticMsg.setCreateTime(LocalDateTime.now());
-        optimisticMsg.setSentByMe(true);
+        loading.set(true);
+        ChatService.getInstance().uploadFile(filePath)
+                .thenAccept(response -> {
+                    Platform.runLater(() -> {
+                        loading.set(false);
+                        if (response != null && response.isSuccess() && response.getData() != null) {
+                            final org.example.client.model.FileUploadResponse uploadResult = response.getData();
+                            final String clientId = UUID.randomUUID().toString();
 
-        // 添加到消息列表并注册待确认
-        messages.add(optimisticMsg);
-        pendingMessages.put(clientId, optimisticMsg);
+                            // 创建乐观消息
+                            final MessageInfo optimisticMsg = new MessageInfo();
+                            optimisticMsg.setMessageId(-1L);
+                            optimisticMsg.setSessionId(conversation.getSessionId());
+                            optimisticMsg.setSenderId(currentUser != null ? currentUser.getUserId() : null);
+                            optimisticMsg.setSenderName(currentUser != null ? currentUser.getUsername() : "");
+                            optimisticMsg.setSenderType("USER");
+                            optimisticMsg.setType(MSG_TYPE_FILE);
+                            // content 存储原始文件名，方便界面显示
+                            optimisticMsg.setContent(fileName);
+                            // extra 存储文件URL和大小，方便接收方下载
+                            optimisticMsg.setExtra(String.format(
+                                    "{\"fileUrl\": \"%s\", \"fileSize\": %d, \"fileName\": \"%s\"}",
+                                    uploadResult.getUrl(), fileSize,
+                                    fileName.replace("\\", "\\\\").replace("\"", "\\\"")));
+                            optimisticMsg.setCreateTime(LocalDateTime.now());
+                            optimisticMsg.setSentByMe(true);
 
-        // 通过 WebSocket 发送 FILE 类型消息
-        final Map<String, Object> data = new HashMap<>();
-        data.put("sessionId", conversation.getSessionId());
-        data.put("msgType", MSG_TYPE_FILE);
-        data.put("content", fileName);
-        data.put("fileSize", fileSize);
+                            // 添加到消息列表并注册待确认
+                            messages.add(optimisticMsg);
+                            pendingMessages.put(clientId, optimisticMsg);
 
-        WebSocketClient.getInstance().send(MessageTypes.SEND_MESSAGE, data);
-        LOG.info("文件消息发送: fileName={}, fileSize={}, clientId={}", fileName, fileSize, clientId);
+                            // 通过 WebSocket 发送 FILE 类型消息
+                            final Map<String, Object> data = new HashMap<>();
+                            data.put("sessionId", conversation.getSessionId());
+                            data.put("msgType", MSG_TYPE_FILE);
+                            data.put("content", fileName);
+                            data.put("fileUrl", uploadResult.getUrl());
+                            data.put("fileSize", fileSize);
+                            data.put("fileName", fileName);
+
+                            WebSocketClient.getInstance().send(MessageTypes.SEND_MESSAGE, data);
+                            LOG.info("文件消息发送: fileName={}, fileUrl={}, fileSize={}, clientId={}",
+                                    fileName, uploadResult.getUrl(), fileSize, clientId);
+                        } else {
+                            final String msg = response != null ? response.getMessage() : "文件上传失败";
+                            errorMessage.set(msg);
+                            LOG.warn("文件上传失败: {}", msg);
+                        }
+                    });
+                })
+                .exceptionally(ex -> {
+                    Platform.runLater(() -> {
+                        loading.set(false);
+                        errorMessage.set("文件上传失败: " + ex.getMessage());
+                        LOG.error("文件上传异常", ex);
+                    });
+                    return null;
+                });
     }
 
     /**

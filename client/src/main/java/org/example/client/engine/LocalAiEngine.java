@@ -97,11 +97,11 @@ public class LocalAiEngine implements AutoCloseable {
         long start = System.currentTimeMillis();
 
         try {
-            // 1. 确定 H2 数据目录
+            // 1. 确定 H2 数据目录（统一使用项目目录下的 ./data）
             String dataDir = System.getProperty("app.data.dir");
             if (dataDir == null) {
-                String appdata = System.getenv("APPDATA");
-                dataDir = appdata != null ? appdata + "/Voluntary-AI-Chat/data" : "./data";
+                // 统一使用项目目录下的 data，避免与 APPDATA 混淆
+                dataDir = "./data";
             }
             Path dir = Path.of(dataDir);
             if (!Files.exists(dir)) {

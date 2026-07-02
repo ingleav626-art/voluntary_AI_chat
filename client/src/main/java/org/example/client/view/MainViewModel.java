@@ -683,6 +683,38 @@ public final class MainViewModel {
                 && currentUser.get().getUserId() != null
                 && currentUser.get().getUserId().equals(senderId));
 
+        // FILE 类型消息：构建 extra 字段，包含文件URL和大小信息
+        if ("FILE".equals(msgType)) {
+            final String fileUrl = (String) data.get("fileUrl");
+            final Long fileSize = data.get("fileSize") != null ? toLong(data.get("fileSize")) : null;
+            final String fileName = (String) data.get("fileName");
+            if (fileUrl != null || fileSize != null) {
+                final StringBuilder extraBuilder = new StringBuilder("{");
+                boolean hasField = false;
+                if (fileUrl != null) {
+                    extraBuilder.append("\"fileUrl\": \"").append(fileUrl).append("\"");
+                    hasField = true;
+                }
+                if (fileSize != null) {
+                    if (hasField) {
+                        extraBuilder.append(", ");
+                    }
+                    extraBuilder.append("\"fileSize\": ").append(fileSize);
+                    hasField = true;
+                }
+                if (fileName != null) {
+                    if (hasField) {
+                        extraBuilder.append(", ");
+                    }
+                    extraBuilder.append("\"fileName\": \"")
+                            .append(fileName.replace("\\", "\\\\").replace("\"", "\\\""))
+                            .append("\"");
+                }
+                extraBuilder.append("}");
+                message.setExtra(extraBuilder.toString());
+            }
+        }
+
         // 更新会话最后消息
         updateConversationLastMessage(sessionId, content);
 
@@ -756,6 +788,38 @@ public final class MainViewModel {
         message.setSentByMe(currentUser.get() != null
                 && currentUser.get().getUserId() != null
                 && currentUser.get().getUserId().equals(senderId));
+
+        // FILE 类型消息：构建 extra 字段，包含文件URL和大小信息
+        if ("FILE".equals(msgType)) {
+            final String fileUrl = (String) data.get("fileUrl");
+            final Long fileSize = data.get("fileSize") != null ? toLong(data.get("fileSize")) : null;
+            final String fileName = (String) data.get("fileName");
+            if (fileUrl != null || fileSize != null) {
+                final StringBuilder extraBuilder = new StringBuilder("{");
+                boolean hasField = false;
+                if (fileUrl != null) {
+                    extraBuilder.append("\"fileUrl\": \"").append(fileUrl).append("\"");
+                    hasField = true;
+                }
+                if (fileSize != null) {
+                    if (hasField) {
+                        extraBuilder.append(", ");
+                    }
+                    extraBuilder.append("\"fileSize\": ").append(fileSize);
+                    hasField = true;
+                }
+                if (fileName != null) {
+                    if (hasField) {
+                        extraBuilder.append(", ");
+                    }
+                    extraBuilder.append("\"fileName\": \"")
+                            .append(fileName.replace("\\", "\\\\").replace("\"", "\\\""))
+                            .append("\"");
+                }
+                extraBuilder.append("}");
+                message.setExtra(extraBuilder.toString());
+            }
+        }
 
         // 更新会话最后消息
         updateConversationLastMessage(sessionId, content);

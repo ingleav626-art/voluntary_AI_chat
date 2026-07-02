@@ -29,6 +29,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Value("${upload.avatar.dir:uploads/avatars}")
     private String avatarDir;
 
+    @Value("${upload.file.dir:${app.data.dir:./data}/uploads/chat/files}")
+    private String chatFileDir;
+
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         // 将相对路径转为绝对路径，确保资源映射可靠
@@ -44,5 +47,11 @@ public class WebMvcConfig implements WebMvcConfigurer {
         LOG.info("头像资源映射: /avatars/** -> file:{}/", avatarPath);
         registry.addResourceHandler("/avatars/**")
                 .addResourceLocations("file:" + avatarPath + "/");
+
+        // 映射 /chat-files/** 到聊天文件目录
+        final Path chatFilePath = Paths.get(chatFileDir).toAbsolutePath();
+        LOG.info("聊天文件资源映射: /chat-files/** -> file:{}/", chatFilePath);
+        registry.addResourceHandler("/chat-files/**")
+                .addResourceLocations("file:" + chatFilePath + "/");
     }
 }

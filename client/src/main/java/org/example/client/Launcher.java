@@ -50,6 +50,11 @@ import org.springframework.context.ConfigurableApplicationContext;
  */
 public final class Launcher {
 
+    // 静态初始化块：在 Logger 加载前设置日志目录，确保 logback.xml 正确解析路径
+    static {
+        System.setProperty("app.log.dir", "./logs");
+    }
+
     private static final Logger LOG = LoggerFactory.getLogger(Launcher.class);
 
     private static final int SERVER_PORT = 8080;
@@ -84,6 +89,10 @@ public final class Launcher {
                 return;
             }
 
+            // 在启动任何线程前初始化 AWT Toolkit，确保 SystemTray 检测正确
+            // 这是解决主机模式下系统托盘失效的关键
+            java.awt.Toolkit.getDefaultToolkit();
+
             // 启动前确保日志目录存在
             ensureDataDirectory();
 
@@ -103,6 +112,8 @@ public final class Launcher {
                         // 发现其他服务器，做客机，不启动本地后端
                         LOG.info("热点模式（客机）：发现服务器 {}，将连接该服务器", discoveredHotspot);
                         connectionManager.setHotspotServerUrl(discoveredHotspot);
+                        // 同时设置 ClientConfig，确保 WebSocketClient 使用正确的地址
+                        org.example.client.config.ClientConfig.getInstance().setHotspotBaseUrl(discoveredHotspot);
                     } else if (isServerModuleAvailable()) {
                         // 未发现且含 server 模块，启动本地后端做主机
                         LOG.info("热点模式（主机）：未发现其他服务器，启动本地后端做主机");
@@ -191,12 +202,24 @@ public final class Launcher {
                 // 本地模式使用精简配置（H2数据库，仅AI组件）
                 final String profile = "local";
 
+                // 数据目录：统一使用项目目录下的 data
+                final String dataDir = getDataDir().toAbsolutePath().toString();
+
                 // 程序化设置启动属性（比 YAML 优先级更高，确保生效）
                 final SpringApplication app = new SpringApplication(
                         org.example.client.server.EmbeddedServerStarter.class);
                 final java.util.Properties props = new java.util.Properties();
                 props.setProperty("spring.profiles.active", profile);
                 props.setProperty("server.port", String.valueOf(SERVER_PORT));
+                // 日志配置：强制使用 client 的 logback.xml，避免 Spring Boot 重置 LoggerContext
+                props.setProperty("logging.config", "classpath:logback.xml");
+                // H2 数据库路径：直接覆盖 YAML 配置，避免占位符解析问题
+                props.setProperty("spring.datasource.url",
+                        "jdbc:h2:file:" + dataDir + "/voluntary_ai_chat;AUTO_SERVER=TRUE;MODE=MySQL;NON_KEYWORDS=USER");
+                props.setProperty("app.data.dir", dataDir);
+                // 图片上传目录
+                props.setProperty("upload.image.dir", dataDir + "/uploads/chat/images");
+                props.setProperty("upload.avatar.dir", dataDir + "/uploads/avatars");
                 // 懒加载：不急于创建所有 Bean，用到才创建
                 props.setProperty("spring.main.lazy-initialization", "true");
                 // Tomcat 最小化：客户包不需要高并发
@@ -275,37 +298,40 @@ public final class Launcher {
     }
 
     /**
-     * 确保 H2 数据目录存在，避免 H2 启动时因目录不存在而报错
+     * 确保数据目录和日志目录存在，避免启动时因目录不存在而报错
      */
     private static void ensureDataDirectory() {
-        String dataDir = System.getProperty("app.data.dir");
-        if (dataDir == null) {
-            final String appdata = System.getenv("APPDATA");
-            if (appdata != null) {
-                dataDir = appdata + "/Voluntary-AI-Chat/data";
-            } else {
-                dataDir = "./data";
-            }
-        }
+        // 创建数据目录
+        final Path dataDir = getDataDir();
         try {
-            final Path dir = Path.of(dataDir);
-            if (!Files.exists(dir)) {
-                Files.createDirectories(dir);
-                LOG.info("已创建数据目录: {}", dir.toAbsolutePath());
+            if (!Files.exists(dataDir)) {
+                Files.createDirectories(dataDir);
+                LOG.info("已创建数据目录: {}", dataDir.toAbsolutePath());
             }
         } catch (final IOException e) {
-            LOG.warn("创建数据目录失败: {}", dataDir, e);
+            LOG.warn("创建数据目录失败: {}", dataDir.toAbsolutePath(), e);
+        }
+
+        // 创建日志目录（./logs）
+        final Path logDirPath = Path.of("./logs");
+        try {
+            if (!Files.exists(logDirPath)) {
+                Files.createDirectories(logDirPath);
+                LOG.info("已创建日志目录: {}", logDirPath.toAbsolutePath());
+            }
+        } catch (final IOException e) {
+            LOG.warn("创建日志目录失败: {}", logDirPath.toAbsolutePath(), e);
         }
     }
 
     /**
-     * 获取数据目录路径
+     * 获取数据目录路径（统一使用项目目录下的 ./data）
      */
     private static Path getDataDir() {
         String dataDir = System.getProperty("app.data.dir");
         if (dataDir == null) {
-            final String appdata = System.getenv("APPDATA");
-            dataDir = appdata != null ? appdata + "/Voluntary-AI-Chat/data" : "./data";
+            // 统一使用项目目录下的 data，避免与 APPDATA 混淆
+            dataDir = "./data";
         }
         return Path.of(dataDir);
     }

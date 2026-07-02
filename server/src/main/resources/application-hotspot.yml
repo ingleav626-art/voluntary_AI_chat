@@ -124,3 +124,5 @@ upload:
   avatar:
     dir: ./data/uploads/avatars
     base-url: http://localhost:8080/avatars
+  file:
+    dir: ./data/uploads/chat/files

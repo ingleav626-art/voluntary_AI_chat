@@ -75,6 +75,8 @@ upload:
   avatar:
     dir: uploads/avatars
     base-url: http://localhost:8080/avatars
+  file:
+    dir: uploads/chat/files
 
 # Redis 缓存配置（默认值）
 app:

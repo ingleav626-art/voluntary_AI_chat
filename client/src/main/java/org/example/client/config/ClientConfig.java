@@ -127,11 +127,17 @@ public final class ClientConfig {
             // 读取本地服务器地址
             localBaseUrl = props.getProperty("client.local-base-url", DEFAULT_LOCAL_BASE_URL);
 
-            // 读取云端服务器地址
-            cloudBaseUrl = props.getProperty("client.cloud-base-url");
+            // 读取云端服务器地址（如果已设置则不覆盖）
+            final String configCloudBaseUrl = props.getProperty("client.cloud-base-url");
+            if (configCloudBaseUrl != null) {
+                cloudBaseUrl = configCloudBaseUrl;
+            }
 
-            // 读取热点服务器地址
-            hotspotBaseUrl = props.getProperty("client.hotspot-base-url");
+            // 读取热点服务器地址（如果已设置则不覆盖，Launcher 可能已通过 UDP 发现设置）
+            final String configHotspotBaseUrl = props.getProperty("client.hotspot-base-url");
+            if (configHotspotBaseUrl != null) {
+                hotspotBaseUrl = configHotspotBaseUrl;
+            }
 
             // 读取当前服务器地址（如果配置文件中指定）
             // 注意：如果已经通过 ServerConnectionManager 设置了地址（如自动发现），不覆盖

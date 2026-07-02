@@ -207,9 +207,9 @@ public class ImageUploadService {
             Path thumbnailPath = uploadPath.resolve(thumbnailName);
             ImageIO.write(thumbnail, getFormatName(contentType), thumbnailPath.toFile());
 
-            // 8. 构建响应
-            String url = baseUrl + "/" + dateStr + "/" + fileName;
-            String thumbnailUrl = baseUrl + "/" + dateStr + "/" + thumbnailName;
+            // 8. 构建响应（返回相对路径，前端根据当前服务器地址拼接完整 URL）
+            String url = "/files/" + dateStr + "/" + fileName;
+            String thumbnailUrl = "/files/" + dateStr + "/" + thumbnailName;
 
             log.info("图片上传成功: fileId={}, url={}, size={}, width={}, height={}",
                     fileId, url, file.getSize(), originalWidth, originalHeight);

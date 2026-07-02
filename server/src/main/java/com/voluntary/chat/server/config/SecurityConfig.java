@@ -34,6 +34,7 @@ public class SecurityConfig {
             "/api/auth/**",
             "/files/**",
             "/avatars/**",
+            "/chat-files/**",
             "/ws/**"
     };
 

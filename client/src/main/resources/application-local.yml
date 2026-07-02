@@ -46,10 +46,10 @@ spring:
     endpoints:
       enabled-by-default: false
 
-# 应用数据目录
+# 应用数据目录（统一使用项目目录下的 ./data）
 app:
   data:
-    dir: ${APPDATA:./data}/Voluntary-AI-Chat/data
+    dir: ./data
 
 # 优化日志级别（减少启动输出）
 logging:
