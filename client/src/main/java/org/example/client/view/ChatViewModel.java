@@ -250,19 +250,47 @@ public final class ChatViewModel {
             final java.time.LocalDateTime createTime) {
         final MessageInfo pending = pendingMessages.remove(clientId);
         if (pending != null) {
+            // 在修改 messageId 前获取 index，因为 Lombok @Data 的 equals()
+            // 依赖 messageId 字段，修改后 indexOf 会返回 -1
+            final int index = messages.indexOf(pending);
+
             pending.setMessageId(messageId);
             pending.setCreateTime(createTime);
 
-            // 触发列表更新
-            final int index = messages.indexOf(pending);
+            // currentMsg：messages 列表中当前实际使用的引用（可能是新对象以触发重绘）
+            final MessageInfo currentMsg;
             if (index >= 0) {
-                messages.set(index, pending);
+                // 创建新 MessageInfo 对象（不同引用），用 remove+add 替代 set，
+                // 强制 JavaFX ListView 调用 updateItem 重绘单元格，使右键菜单
+                // 能立即从"发送中..."更新为"撤回"
+                final MessageInfo confirmed = new MessageInfo();
+                confirmed.setMessageId(messageId);
+                confirmed.setCreateTime(createTime);
+                confirmed.setSessionId(pending.getSessionId());
+                confirmed.setSenderId(pending.getSenderId());
+                confirmed.setSenderName(pending.getSenderName());
+                confirmed.setSenderAvatar(pending.getSenderAvatar());
+                confirmed.setSenderType(pending.getSenderType());
+                confirmed.setType(pending.getType());
+                confirmed.setContent(pending.getContent());
+                confirmed.setThumbnailUrl(pending.getThumbnailUrl());
+                confirmed.setWidth(pending.getWidth());
+                confirmed.setHeight(pending.getHeight());
+                confirmed.setRecalled(pending.isRecalled());
+                confirmed.setExtra(pending.getExtra());
+                confirmed.setRead(pending.isRead());
+                confirmed.setSentByMe(pending.isSentByMe());
+                messages.remove(index);
+                messages.add(index, confirmed);
+                currentMsg = confirmed;
+            } else {
+                currentMsg = pending;
             }
 
             // 如果该消息注册了延迟撤回，ACK 到达后异步执行 REST 撤回
             if (pendingRecallClientIds.remove(clientId)) {
                 LOG.info("ACK 到达，执行异步 REST 撤回: clientId={}, messageId={}", clientId, messageId);
-                final String recallContent = pending.getContent();
+                final String recallContent = currentMsg.getContent();
                 ChatService.getInstance().recallMessage(messageId)
                         .thenAccept(response -> {
                             Platform.runLater(() -> {
@@ -274,10 +302,10 @@ public final class ChatViewModel {
                                     LOG.info("延迟 REST 撤回成功: messageId={}", messageId);
                                 } else {
                                     // 撤回失败：不清理 pendingRecallContents，由 checkAndExecutePendingRecalls 重试
-                                    pending.setRecalled(false);
-                                    final int idx = messages.indexOf(pending);
+                                    currentMsg.setRecalled(false);
+                                    final int idx = messages.indexOf(currentMsg);
                                     if (idx >= 0) {
-                                        messages.set(idx, pending);
+                                        messages.set(idx, currentMsg);
                                     }
                                     final String msg = response != null ? response.getMessage() : "撤回失败";
                                     errorMessage.set(msg);
@@ -289,10 +317,10 @@ public final class ChatViewModel {
                         .exceptionally(ex -> {
                             LOG.error("延迟 REST 撤回异常（保留在待撤回列表以便重试）: messageId={}", messageId, ex);
                             Platform.runLater(() -> {
-                                pending.setRecalled(false);
-                                final int idx = messages.indexOf(pending);
+                                currentMsg.setRecalled(false);
+                                final int idx = messages.indexOf(currentMsg);
                                 if (idx >= 0) {
-                                    messages.set(idx, pending);
+                                    messages.set(idx, currentMsg);
                                 }
                                 errorMessage.set("撤回失败，请重试");
                             });
@@ -300,7 +328,10 @@ public final class ChatViewModel {
                         });
             }
 
-            LOG.debug("消息确认更新: clientId={}, messageId={}", clientId, messageId);
+            // ACK 到达后自动刷新消息列表，使右键菜单从"发送中..."更新为"撤回"
+            Platform.runLater(() -> {
+                messages.setAll(new ArrayList<>(messages));
+            });
         }
     }
 
@@ -368,7 +399,7 @@ public final class ChatViewModel {
             return;
         }
 
-        final Long messageId = message.getMessageId();
+        Long messageId = message.getMessageId();
 
         // 乐观消息：立即标记撤回，等 ACK 到达后自动执行 REST 撤回
         if (messageId == null || messageId < 0) {
@@ -394,12 +425,21 @@ public final class ChatViewModel {
                         clientId, message.getContent());
                 return;
             }
-            LOG.warn("乐观消息未找到对应 clientId，忽略: messageId={}", messageId);
-            return;
+
+            // 未找到 clientId：ACK 可能已并发到达并更新了 messageId
+            // 重新读取 messageId（ACK 线程可能已经将其更新为正数）
+            messageId = message.getMessageId();
+            if (messageId == null || messageId < 0) {
+                LOG.warn("乐观消息未找到对应 clientId，忽略: messageId={}", messageId);
+                return;
+            }
+            // ACK 已到达，messageId 已被更新，继续执行已确认路径的 REST 撤回
+            LOG.info("乐观消息已由 ACK 并发确认，直接执行 REST 撤回: messageId={}", messageId);
         }
 
         // 已确认消息，直接调 REST 撤回
-        ChatService.getInstance().recallMessage(messageId)
+        final Long finalMessageId = messageId;
+        ChatService.getInstance().recallMessage(finalMessageId)
                 .thenAccept(response -> {
                     Platform.runLater(() -> {
                         if (response != null && response.isSuccess()) {
@@ -408,7 +448,7 @@ public final class ChatViewModel {
                             if (index >= 0) {
                                 messages.set(index, message);
                             }
-                            LOG.info("消息撤回成功: messageId={}", messageId);
+                            LOG.info("消息撤回成功: messageId={}", finalMessageId);
                         } else {
                             final String msg = response != null ? response.getMessage() : "撤回失败";
                             errorMessage.set(msg);
@@ -417,15 +457,22 @@ public final class ChatViewModel {
                     });
                 })
                 .exceptionally(ex -> {
-                    LOG.error("消息撤回异常: messageId={}", messageId, ex);
+                    LOG.error("消息撤回异常: messageId={}", finalMessageId, ex);
                     Platform.runLater(() -> errorMessage.set("网络异常，撤回失败"));
                     return null;
                 });
     }
 
+    /** 撤回超时错误码（code=4001），此错误不可恢复 */
+    private static final int RECALL_TIMEOUT_CODE = 4001;
+
     /**
      * 检查并执行待撤回的乐观消息
      * 刷新历史消息后，如果发现有待撤回的消息（内容匹配），立即执行 REST 撤回
+     * <p>
+     * <b>注意</b>：仅匹配"自己发送 + 内容相同 + 未撤回 + 2分钟内"的消息，
+     * 避免因内容重复（如"1"）误匹配到其他消息。
+     * </p>
      *
      * @param loadedMessages 加载的消息列表
      */
@@ -437,15 +484,38 @@ public final class ChatViewModel {
         LOG.debug("检查待撤回消息: pendingCount={}, loadedCount={}",
                 pendingRecallContents.size(), loadedMessages.size());
 
+        final java.time.LocalDateTime cutoff = java.time.LocalDateTime.now().minusMinutes(2);
+
         for (final MessageInfo msg : loadedMessages) {
             // 只检查自己发送的消息，且内容匹配待撤回列表
             if (msg.isSentByMe() && msg.getContent() != null
                     && pendingRecallContents.contains(msg.getContent())
                     && msg.getMessageId() != null && msg.getMessageId() > 0) {
+
+                // 关键修复：先检查服务器是否已经撤回了该消息
+                if (msg.isRecalled()) {
+                    // 服务器已经撤回，跳过但不移除 pendingRecallContents
+                    // （可能有其他同内容消息仍需撤回，如多个"1"）
+                    LOG.info("服务器已撤回该消息，跳过: messageId={}, content={}",
+                            msg.getMessageId(), msg.getContent());
+                    continue; // 跳过，继续检查其他同内容消息
+                }
+
+                // 检查消息是否超过2分钟撤回窗口
+                if (msg.getCreateTime() != null && msg.getCreateTime().isBefore(cutoff)) {
+                    // 超过2分钟，永久不可撤回，跳过但不移除 pendingRecallContents
+                    // （可能有其他同内容消息仍在2分钟窗口内）
+                    LOG.info("消息已超过2分钟撤回窗口，跳过: messageId={}, content={}",
+                            msg.getMessageId(), msg.getContent());
+                    continue; // 跳过，继续检查其他同内容消息
+                }
+
+                // 消息尚未撤回且未超过2分钟，执行 REST 撤回
                 LOG.info("发现待撤回消息，立即执行 REST 撤回: messageId={}, content={}",
                         msg.getMessageId(), msg.getContent());
                 // 从待撤回列表中移除（先移除，避免重试风暴）
-                pendingRecallContents.remove(msg.getContent());
+                final String recallContent = msg.getContent();
+                pendingRecallContents.remove(recallContent);
                 // 执行 REST 撤回
                 ChatService.getInstance().recallMessage(msg.getMessageId())
                         .thenAccept(response -> {
@@ -462,11 +532,14 @@ public final class ChatViewModel {
                                     } else {
                                         final String errorMsg = response != null ? response.getMessage()
                                                 : "撤回失败";
-                                        LOG.warn("延迟 REST 撤回失败: messageId={}, error={}",
-                                                msg.getMessageId(), errorMsg);
-                                        // 撤回失败，重新加入待撤回列表以便用户重试
-                                        if (msg.getContent() != null) {
-                                            pendingRecallContents.add(msg.getContent());
+                                        final int code = response != null ? response.getCode() : 0;
+                                        LOG.warn("延迟 REST 撤回失败: messageId={}, code={}, error={}",
+                                                msg.getMessageId(), code, errorMsg);
+                                        // 仅临时性错误才重新加入待撤回列表
+                                        // 永久性错误（如超时code=4001）不再重试
+                                        if (code != RECALL_TIMEOUT_CODE && recallContent != null) {
+                                            pendingRecallContents.add(recallContent);
+                                            LOG.info("临时性撤回失败，重新加入待撤回列表以便重试: content={}", recallContent);
                                         }
                                     }
                                 } catch (final Exception e) {

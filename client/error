@@ -1,0 +1,7 @@
+23:37:03.253 [JavaFX Application Thread] INFO  o.example.client.service.AiService -- 鍒涘缓缇I閰嶇疆: groupId=2072343051224383489, aiId=1782718758786365
+23:37:03.263 [ForkJoinPool.commonPool-worker-3] WARN  o.e.client.service.BaseHttpService -- 涓氬姟閿欒: code=400, backendMsg=璇?AI 宸查厤缃 湪姝ょ兢涓? displayMsg=璇锋眰鍙傛暟閿欒锛岃妫€鏌ヨ緭鍏?
+?
+23:41:51.721 [http-nio-0.0.0.0-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy -- Securing POST /api/auth/sms/send
+23:41:51.721 [http-nio-0.0.0.0-8080-exec-1] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter -- Set SecurityContextHolder to anonymous SecurityContext
+23:41:51.721 [http-nio-0.0.0.0-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy -- Secured POST /api/auth/sms/send
+23:41:51.723 [http-nio-0.0.0.0-8080-exec-1] WARN  c.v.c.s.c.GlobalExceptionHandler -- 鍙傛暟鏍￠獙澶辫触: 鎵嬫満鍙锋牸寮忎笉姝ｇ‘

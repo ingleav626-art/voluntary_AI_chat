@@ -83,7 +83,6 @@ public final class MessageSender {
         optimisticMsg.setSentByMe(true);
 
         messages.add(optimisticMsg);
-        pendingMessages.put(clientId, optimisticMsg);
 
         // 通过 WebSocket 发送
         final Map<String, Object> data = new HashMap<>();
@@ -92,11 +91,15 @@ public final class MessageSender {
         data.put("content", text.trim());
 
         if ("AI".equals(conversation.getTargetType())) {
-            // AI 对话始终使用本地引擎（API.md 架构：客户包不走 HTTP/WS 回环）
+            // AI 对话始终使用本地引擎，用本地 clientId 即可
+            pendingMessages.put(clientId, optimisticMsg);
             handleAiChat(currentUser, conversation, text.trim(), messages);
         } else {
-            WebSocketClient.getInstance().send(MessageTypes.SEND_MESSAGE, data);
-
+            // 用 WebSocket 消息 ID 作为 pendingMessages 的 key，
+            // 因为服务端 ACK 回传的 clientId 就是 wsMessage.getId()
+            final String wsMsgId = WebSocketClient.getInstance().send(MessageTypes.SEND_MESSAGE, data);
+            final String ackKey = wsMsgId != null ? wsMsgId : clientId;
+            pendingMessages.put(ackKey, optimisticMsg);
             // 本地模式下：群聊消息检查@触发AI（服务端跳过@触发检查）
             if (conversation.getSessionId() != null && conversation.getSessionId().startsWith("g_")) {
                 triggerGroupAiIfNeeded(currentUser, conversation, text.trim(), messages);

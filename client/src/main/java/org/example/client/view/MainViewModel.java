@@ -881,12 +881,9 @@ public final class MainViewModel {
         if (chatVm != null) {
             try {
                 chatVm.updateMessageAck(clientId, messageId, parseDateTime(createTimeStr));
-                LOG.debug("消息确认: clientId={}, messageId={}", clientId, messageId);
             } catch (final Exception e) {
                 LOG.error("处理消息确认时异常: clientId={}, messageId={}", clientId, messageId, e);
             }
-        } else {
-            LOG.debug("消息确认时 ChatViewModel 为 null: clientId={}, messageId={}", clientId, messageId);
         }
     }
 
